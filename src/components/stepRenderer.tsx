@@ -186,7 +186,17 @@ export default function StepRenderer({
 
     case 'checkpoint':
       if (step.render) return step.render();
-      if (step.html) return <div className="checkpoint-content" dangerouslySetInnerHTML={{ __html: step.html }} />;
+      if (step.html) return (
+        <div className="flex-grow">
+          <div className="mb-8">
+            <p className="ft-4 sans font-bold" dangerouslySetInnerHTML={{ __html: step.title || '' }} />
+            {step.description && (
+              <p className="ft-2 mt-4" dangerouslySetInnerHTML={{ __html: step.description }} />
+            )}
+          </div>
+          <div className="checkpoint-content" dangerouslySetInnerHTML={{ __html: step.html }} />
+        </div>
+      );
       return null;
 
     default:
