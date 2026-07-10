@@ -1,0 +1,77 @@
+form {
+  font-size: 16px;
+}
+
+input, select, textarea {
+  font-size: 1.6rem;
+  @apply flex border border-blue-200 px-6 py-4 w-full rounded-lg;
+  &::placeholder {
+    @apply text-gray-400;
+  }
+  &::-ms-input-placeholder {
+    @apply text-gray-500;
+  }
+}
+
+input[type=radio], input[type=checkbox] {
+  display: none;
+}
+
+input[type=radio] + label, input[type=checkbox] + label {
+  @extend .ft-0;
+  @apply flex w-full p-8 mt-0
+  border border-blue-200 rounded-lg
+  text-left
+  justify-start items-center
+  cursor-pointer
+  bg-blue-50;
+}
+
+input[type=radio] + label:before, input[type=checkbox] + label:before {
+  content: '';
+  @apply flex mr-6 w-6 h-6 rounded-full border border-blue-300;
+}
+
+input[type=radio]:checked + label, input[type=checkbox]:checked + label {
+  @apply border-blue-600 bg-blue-500 text-blue-50 font-bold;
+}
+
+input[type=radio]:checked + label:before, input[type=checkbox]:checked + label:before {
+  content: '';
+  @apply bg-blue-50;
+}
+
+select {
+  appearance: none;
+  border-radius: 0;
+  &::-ms-expand {
+    display: none;
+  }
+  & option:disabled {
+    @apply text-gray-500;
+  }
+  &:invalid {
+    @apply text-gray-500;
+  }
+  &[disabled] {
+    @apply text-gray-500;
+  }
+}
+
+.select {
+  position: relative;
+  &::after {
+    font-size: 1.4rem;
+    display: block;
+    position: absolute;
+    right: 1rem;
+    top: 25%;
+    content: "expand_more";
+    font-family: "Material Icons";
+    color: black;
+  }
+}
+
+.survey-card {
+  @apply bg-white top-20 flex flex-col flex-grow w-full max-w-[56rem] p-8 rounded-b-2xl overflow-scroll;
+}

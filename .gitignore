@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Build / TS
+tsconfig.tsbuildinfo
+dist/
+build/
+
+# Env vars (contienen credenciales, nunca deben subirse)
+.env
+.env.local
+.env.*.local
+test.env
+
+# Payload local media (uploads locales de desarrollo)
+media/
+
+# Testing
+/coverage
+/playwright-report/
+/test-results/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

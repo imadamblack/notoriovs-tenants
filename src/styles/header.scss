@@ -1,0 +1,26 @@
+.burger_ico {
+  @apply absolute top-1/2 right-8 w-10 bg-black;
+  height: 1px;
+}
+.burger_ico:before {
+  top: -.6rem;
+}
+.burger_ico:after {
+  top: .6rem;
+}
+.burger_ico:before,
+.burger_ico:after {
+  @apply absolute w-10 bg-black;
+  height: 1px;
+  content: "";
+  transition: ease 0.5s;
+}
+.burger_box.active .burger_ico {
+  @apply h-0;
+}
+.burger_box.active .burger_ico:after {
+  transform: rotate(-45deg) translateY(-0.5rem) translateX(.3rem)
+}
+.burger_box.active .burger_ico:before {
+  transform: rotate(45deg) translateY(0.5rem) translateX(.3rem)
+}
