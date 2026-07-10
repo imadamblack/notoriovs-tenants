@@ -168,6 +168,7 @@ export default function StepRenderer({
                 type={field.type}
                 {...register(field.name, field.inputOptions)}
                 placeholder={field.title}
+                onKeyDown={field.type === 'tel' ? restrictNumber : undefined}
                 className={errors[field.name]?.message ? '!border-red-500' : ''}
               />
               <p className="-ft-2 text-red-500 font-medium">

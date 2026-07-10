@@ -92,7 +92,9 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
   const onSubmit = async (data: SurveyFormValues) => {
     setSending(true);
     try {
-      data.whatsapp = '521' + data.phone.replace(/^\+?((MX)?\s?(52)?)?\s?0?1?|\s|\(|\)|-/g, '');
+      if (typeof data.telefono === 'string' && data.telefono.trim() !== '') {
+        data.whatsapp = '521' + data.telefono.replace(/^\+?((MX)?\s?(52)?)?\s?0?1?|\s|\(|\)|-/g, '');
+      }
       const res = await fetch('/api/quiz-submit', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
