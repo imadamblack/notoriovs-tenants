@@ -2,7 +2,7 @@
 // src/middleware.ts (server/edge) como por src/services/fbEvents.ts
 // (browser, vía window.location.hostname) para que ambos sitios coincidan
 // en qué cuenta como "subdominio de tenant".
-const RESERVED_SUBDOMAINS = new Set(['www', 'app', 'admin'])
+const RESERVED_SUBDOMAINS = new Set(['app', 'admin'])
 
 export function getSubdomainFromHost(host: string, rootDomain: string): string {
   const hostWithoutPort = (host || '').toLowerCase().split(':')[0]
