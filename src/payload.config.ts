@@ -24,6 +24,7 @@ export default buildConfig({
         Logo: '/components/AdminLogo#AdminLogo',
         // Icon: '/components/Favicon#Favicon',
       },
+      beforeDashboard: ['/components/TenantsDashboardWidget#TenantsDashboardWidget'],
     },
   },
   collections: [Users, Media, Tenants],

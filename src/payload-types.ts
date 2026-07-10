@@ -173,7 +173,7 @@ export interface Tenant {
   id: number;
   name: string;
   /**
-   * Solo el subdominio, ej: "cliente1" (sin .tudominio.com).
+   * Se genera automáticamente desde "name".
    */
   subdomain: string;
   active?: boolean | null;
