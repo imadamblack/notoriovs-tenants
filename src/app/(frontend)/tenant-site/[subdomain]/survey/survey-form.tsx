@@ -132,7 +132,10 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
                 src={(intro.image as { url?: string }).url || ''}
                 alt=""
                 fill
-                style={{objectFit: 'cover'}}
+                style={{
+                  objectFit: 'cover',
+                  objectPosition: `${(intro.image as { focalX?: number }).focalX ?? 50}% ${(intro.image as { focalY?: number }).focalY ?? 50}%`,
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-b from-neutral-900/60 via-transparent via-75% to-transparent"/>
             </div>

@@ -19,10 +19,19 @@ export default buildConfig({
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    meta: {
+      icons: [
+        {
+          rel: 'icon',
+          type: 'image/svg+xml',
+          url: '/favicon.svg',
+        },
+      ],
+    },
     components: {
       graphics: {
         Logo: '/components/AdminLogo#AdminLogo',
-        // Icon: '/components/Favicon#Favicon',
+        Icon: '/components/Favicon#Favicon',
       },
       beforeDashboard: ['/components/TenantsDashboardWidget#TenantsDashboardWidget'],
     },
