@@ -39,7 +39,10 @@ export const Tenants: CollectionConfig = {
     useAsTitle: 'name',
     defaultColumns: ['name', 'subdomain', 'active'],
     description:
-      'Cada tenant = 1 subdominio con su propia landing, quiz y webhooks. Ver arquitectura en CLAUDE.md.',
+      'Crea y edita la landing, quiz y webhooks de un cliente',
+    livePreview: {
+      url: ({ data }) => `/tenant-site/${data.subdomain}`,
+    },
   },
   access: {
     read: () => true,
@@ -55,6 +58,20 @@ export const Tenants: CollectionConfig = {
         'Se genera automáticamente desde "name".',
     }),
     { name: 'active', type: 'checkbox', defaultValue: true },
+
+    // Botones de vista previa (landing/quiz/thankyou) en el sidebar. Ver
+    // src/components/TenantPreviewLinks.tsx. El livePreview nativo de Payload
+    // solo admite una `url` fija, así que esto cubre el resto de vistas.
+    {
+      name: 'previewLinks',
+      type: 'ui',
+      admin: {
+        position: 'sidebar',
+        components: {
+          Field: '/components/TenantPreviewLinks#TenantPreviewLinks',
+        },
+      },
+    },
 
     {
       type: 'tabs',

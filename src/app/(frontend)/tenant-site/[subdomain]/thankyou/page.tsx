@@ -28,7 +28,7 @@ export default async function TenantThankYouPage({params}: TenantThankYouPagePro
 
   return (
     <main className="py-12">
-      <div className="reading-container bg-neutral-100 flex flex-col justify-start items-start">
+      <div className="reading-container bg-neutral-100 flex flex-col">
         {logo != null && typeof logo === 'object' ? (
           <div className="relative flex justify-start w-40 h-16">
             <Image
@@ -40,14 +40,14 @@ export default async function TenantThankYouPage({params}: TenantThankYouPagePro
           </div>
         ) : (
           tenantName && (
-            <p className="ft-3 font-bold text-white z-10 mb-8">{tenantName}</p>
+            <p className="ft-3 font-bold text-white z-10">{tenantName}</p>
           )
         )}
         <h1 className="ft-6 font-bold">{title}</h1>
-        <p className="ft-2 mb-8 max-w-[560px] mx-auto">{subtitle}</p>
+        <p className="ft-2">{subtitle}</p>
         {thankYouPage?.contentHTML && (
           <div
-            className="ft-1 mb-8 max-w-[560px] mx-auto"
+            className="ft-1 mx-auto"
             dangerouslySetInnerHTML={{__html: thankYouPage.contentHTML}}
           />
         )}

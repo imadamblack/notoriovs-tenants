@@ -1,6 +1,10 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getTenantBySubdomain } from '@/utils/getTenant'
+import { getSubdomainFromHost } from '@/utils/subdomain'
+
+const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'notoriovs.com'
 
 type TenantLandingProps = {
   params: Promise<{ subdomain: string }>
@@ -154,7 +158,19 @@ export default async function TenantLanding({ params }: TenantLandingProps) {
 
   // Landing "nullable": si el tenant no configuró título ni bloques, se
   // omite la landing y se va directo al quiz.
-  if (!hasLanding) redirect('/survey')
+  //
+  // `redirect()` de Next siempre construye el Location a partir de la raíz
+  // del host actual (no del pathname reescrito por el middleware). Cuando
+  // esta página se sirve vía el subdominio real del tenant, el host YA es
+  // ese subdominio, así que "/survey" cae en el lugar correcto. Pero cuando
+  // se accede directo a /tenant-site/{subdomain} (preview desde el admin,
+  // mismo host que /admin), "/survey" caería en la raíz del admin y no en
+  // /tenant-site/{subdomain}/survey. Detectamos el caso y ajustamos el target.
+  if (!hasLanding) {
+    const host = (await headers()).get('host') || ''
+    const isRealTenantHost = getSubdomainFromHost(host, ROOT_DOMAIN) === subdomain
+    redirect(isRealTenantHost ? '/survey' : `/tenant-site/${subdomain}/survey`)
+  }
 
   return (
     <main>

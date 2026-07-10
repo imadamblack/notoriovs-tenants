@@ -164,7 +164,7 @@ export interface Media {
   focalY?: number | null;
 }
 /**
- * Cada tenant = 1 subdominio con su propia landing, quiz y webhooks. Ver arquitectura en CLAUDE.md.
+ * Crea y edita la landing, quiz y webhooks de un cliente
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tenants".

@@ -15,6 +15,15 @@ export function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // Rutas ya resueltas a /tenant-site/{subdomain}/... (ej. el iframe de Live
+  // Preview del admin) pasan directo. Sin este guard, si el admin se sirve
+  // desde un subdominio no reservado (ver RESERVED_SUBDOMAINS), esta ruta se
+  // reescribiría dos veces (/tenant-site/{admin}/tenant-site/{tenant}/...) y
+  // el preview daría 404.
+  if (pathname.startsWith('/tenant-site')) {
+    return NextResponse.next()
+  }
+
   const subdomain = getSubdomainFromHost(host, ROOT_DOMAIN)
 
   // Dominio raíz (sin subdominio) o subdominio reservado: se sirve el sitio
