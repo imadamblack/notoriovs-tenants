@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  const { subdomain, answers, contact } = body || {}
+  const { subdomain, answers } = body || {}
 
   if (!subdomain) {
     return NextResponse.json({ error: 'Falta subdomain' }, { status: 400 })
@@ -39,7 +39,6 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         tenant: tenant.name,
         subdomain,
-        contact,
         answers,
         submittedAt: new Date().toISOString(),
       }),

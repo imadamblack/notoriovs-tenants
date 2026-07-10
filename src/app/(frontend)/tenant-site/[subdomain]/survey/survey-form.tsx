@@ -92,16 +92,17 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
   const onSubmit = async (data: SurveyFormValues) => {
     setSending(true);
     try {
+      data.whatsapp = '521' + data.phone.replace(/^\+?((MX)?\s?(52)?)?\s?0?1?|\s|\(|\)|-/g, '');
       const res = await fetch('/api/quiz-submit', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({subdomain, answers: data, contact: data, utm}),
+        body: JSON.stringify({subdomain, answers: data, utm}),
       });
       const resJson = await res.json().catch(() => ({}));
 
       fbEvent('Lead', {email: data.email, phone: data.whatsapp, externalID: resJson.id});
       gtagSendEvent('', {fullName: data.fullName, phone: data.whatsapp});
-      setCookie('lead', {...data, id: resJson.id});
+      setCookie('lead', {...data, id: resJson.id, utm});
 
       await router.push('thankyou');
     } catch (err) {
