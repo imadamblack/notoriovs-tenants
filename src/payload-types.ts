@@ -309,7 +309,17 @@ export interface Tenant {
    */
   quizSteps?:
     | {
-        type: 'text' | 'tel' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'opt-in' | 'checkpoint';
+        type:
+          | 'text'
+          | 'tel'
+          | 'number'
+          | 'textarea'
+          | 'radio'
+          | 'checkbox'
+          | 'select'
+          | 'state-mx'
+          | 'opt-in'
+          | 'checkpoint';
         /**
          * Nombre del campo en el formulario (react-hook-form). Debe ser único por paso.
          */
