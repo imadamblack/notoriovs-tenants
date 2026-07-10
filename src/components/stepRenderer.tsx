@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { FieldErrors, RegisterOptions, UseFormRegister } from 'react-hook-form';
 import { Checkbox, Radio, Select, type FormAtomOption } from './formAtoms';
 import { restrictNumber } from '@/utils/formValidators';
+import { MEXICO_STATES } from '@/utils/mexicoStates';
 import Link from 'next/link';
 
 export type SurveyOptInField = {
@@ -14,7 +15,7 @@ export type SurveyOptInField = {
 };
 
 export type SurveyStep = {
-  type: 'text' | 'tel' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'opt-in' | 'checkpoint';
+  type: 'text' | 'tel' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'state-mx' | 'opt-in' | 'checkpoint';
   name?: string;
   title?: string;
   description?: string;
@@ -133,6 +134,20 @@ export default function StepRenderer({
             inputOptions={step.inputOptions}
             placeholder={step.placeholder}
             options={step.options || []}
+            className={errors[step.name as string]?.message ? '!border-red-500' : undefined}
+          />
+        </div>
+      );
+
+    case 'state-mx':
+      return (
+        <div className="flex flex-col">
+          {commonText}
+          <Select
+            name={step.name as string}
+            inputOptions={step.inputOptions}
+            placeholder={step.placeholder || 'Selecciona tu estado'}
+            options={MEXICO_STATES as unknown as FormAtomOption[]}
             className={errors[step.name as string]?.message ? '!border-red-500' : undefined}
           />
         </div>

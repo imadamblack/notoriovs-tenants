@@ -13,13 +13,14 @@ const STEP_TYPES = [
   { label: 'Opción única (radio)', value: 'radio' },
   { label: 'Opción múltiple (checkbox)', value: 'checkbox' },
   { label: 'Selector (select)', value: 'select' },
+  { label: 'Estado de la República (México)', value: 'state-mx' },
   { label: 'Opt-in (datos de contacto)', value: 'opt-in' },
   { label: 'Checkpoint (tracking, sin input)', value: 'checkpoint' },
 ] as const
 
 const OPTION_STEP_TYPES = ['radio', 'checkbox', 'select']
-const INPUT_STEP_TYPES = ['text', 'tel', 'number', 'textarea', 'radio', 'checkbox', 'select']
-const PLACEHOLDER_STEP_TYPES = ['text', 'tel', 'number', 'textarea', 'select']
+const INPUT_STEP_TYPES = ['text', 'tel', 'number', 'textarea', 'radio', 'checkbox', 'select', 'state-mx']
+const PLACEHOLDER_STEP_TYPES = ['text', 'tel', 'number', 'textarea', 'select', 'state-mx']
 
 // Campo oculto que Payload calcula automáticamente a partir de
 // `checkpointContent` (richText) y expone como HTML listo para renderizar.
