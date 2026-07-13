@@ -29,6 +29,8 @@ export type TenantQuizStep = {
   cols?: number | null
   options?: TenantQuizOption[] | null
   optInFields?: TenantQuizOptInFields | null
+  // Solo aplica a pasos tipo "opt-in". Ver campo `optInActive` en Tenants.ts.
+  optInActive?: boolean | null
   autoAdvance?: boolean | null
   // Contenido para pasos tipo "checkpoint", editado con el WYSIWYG
   // (`checkpointContent`, richText) y convertido a HTML por Payload.
@@ -58,28 +60,37 @@ export function mapTenantQuizToSurveySteps(
 ): SurveyStep[] {
   if (!steps?.length) return []
 
-  return steps.map((step): SurveyStep => {
+  // El paso "opt-in" siempre debe ir al final (ver hook en `quizSteps` de
+  // Tenants.ts, que ya reordena al guardar). Se repite la garantía aquí por
+  // si hay datos existentes que no se han vuelto a guardar desde el CMS.
+  // También se filtran los pasos "opt-in" desactivados (`optInActive: false`).
+  const visibleSteps = steps.filter((step) => step.type !== 'opt-in' || step.optInActive !== false)
+  const orderedSteps = [
+    ...visibleSteps.filter((step) => step.type !== 'opt-in'),
+    ...visibleSteps.filter((step) => step.type === 'opt-in'),
+  ]
+
+  return orderedSteps.map((step): SurveyStep => {
     const inputOptions = step.requiredMessage
       ? { required: step.requiredMessage }
       : undefined
 
+    // Nombre y teléfono son SIEMPRE obligatorios: no dependen de que el
+    // editor del CMS haya llenado el mensaje de error. Si lo deja vacío, se
+    // usa un mensaje por default, pero el campo nunca deja de ser requerido.
     const optInFields: SurveyOptInField[] | undefined = step.optInFields
       ? [
           {
             name: 'nombre',
             type: 'text',
             title: step.optInFields.nombreTitle || undefined,
-            inputOptions: step.optInFields.nombreRequiredMessage
-              ? { required: step.optInFields.nombreRequiredMessage }
-              : undefined,
+            inputOptions: { required: step.optInFields.nombreRequiredMessage || 'Ingresa tu nombre' },
           },
           {
             name: 'telefono',
             type: 'tel',
             title: step.optInFields.telefonoTitle || undefined,
-            inputOptions: step.optInFields.telefonoRequiredMessage
-              ? { required: step.optInFields.telefonoRequiredMessage }
-              : undefined,
+            inputOptions: { required: step.optInFields.telefonoRequiredMessage || 'Ingresa tu teléfono' },
           },
           {
             name: 'email',

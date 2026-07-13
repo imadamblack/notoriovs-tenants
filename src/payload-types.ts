@@ -379,13 +379,23 @@ export interface Tenant {
             }[]
           | null;
         /**
-         * Solo para pasos tipo "opt-in". Campos fijos: nombre y teléfono (obligatorios) y email (opcional).
+         * Solo para pasos tipo "opt-in". Si se desactiva, este paso no se muestra en el quiz (sin necesidad de borrarlo).
+         */
+        optInActive?: boolean | null;
+        /**
+         * Solo para pasos tipo "opt-in". Campos fijos: nombre y teléfono (siempre obligatorios, sin excepción) y email (opcional).
          */
         optInFields?: {
           nombreTitle?: string | null;
-          nombreRequiredMessage?: string | null;
+          /**
+           * El campo nombre siempre es obligatorio; este texto solo define el mensaje de error.
+           */
+          nombreRequiredMessage: string;
           telefonoTitle?: string | null;
-          telefonoRequiredMessage?: string | null;
+          /**
+           * El campo teléfono siempre es obligatorio; este texto solo define el mensaje de error.
+           */
+          telefonoRequiredMessage: string;
           /**
            * El email nunca es obligatorio para el usuario.
            */
@@ -735,6 +745,7 @@ export interface TenantsSelect<T extends boolean = true> {
               value?: T;
               id?: T;
             };
+        optInActive?: T;
         optInFields?:
           | T
           | {

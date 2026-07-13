@@ -266,6 +266,19 @@ export const Tenants: CollectionConfig = {
                 description:
                   'Cada paso se traduce 1:1 a un SurveyStep consumido por StepRenderer/formAtoms en el frontend del quiz.',
               },
+              // El paso "opt-in" siempre debe quedar al final del quiz, sin
+              // importar en qué posición lo haya arrastrado el editor. Este
+              // hook reordena el arreglo en cada guardado.
+              hooks: {
+                beforeChange: [
+                  ({ value }) => {
+                    if (!Array.isArray(value)) return value
+                    const rest = value.filter((step) => step?.type !== 'opt-in')
+                    const optIns = value.filter((step) => step?.type === 'opt-in')
+                    return [...rest, ...optIns]
+                  },
+                ],
+              },
               fields: [
                 {
                   type: 'row',
@@ -330,12 +343,23 @@ export const Tenants: CollectionConfig = {
                   ],
                 },
                 {
+                  name: 'optInActive',
+                  type: 'checkbox',
+                  label: 'Paso de opt-in activo',
+                  defaultValue: true,
+                  admin: {
+                    description:
+                      'Solo para pasos tipo "opt-in". Si se desactiva, este paso no se muestra en el quiz (sin necesidad de borrarlo).',
+                    condition: (_, siblingData) => siblingData?.type === 'opt-in',
+                  },
+                },
+                {
                   name: 'optInFields',
                   type: 'group',
                   label: 'Campos de contacto',
                   admin: {
                     description:
-                      'Solo para pasos tipo "opt-in". Campos fijos: nombre y teléfono (obligatorios) y email (opcional).',
+                      'Solo para pasos tipo "opt-in". Campos fijos: nombre y teléfono (siempre obligatorios, sin excepción) y email (opcional).',
                     condition: (_, siblingData) => siblingData?.type === 'opt-in',
                   },
                   fields: [
@@ -353,6 +377,10 @@ export const Tenants: CollectionConfig = {
                           type: 'text',
                           label: 'Mensaje de error — Nombre',
                           defaultValue: 'Ingresa tu nombre',
+                          required: true,
+                          admin: {
+                            description: 'El campo nombre siempre es obligatorio; este texto solo define el mensaje de error.',
+                          },
                         },
                       ],
                     },
@@ -370,6 +398,10 @@ export const Tenants: CollectionConfig = {
                           type: 'text',
                           label: 'Mensaje de error — Teléfono',
                           defaultValue: 'Ingresa tu teléfono',
+                          required: true,
+                          admin: {
+                            description: 'El campo teléfono siempre es obligatorio; este texto solo define el mensaje de error.',
+                          },
                         },
                       ],
                     },
