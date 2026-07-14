@@ -191,7 +191,17 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
             className="relative container !px-0 md:pb-0 flex flex-col flex-grow md:flex-grow-0 items-center pointer-events-auto touch-auto">
             <div className="survey-card">
               <FormProvider {...methods}>
-                <form className="flex flex-col flex-grow" onSubmit={handleSubmit(onSubmit)}>
+                <form
+                  className="flex flex-col flex-grow"
+                  onSubmit={handleSubmit(onSubmit)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    if (formStep !== lastInputIndex) {
+                      e.preventDefault();
+                      handleNext();
+                    }
+                  }}
+                >
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={formStep}
