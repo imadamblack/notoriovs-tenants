@@ -455,9 +455,9 @@ export interface Tenant {
    */
   optInWebhook?: string | null;
   /**
-   * URL a la que se envían las respuestas completas del quiz (CRM, n8n, Zapier, etc).
+   * Se genera automáticamente como https://n8n.notoriovs.com/webhook/ + subdominio. No editable.
    */
-  quizWebhook: string;
+  quizWebhook?: string | null;
   tracking?: {
     metaPixelId?: string | null;
     metaCapiToken?: string | null;
