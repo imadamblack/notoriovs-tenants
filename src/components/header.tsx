@@ -16,7 +16,7 @@ export default function Header() {
           <Image
             src="/logo.svg"
             fill
-            alt="Another Real Estate Agency"
+            alt=""
             style={{ objectFit: 'contain' }}
             priority
           />

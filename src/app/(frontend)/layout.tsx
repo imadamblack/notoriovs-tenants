@@ -4,16 +4,11 @@ import type { ReactNode } from 'react';
 
 export async function generateMetadata() {
   return {
-    title: 'Another Real Estate Agency',
-    description: 'Agencia boutique de inversión inmobiliaria en preventa',
+    title: 'Notoriovs Studio',
+    description: 'Agencia de Marketing orientada a Resultados',
   };
 }
 
-// Único layout raíz de (frontend): define <html>/<body> una sola vez.
-// Los layouts anidados de (site), survey y tenant-site ya no deben repetir
-// estas etiquetas, pero sí deben renderizar su propio <TrackingAnalytics/>
-// (con el pixel/tag que les corresponda) para no compartir un solo pixel
-// global entre el sitio default y los tenants.
 export default function RootLayout({children}: { children: ReactNode }) {
 
   return (
