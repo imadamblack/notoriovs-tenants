@@ -391,6 +391,17 @@ export const Tenants: CollectionConfig = {
                         { name: 'value', type: 'text', required: true },
                       ],
                     },
+                    {
+                      name: 'disqualifies',
+                      type: 'checkbox',
+                      label: 'Descalifica al lead',
+                      defaultValue: false,
+                      admin: {
+                        description:
+                          'Redirige a la página "No Elegible".',
+                        width: '25%',
+                      },
+                    },
                   ],
                 },
                 {
@@ -498,6 +509,32 @@ export const Tenants: CollectionConfig = {
               admin: {
                 description:
                   'Personaliza la página de gracias post-envío del quiz. Si se deja vacío, cae al copy genérico basado en generalInfo.',
+              },
+              fields: [
+                { name: 'title', type: 'text' },
+                { name: 'subtitle', type: 'text' },
+                { name: 'content', type: 'richText', editor: lexicalEditor() },
+                lexicalHTMLField({
+                  lexicalFieldName: 'content',
+                  htmlFieldName: 'contentHTML',
+                }),
+              ],
+            },
+          ],
+        },
+
+        // ─────────────────────────────────────────
+        // Not Eligible Page
+        // ─────────────────────────────────────────
+        {
+          label: 'Página No Elegible',
+          fields: [
+            {
+              name: 'notEligiblePage',
+              type: 'group',
+              admin: {
+                description:
+                  'Página a la que se redirige al lead cuando elige una opción marcada como "Descalifica al lead" en una pregunta de radio. Si se deja vacío, cae al copy genérico.',
               },
               fields: [
                 { name: 'title', type: 'text' },

@@ -6,6 +6,9 @@ import type { RegisterOptions } from 'react-hook-form';
 export type FormAtomOption = {
   value: string;
   label: string;
+  // Solo tiene efecto en preguntas tipo radio: ver lógica de redirección a
+  // "not-elegible" en survey-form.tsx.
+  disqualifies?: boolean;
 };
 
 type SelectProps = {

@@ -375,6 +375,10 @@ export interface Tenant {
           | {
               label: string;
               value: string;
+              /**
+               * Redirige a la página "No Elegible".
+               */
+              disqualifies?: boolean | null;
               id?: string | null;
             }[]
           | null;
@@ -431,6 +435,29 @@ export interface Tenant {
    * Personaliza la página de gracias post-envío del quiz. Si se deja vacío, cae al copy genérico basado en generalInfo.
    */
   thankYouPage?: {
+    title?: string | null;
+    subtitle?: string | null;
+    content?: {
+      root: {
+        type: string;
+        children: {
+          type: any;
+          version: number;
+          [k: string]: unknown;
+        }[];
+        direction: ('ltr' | 'rtl') | null;
+        format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+        indent: number;
+        version: number;
+      };
+      [k: string]: unknown;
+    } | null;
+    contentHTML?: string | null;
+  };
+  /**
+   * Página a la que se redirige al lead cuando elige una opción marcada como "Descalifica al lead" en una pregunta de radio. Si se deja vacío, cae al copy genérico.
+   */
+  notEligiblePage?: {
     title?: string | null;
     subtitle?: string | null;
     content?: {
@@ -743,6 +770,7 @@ export interface TenantsSelect<T extends boolean = true> {
           | {
               label?: T;
               value?: T;
+              disqualifies?: T;
               id?: T;
             };
         optInActive?: T;
@@ -761,6 +789,14 @@ export interface TenantsSelect<T extends boolean = true> {
         id?: T;
       };
   thankYouPage?:
+    | T
+    | {
+        title?: T;
+        subtitle?: T;
+        content?: T;
+        contentHTML?: T;
+      };
+  notEligiblePage?:
     | T
     | {
         title?: T;

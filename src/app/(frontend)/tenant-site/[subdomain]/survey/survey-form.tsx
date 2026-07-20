@@ -75,6 +75,17 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
     return step.type !== 'checkpoint' ? i : lastIndex;
   }, 0);
 
+  // Pasos tipo "radio" cuya opción elegida esté marcada como
+  // `disqualifies` en el CMS cortan el quiz: el lead se redirige a
+  // "not-elegible" en vez de seguir avanzando (o de llegar a thankyou).
+  const findDisqualifyingAnswer = (values: SurveyFormValues) => {
+    return steps.some((step) => {
+      if (step.type !== 'radio' || !step.name) return false;
+      const selected = values[step.name];
+      return step.options?.some((opt) => opt.value === selected && opt.disqualifies);
+    });
+  };
+
   const handleNext = async () => {
     const currentStep = steps[formStep];
 
@@ -85,11 +96,21 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
     const valid = await methods.trigger(currentStep.name as string);
     if (!valid) return;
 
+    if (findDisqualifyingAnswer(methods.getValues())) {
+      await router.push('not-elegible');
+      return;
+    }
+
     window.scrollTo(0, 0);
     setFormStep((prev) => Math.min(prev + 1, steps.length - 1));
   };
 
   const onSubmit = async (data: SurveyFormValues) => {
+    if (findDisqualifyingAnswer(data)) {
+      await router.push('not-elegible');
+      return;
+    }
+
     setSending(true);
     try {
       if (typeof data.telefono === 'string' && data.telefono.trim() !== '') {

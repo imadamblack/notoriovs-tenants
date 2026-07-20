@@ -13,6 +13,7 @@ const VIEWS = [
   { label: 'Ver Landing', path: '' },
   { label: 'Ver Quiz', path: '/survey' },
   { label: 'Ver Gracias', path: '/thankyou' },
+  { label: 'Ver No Elegible', path: '/not-elegible' },
 ]
 
 const btnStyle: React.CSSProperties = {

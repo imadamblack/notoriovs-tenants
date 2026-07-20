@@ -52,6 +52,11 @@ export type TenantDoc = {
     subtitle?: string | null
     contentHTML?: string | null
   } | null
+  notEligiblePage?: {
+    title?: string | null
+    subtitle?: string | null
+    contentHTML?: string | null
+  } | null
 }
 
 /**

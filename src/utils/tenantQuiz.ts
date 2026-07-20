@@ -7,6 +7,10 @@ import type { SurveyStep, SurveyOptInField } from '@/components/stepRenderer'
 export type TenantQuizOption = {
   label: string
   value: string
+  // Solo aplica en pasos tipo "radio". Ver campo `options.disqualifies` en
+  // Tenants.ts. Si el lead elige esta opción, el quiz lo redirige a la
+  // página "No Elegible" en vez de continuar.
+  disqualifies?: boolean | null
 }
 
 // Campos fijos del paso "opt-in": nombre y teléfono (obligatorios) y email
@@ -110,7 +114,11 @@ export function mapTenantQuizToSurveySteps(
       description: step.description || undefined,
       placeholder: step.placeholder || undefined,
       inputOptions,
-      options: step.options?.map((opt) => ({ label: opt.label, value: opt.value })),
+      options: step.options?.map((opt) => ({
+        label: opt.label,
+        value: opt.value,
+        disqualifies: opt.disqualifies || undefined,
+      })),
       cols: step.cols || undefined,
       fields: optInFields,
       autoAdvance: step.autoAdvance || undefined,
