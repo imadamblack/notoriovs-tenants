@@ -1,6 +1,7 @@
 import {notFound} from 'next/navigation'
 import {getTenantBySubdomain} from '@/utils/getTenant'
 import Image from "next/image";
+import NotEligibleTracking from './not-eligible-tracking';
 
 type TenantNotEligiblePageProps = {
   params: Promise<{ subdomain: string }>
@@ -29,6 +30,7 @@ export default async function TenantNotEligiblePage({params}: TenantNotEligibleP
 
   return (
     <main className="py-12 flex-grow">
+      <NotEligibleTracking />
       <div className="reading-container bg-neutral-100 flex flex-col">
         {logo != null && typeof logo === 'object' ? (
           <div className="relative flex justify-start w-40 h-16">
