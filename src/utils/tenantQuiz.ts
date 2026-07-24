@@ -94,13 +94,12 @@ export function mapTenantQuizToSurveySteps(
             name: 'telefono',
             type: 'tel',
             title: step.optInFields.telefonoTitle || undefined,
-            inputOptions: {
-              required: step.optInFields.telefonoRequiredMessage || 'Ingresa tu teléfono',
-              pattern: {
-                value: /^\d{10}$/,
-                message: 'El teléfono debe tener 10 dígitos',
-              },
-            },
+            // La validación de 10 dígitos (pattern con RegExp) se aplica en
+            // stepRenderer.tsx (Client Component), no aquí: un RegExp no es
+            // serializable al cruzar de Server a Client Component y rompe el
+            // render en producción ("Only plain objects... can be passed to
+            // Client Components").
+            inputOptions: { required: step.optInFields.telefonoRequiredMessage || 'Ingresa tu teléfono' },
           },
           {
             name: 'email',

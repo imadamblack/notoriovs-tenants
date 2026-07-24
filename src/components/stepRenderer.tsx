@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import type { FieldErrors, RegisterOptions, UseFormRegister } from 'react-hook-form';
 import { Checkbox, Radio, Select, type FormAtomOption } from './formAtoms';
-import { restrictNumber } from '@/utils/formValidators';
+import { restrictNumber, phonePattern } from '@/utils/formValidators';
 import { MEXICO_STATES } from '@/utils/mexicoStates';
 import Link from 'next/link';
 
@@ -72,7 +72,12 @@ export default function StepRenderer({
         <div className="flex-grow">
           {commonText}
           <input
-            {...register(step.name as string, step.inputOptions)}
+            {...register(
+              step.name as string,
+              step.type === 'tel'
+                ? ({ ...step.inputOptions, pattern: phonePattern } as RegisterOptions)
+                : step.inputOptions,
+            )}
             type={step.type}
             placeholder={step.placeholder}
             onKeyDown={step.type !== 'text' ? restrictNumber : undefined}
@@ -166,7 +171,12 @@ export default function StepRenderer({
             <div key={field.name}>
               <input
                 type={field.type}
-                {...register(field.name, field.inputOptions)}
+                {...register(
+                  field.name,
+                  field.type === 'tel'
+                    ? ({ ...field.inputOptions, pattern: phonePattern } as RegisterOptions)
+                    : field.inputOptions,
+                )}
                 placeholder={field.title}
                 onKeyDown={field.type === 'tel' ? restrictNumber : undefined}
                 className={errors[field.name]?.message ? '!border-red-500' : ''}
