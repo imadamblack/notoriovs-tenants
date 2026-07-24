@@ -94,7 +94,13 @@ export function mapTenantQuizToSurveySteps(
             name: 'telefono',
             type: 'tel',
             title: step.optInFields.telefonoTitle || undefined,
-            inputOptions: { required: step.optInFields.telefonoRequiredMessage || 'Ingresa tu teléfono' },
+            inputOptions: {
+              required: step.optInFields.telefonoRequiredMessage || 'Ingresa tu teléfono',
+              pattern: {
+                value: /^\d{10}$/,
+                message: 'El teléfono debe tener 10 dígitos',
+              },
+            },
           },
           {
             name: 'email',
