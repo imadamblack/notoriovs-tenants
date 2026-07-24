@@ -14,7 +14,6 @@ export default function RootLayout({children}: { children: ReactNode }) {
   return (
     <html lang="es" className="scroll-pt-[6rem]">
     <head>
-      <Script src="/typetura.js" strategy="beforeInteractive"/>
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
       <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
       <link rel="icon" type="image/png" href="/favicon.png"/>
