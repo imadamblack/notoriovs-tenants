@@ -7,10 +7,7 @@ declare global {
   }
 }
 
-// Mismo dominio raíz que usa src/middleware.ts (server), expuesto al
-// browser porque fbEvent corre client-side. Configúralo con
-// NEXT_PUBLIC_ROOT_DOMAIN si difiere del default.
-const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'tudominio.com';
+const ROOT_DOMAIN = 'notoriovs.com';
 
 type FbUserData = {
   phone?: string;
