@@ -168,7 +168,7 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
                   src={(logo as {url?: string}).url || ''}
                   alt=""
                   fill
-                  style={{objectFit: 'contain', filter: 'brightness(100)'}}
+                  style={{objectFit: 'contain', filter: 'brightness(0) invert(1)'}}
                 />
               </div>
             ) : (
