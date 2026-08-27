@@ -1,5 +1,4 @@
 import '@/styles/globals.scss';
-import Script from 'next/script';
 import type { ReactNode } from 'react';
 
 export async function generateMetadata() {
@@ -14,7 +13,6 @@ export default function RootLayout({children}: { children: ReactNode }) {
   return (
     <html lang="es" className="scroll-pt-[6rem]">
     <head>
-      <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
       <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
       <link rel="icon" type="image/png" href="/favicon.png"/>
     </head>
