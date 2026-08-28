@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@payloadcms/next": "3.85.2",
+    "@payloadcms/plugin-multi-tenant": "3.85.2",
     "@payloadcms/richtext-lexical": "3.85.2",
     "@payloadcms/storage-vercel-blob": "3.85.2",
     "@payloadcms/ui": "3.85.2",

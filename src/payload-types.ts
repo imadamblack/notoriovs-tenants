@@ -70,6 +70,8 @@ export interface Config {
     users: User;
     media: Media;
     tenants: Tenant;
+    leads: Lead;
+    'marketing-reports': MarketingReport;
     'payload-kv': PayloadKv;
     'payload-folders': FolderInterface;
     'payload-locked-documents': PayloadLockedDocument;
@@ -85,6 +87,8 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
+    leads: LeadsSelect<false> | LeadsSelect<true>;
+    'marketing-reports': MarketingReportsSelect<false> | MarketingReportsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -490,6 +494,112 @@ export interface Tenant {
     metaCapiToken?: string | null;
     googleTagId?: string | null;
   };
+  /**
+   * Contraseña única y compartida que usa el cliente para entrar a su dashboard de leads (/tenant-site/{subdomain}/dashboard). Se captura a mano, igual que el Meta Pixel o el CAPI Token. Déjala vacía para desactivar el acceso al dashboard.
+   */
+  dashboardPassword?: string | null;
+  /**
+   * Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. El "key" es el valor que se guarda en Lead.status; evita cambiarlo una vez que ya hay leads en esa etapa (si solo quieres renombrarla, edita el "label").
+   */
+  leadPipeline?:
+    | {
+        label: string;
+        /**
+         * Sin espacios ni acentos, ej: "cita-agendada".
+         */
+        key: string;
+        /**
+         * Se usa para calcular la tasa de conversión en el reporte de KPIs.
+         */
+        isWon?: boolean | null;
+        isLost?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Leads capturados por el quiz de cada tenant.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads".
+ */
+export interface Lead {
+  id: number;
+  tenant: number | Tenant;
+  name?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  /**
+   * Debe coincidir con el "key" de una etapa definida en Tenants → Dashboard Cliente → Pipeline. Se asigna automáticamente a la primera etapa cuando se crea el lead.
+   */
+  status: string;
+  source?: ('quiz' | 'manual') | null;
+  /**
+   * Notas visibles y editables desde el dashboard de cliente.
+   */
+  notes?: string | null;
+  /**
+   * Copia cruda de todas las respuestas enviadas por el lead (react-hook-form values).
+   */
+  answers?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  utm?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * KPIs semanales de campañas de ads por tenant (ingesta desde n8n).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "marketing-reports".
+ */
+export interface MarketingReport {
+  id: number;
+  tenant: number | Tenant;
+  weekStart: string;
+  weekEnd: string;
+  campaign: string;
+  impressions?: number | null;
+  reach?: number | null;
+  frequency?: number | null;
+  /**
+   * MXN
+   */
+  cpm?: number | null;
+  clicks?: number | null;
+  /**
+   * Porcentaje, ej: 0.91
+   */
+  ctr?: number | null;
+  landingPageViews?: number | null;
+  leads?: number | null;
+  /**
+   * MXN
+   */
+  costPerLead?: number | null;
+  /**
+   * MXN
+   */
+  spend?: number | null;
+  ads?: string[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -528,6 +638,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tenants';
         value: number | Tenant;
+      } | null)
+    | ({
+        relationTo: 'leads';
+        value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'marketing-reports';
+        value: number | MarketingReport;
       } | null)
     | ({
         relationTo: 'payload-folders';
@@ -813,6 +931,57 @@ export interface TenantsSelect<T extends boolean = true> {
         metaCapiToken?: T;
         googleTagId?: T;
       };
+  dashboardPassword?: T;
+  leadPipeline?:
+    | T
+    | {
+        label?: T;
+        key?: T;
+        isWon?: T;
+        isLost?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads_select".
+ */
+export interface LeadsSelect<T extends boolean = true> {
+  tenant?: T;
+  name?: T;
+  phone?: T;
+  whatsapp?: T;
+  email?: T;
+  status?: T;
+  source?: T;
+  notes?: T;
+  answers?: T;
+  utm?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "marketing-reports_select".
+ */
+export interface MarketingReportsSelect<T extends boolean = true> {
+  tenant?: T;
+  weekStart?: T;
+  weekEnd?: T;
+  campaign?: T;
+  impressions?: T;
+  reach?: T;
+  frequency?: T;
+  cpm?: T;
+  clicks?: T;
+  ctr?: T;
+  landingPageViews?: T;
+  leads?: T;
+  costPerLead?: T;
+  spend?: T;
+  ads?: T;
   updatedAt?: T;
   createdAt?: T;
 }

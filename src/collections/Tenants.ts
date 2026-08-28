@@ -585,6 +585,77 @@ export const Tenants: CollectionConfig = {
             },
           ],
         },
+
+        // ─────────────────────────────────────────
+        // Dashboard Cliente — acceso simple por contraseña + Kanban
+        // ─────────────────────────────────────────
+        {
+          label: 'Dashboard Cliente',
+          fields: [
+            {
+              name: 'dashboardPassword',
+              type: 'text',
+              label: 'Contraseña del dashboard',
+              admin: {
+                description:
+                  'Contraseña única y compartida que usa el cliente para entrar a su dashboard de leads (/tenant-site/{subdomain}/dashboard). Se captura a mano, igual que el Meta Pixel o el CAPI Token. Déjala vacía para desactivar el acceso al dashboard.',
+              },
+            },
+            {
+              name: 'leadPipeline',
+              type: 'array',
+              label: 'Pipeline (etapas del Kanban)',
+              defaultValue: [
+                { label: 'Nuevo', key: 'nuevo' },
+                { label: 'Contactado', key: 'contactado' },
+                { label: 'Calificado', key: 'calificado' },
+                { label: 'Ganado', key: 'ganado', isWon: true },
+                { label: 'Perdido', key: 'perdido', isLost: true },
+              ],
+              admin: {
+                description:
+                  'Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. El "key" es el valor que se guarda en Lead.status; evita cambiarlo una vez que ya hay leads en esa etapa (si solo quieres renombrarla, edita el "label").',
+              },
+              fields: [
+                {
+                  type: 'row',
+                  fields: [
+                    { name: 'label', type: 'text', required: true, label: 'Nombre de la etapa' },
+                    {
+                      name: 'key',
+                      type: 'text',
+                      required: true,
+                      label: 'Key (interno)',
+                      admin: { description: 'Sin espacios ni acentos, ej: "cita-agendada".' },
+                    },
+                  ],
+                },
+                {
+                  type: 'row',
+                  fields: [
+                    {
+                      name: 'isWon',
+                      type: 'checkbox',
+                      defaultValue: false,
+                      label: 'Cuenta como "Ganado"',
+                      admin: {
+                        description: 'Se usa para calcular la tasa de conversión en el reporte de KPIs.',
+                        width: '50%',
+                      },
+                    },
+                    {
+                      name: 'isLost',
+                      type: 'checkbox',
+                      defaultValue: false,
+                      label: 'Cuenta como "Perdido"',
+                      admin: { width: '50%' },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       ],
     },
   ],
