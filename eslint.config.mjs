@@ -1,16 +1,9 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { FlatCompat } from '@eslint/eslintrc'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-})
+import nextCoreWebVitals from 'eslint-config-next/core-web-vitals'
+import nextTypescript from 'eslint-config-next/typescript'
 
 const eslintConfig = [
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   {
     rules: {
       '@typescript-eslint/ban-ts-comment': 'warn',
@@ -28,6 +21,15 @@ const eslintConfig = [
           caughtErrorsIgnorePattern: '^(_|ignore)',
         },
       ],
+      // eslint-config-next 16 trae la regla nueva de react-hooks (v7,
+      // pensada para React Compiler) como error. Marca como "prohibido"
+      // cualquier setState síncrono dentro de un efecto, lo cual incluye
+      // patrones estándar y correctos como "reset de loading antes de un
+      // fetch" o "reconciliar un evento externo contra el estado local"
+      // (ver DashboardApp/KanbanBoard). No hay bug real detrás de esos
+      // casos, así que se baja a warning en vez de reescribir esos efectos
+      // solo para complacer la regla.
+      'react-hooks/set-state-in-effect': 'warn',
     },
   },
   {

@@ -43,7 +43,7 @@ input[type=radio]:checked + label:before, input[type=checkbox]:checked + label:b
 
 select {
   appearance: none;
-  border-radius: 0;
+  @apply rounded-lg w-full;
   &::-ms-expand {
     display: none;
   }
@@ -61,14 +61,17 @@ select {
 .select {
   position: relative;
   &::after {
-    font-size: 1.4rem;
     display: block;
     position: absolute;
     right: 1rem;
-    top: 25%;
-    content: "expand_more";
-    font-family: "Material Icons";
-    color: black;
+    top: 37%;
+    width: 1.5rem;
+    height: 1.5rem;
+    content: "";
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: contain;
+    pointer-events: none;
   }
 }
 
