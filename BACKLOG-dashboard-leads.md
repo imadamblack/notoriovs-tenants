@@ -7,12 +7,14 @@ Todo el trabajo de esta funcionalidad vive en la rama `feature/tenant-leads-dash
 - [x] `npm install` — trae `@payloadcms/plugin-multi-tenant`. Hecho (commit "FIX: importMap errors").
 - [x] `pnpm run generate:types` / `npm run generate:types` — `src/payload-types.ts` ya se regeneró de verdad. **Ojo:** cada vez que se agregue o cambie un campo en `Leads.ts`/`MarketingReports.ts`/`Tenants.ts` (como el cambio de `stage`/`status` de esta misma sesión) hay que volver a correrlo; mientras tanto el archivo puede traer parches escritos a mano documentados en comentarios.
 - [x] `npm run dev` levanta, aparecen **Leads** y **Marketing Reports**, y el selector de tenant en el admin.
-- [ ] `npm run build` completo al menos una vez en un entorno con red y con acceso a la base de datos.
-- [ ] `npm run lint` — no se pudo correr desde el entorno donde se armó la rama (el `eslint.config.mjs` tronaba con un error de configuración); confirmar si es algo puntual de ese entorno o un problema real del proyecto.
+- [x] `npm run lint` — arreglado. La causa real: `eslint.config.mjs` envolvía `next/core-web-vitals` y `next/typescript` con `FlatCompat` (capa de compatibilidad para configs viejos), y esa combinación con ESLint 9 + eslint-config-next 16 produce una config con referencias circulares (el plugin `react-hooks` se referencia a sí mismo) que revienta al intentar formatear cualquier error de validación. Es un bug conocido de la interacción `@eslint/eslintrc` + `eslint-config-next` (ver [next.js#84596](https://github.com/vercel/next.js/discussions/84596)), no algo específico de esta rama ni de un entorno en particular — se reproduce igual en `main`. Fix: importar los flat configs de `eslint-config-next/core-web-vitals` y `eslint-config-next/typescript` directamente, sin `FlatCompat`.
+  - Con el fix, `npm run lint` corre limpio salvo por 5 errores nuevos de la regla `react-hooks/set-state-in-effect` (parte del preset "React Compiler" que trae `eslint-plugin-react-hooks` v7, incluido por primera vez en `eslint-config-next` 16) en `DashboardApp.tsx` y `KanbanBoard.tsx`. Son los patrones estándar de "reset de loading antes de un fetch" y "reconciliar un evento externo contra el estado local" — no hay bug de renders en cascada real detrás, así que se bajó esa regla a `warning` (con el porqué documentado en el propio `eslint.config.mjs`) en vez de reescribir esos efectos solo para complacerla. Si en algún momento se quiere cumplir la regla al pie de la letra, esos 5 puntos son el mapa exacto de dónde tocar.
+- [x] Tipos: `npx tsc --noEmit` corre limpio (0 errores) sobre toda la rama.
+- [ ] `npm run build` completo: **no se pudo verificar en el entorno donde se preparó este PR.** El sandbox donde corrí lint/tsc es una VM Linux/arm64 sin el binario nativo de SWC para esa plataforma (`@next/swc-linux-arm64-gnu`) y sin salida a `registry.npmjs.org` para instalarlo (403 del proxy de red). El `node_modules` del proyecto sí trae `@next/swc-darwin-arm64` (instalado desde una Mac real), así que lo más probable es que `npm run build` funcione sin problema corrido directamente en la Mac donde vive el proyecto — pero hace falta confirmarlo ahí, con red normal, antes de abrir el PR a ojos de todos como "verde". También hace falta correrlo con `DATABASE_URL` apuntando a una base real (Payload valida el schema contra la DB en build/dev), cosa que tampoco pude probar por la misma razón de red.
 
 ## 2. Variables de entorno
 
-- [ ] Agregar `MARKETING_REPORT_INGEST_KEY` a `.env` (local) y a las variables de entorno de producción/hosting. Es el secreto que valida las llamadas del workflow de n8n al endpoint `/api/marketing-reports/ingest`. Mientras no exista, ese endpoint rechaza todo (default-deny a propósito).
+- [x] `MARKETING_REPORT_INGEST_KEY` agregada al `.env` local (se generó un secreto aleatorio de 64 caracteres hex). **Falta agregar la misma variable (puede ser un valor distinto) en las variables de entorno de producción/hosting** — sin eso, el endpoint de ingesta sigue rechazando todo en producción por diseño (default-deny).
 
 ## 3. Configuración por tenant (Payload admin)
 
@@ -42,9 +44,13 @@ Todo el trabajo de esta funcionalidad vive en la rama `feature/tenant-leads-dash
 
 ## 6. Antes de deployar a producción
 
-- [ ] **Revisar cómo se aplican los cambios de esquema a la base de Postgres de producción.** Este proyecto no tiene carpeta `migrations/` ni un script `payload migrate` configurado, lo que sugiere que hoy depende del modo "push" automático de Payload (que solo corre en desarrollo por default). Antes de mergear, hay que confirmar explícitamente cómo se van a crear las tablas nuevas (`leads`, `marketing_reports`, más las que agregue el plugin de multi-tenant en `users`) en la base de producción: correr `payload migrate:create` + `payload migrate` como paso de deploy, o confirmar que el mecanismo actual ya las crea solo. Esto es lo único de todo el backlog que, si se salta, puede tumbar producción.
+- [ ] **Revisar cómo se aplican los cambios de esquema a la base de Postgres de producción.** Este proyecto no tenía carpeta `migrations/` ni scripts `payload migrate*` configurados, lo que sugiere que hoy depende del modo "push" automático de Payload (que solo corre en desarrollo por default). Se agregaron los scripts `migrate:create` / `migrate` / `migrate:status` a `package.json` (usan las convenciones estándar de Payload, guardan en `src/migrations` por default), pero **generarlas y correrlas requiere una conexión real a la base de datos** que no estuvo disponible en el entorno donde se preparó este PR (sin salida de red al host de Neon). Antes de deployar a producción, correr esto una vez en un entorno con acceso a la DB real:
+  1. `npm run migrate:create` — genera la migración con el diff de esquema (tablas `leads`, `marketing_reports`, más las que agrega el plugin de multi-tenant en `users`) contra el estado actual de la DB de producción (o de un clon/staging de la misma).
+  2. Revisar el SQL generado a mano antes de aplicarlo — sobre todo cualquier `ALTER TABLE ... NOT NULL` en tablas con filas existentes (ver el punto de `stage` requerido en la sección 5).
+  3. `npm run migrate` como paso de deploy, antes de que la nueva versión del código empiece a recibir tráfico.
+  - Esto sigue siendo lo único de todo el backlog que, si se salta, puede tumbar producción.
 - [ ] Probar el flujo completo en un ambiente de staging/preview si existe, antes del deploy final.
-- [ ] Mergear `feature/tenant-leads-dashboard` a `main` solo después de que los puntos 1 a 5 estén en verde.
+- [ ] Confirmar `npm run build` en la Mac real del proyecto (ver punto 1) y correr la QA manual de la sección 5 antes de mergear a `main`.
 
 ## 7. Mejoras futuras (no bloquean el lanzamiento)
 
