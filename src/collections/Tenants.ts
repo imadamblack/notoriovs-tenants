@@ -606,30 +606,18 @@ export const Tenants: CollectionConfig = {
               type: 'array',
               label: 'Pipeline (etapas del Kanban)',
               defaultValue: [
-                { label: 'Nuevo', key: 'nuevo' },
-                { label: 'Contactado', key: 'contactado' },
-                { label: 'Calificado', key: 'calificado' },
-                { label: 'Ganado', key: 'ganado', isWon: true },
-                { label: 'Perdido', key: 'perdido', isLost: true },
+                { label: 'Nuevo' },
+                { label: 'Contactado' },
+                { label: 'Calificado' },
+                { label: 'Ganado', isWon: true },
+                { label: 'Perdido', isLost: true },
               ],
               admin: {
                 description:
-                  'Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. El "key" es el valor que se guarda en Lead.status; evita cambiarlo una vez que ya hay leads en esa etapa (si solo quieres renombrarla, edita el "label").',
+                  'Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. Cada lead guarda en Lead.stage el "id" interno (autogenerado por Payload) de la etapa en la que está, no el nombre, así que puedes renombrar una etapa o reordenarlas libremente sin romper nada. Ese id solo se pierde si BORRAS la etapa y creas una "igual" en su lugar: los leads que estaban ahí quedan huérfanos y caen en la columna "Otro" del Kanban hasta que se reasignan a mano.',
               },
               fields: [
-                {
-                  type: 'row',
-                  fields: [
-                    { name: 'label', type: 'text', required: true, label: 'Nombre de la etapa' },
-                    {
-                      name: 'key',
-                      type: 'text',
-                      required: true,
-                      label: 'Key (interno)',
-                      admin: { description: 'Sin espacios ni acentos, ej: "cita-agendada".' },
-                    },
-                  ],
-                },
+                { name: 'label', type: 'text', required: true, label: 'Nombre de la etapa' },
                 {
                   type: 'row',
                   fields: [

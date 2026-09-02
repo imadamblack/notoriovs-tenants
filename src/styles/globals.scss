@@ -45,7 +45,7 @@ a.link {
 * {
   box-sizing: border-box;
   &:focus {
-    @apply outline outline-blue-500 #{!important};
+    outline: none !important;
   }
 }
 

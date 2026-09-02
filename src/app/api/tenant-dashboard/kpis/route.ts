@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { requireDashboardTenant } from '@/utils/requireDashboardAuth'
 
-type LeadRow = { status?: string | null; createdAt?: string }
+type LeadRow = { stage?: string | null; status?: string | null; createdAt?: string }
 
 // Agrupa leads por semana (lunes-domingo) para la gráfica de tendencia.
 // Simple a propósito: sin librerías de fechas, solo Date nativo.
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       where: { tenant: { equals: tenant.id } },
       limit: 5000,
       depth: 0,
-      select: { status: true, createdAt: true },
+      select: { stage: true, status: true, createdAt: true },
       overrideAccess: true,
     }),
     payload.find({
@@ -45,23 +45,28 @@ export async function GET(req: NextRequest) {
   const pipeline = tenant.leadPipeline || []
   const total = leads.length
 
+  // Progreso por etapa: agrupa por `stage` (la columna del Kanban), no por
+  // `status`. Las dos cosas son independientes desde que se separaron: un
+  // lead puede estar "Ganado" (status) sentado en cualquier etapa.
   const byStage = pipeline.map((stage) => {
-    const count = (leads as LeadRow[]).filter((l) => l.status === stage.key).length
+    const count = (leads as LeadRow[]).filter((l) => l.stage === stage.id).length
     return {
-      key: stage.key,
+      id: stage.id,
       label: stage.label,
       count,
       pct: total ? Math.round((count / total) * 1000) / 10 : 0,
     }
   })
 
-  const knownKeys = new Set(pipeline.map((s) => s.key))
-  const otherCount = (leads as LeadRow[]).filter((l) => !l.status || !knownKeys.has(l.status)).length
+  const knownIds = new Set(pipeline.map((s) => s.id))
+  const otherCount = (leads as LeadRow[]).filter((l) => !l.stage || !knownIds.has(l.stage)).length
 
-  const wonKeys = new Set(pipeline.filter((s) => s.isWon).map((s) => s.key))
-  const lostKeys = new Set(pipeline.filter((s) => s.isLost).map((s) => s.key))
-  const won = (leads as LeadRow[]).filter((l) => l.status && wonKeys.has(l.status)).length
-  const lost = (leads as LeadRow[]).filter((l) => l.status && lostKeys.has(l.status)).length
+  // Conversión: ahora se lee directo del `status` fijo (open/won/lost/
+  // disqualified) en vez de inferirse de las etiquetas del pipeline, así
+  // que no depende de cómo cada tenant nombró sus etapas.
+  const won = (leads as LeadRow[]).filter((l) => l.status === 'won').length
+  const lost = (leads as LeadRow[]).filter((l) => l.status === 'lost').length
+  const disqualified = (leads as LeadRow[]).filter((l) => l.status === 'disqualified').length
 
   const weekBuckets = new Map<string, number>()
   for (const lead of leads as LeadRow[]) {
@@ -110,8 +115,10 @@ export async function GET(req: NextRequest) {
     otherCount,
     won,
     lost,
+    disqualified,
     conversionRate: total ? Math.round((won / total) * 1000) / 10 : 0,
     lossRate: total ? Math.round((lost / total) * 1000) / 10 : 0,
+    disqualifiedRate: total ? Math.round((disqualified / total) * 1000) / 10 : 0,
     trend,
     marketing,
     marketingTotals: {

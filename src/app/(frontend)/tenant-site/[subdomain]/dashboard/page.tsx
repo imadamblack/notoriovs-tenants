@@ -44,7 +44,10 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
     <DashboardApp
       subdomain={subdomain}
       companyName={tenant.generalInfo?.companyName || tenant.name}
-      pipeline={tenant.leadPipeline || []}
+      // Filtra por si acaso una fila del array llegara sin id (Payload lo
+      // tipa como opcional); en la práctica siempre lo tiene una vez que el
+      // tenant se guardó, así que esto nunca debería quitar etapas reales.
+      pipeline={(tenant.leadPipeline || []).filter((stage): stage is typeof stage & { id: string } => Boolean(stage.id))}
     />
   )
 }

@@ -7,9 +7,12 @@ import type { TenantQuizStep } from '@/utils/tenantQuiz'
 // `payload generate:types` en este entorno). Deben mantenerse en sync con
 // src/collections/Tenants.ts.
 export type TenantLeadStage = {
+  // Id autogenerado por Payload para esta fila del array; es lo único que
+  // referencia `Lead.stage` (ver comentario en Leads.ts). Puede venir null
+  // en teoría (tipo de Payload), pero en la práctica siempre existe una vez
+  // que el tenant se guardó al menos una vez.
   id?: string | null
   label: string
-  key: string
   isWon?: boolean | null
   isLost?: boolean | null
 }

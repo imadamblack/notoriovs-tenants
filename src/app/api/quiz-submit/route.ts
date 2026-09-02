@@ -33,10 +33,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
   }
 
-  // La primera etapa del pipeline configurado en Tenants → Dashboard
-  // Cliente → Pipeline. Si el tenant no configuró ninguna (pipeline vacío),
-  // cae a 'nuevo' como key genérico.
-  const firstStage = tenant.leadPipeline?.[0]?.key || 'nuevo'
+  // El id (autogenerado por Payload) de la primera etapa del pipeline
+  // configurado en Tenants → Dashboard Cliente → Pipeline. Si el tenant no
+  // configuró ninguna (pipeline vacío), cae a 'nuevo' como sentinel: no
+  // coincide con ningún id real, así que esos leads simplemente aparecen en
+  // la columna "Otro" del dashboard hasta que se les configure un pipeline.
+  const firstStage = tenant.leadPipeline?.[0]?.id || 'nuevo'
 
   let leadId: string | number | undefined
 
@@ -50,7 +52,8 @@ export async function POST(req: NextRequest) {
         phone: typeof answers?.telefono === 'string' ? answers.telefono : undefined,
         whatsapp: typeof answers?.whatsapp === 'string' ? answers.whatsapp : undefined,
         email: typeof answers?.email === 'string' ? answers.email : undefined,
-        status: firstStage,
+        stage: firstStage,
+        status: 'open',
         source: 'quiz',
         answers: answers ?? null,
         utm: utm ?? null,

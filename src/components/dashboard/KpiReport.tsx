@@ -2,7 +2,7 @@
 
 import type { PipelineStage } from '@/components/dashboard/DashboardApp'
 
-type StageKpi = { key: string; label: string; count: number; pct: number }
+type StageKpi = { id: string; label: string; count: number; pct: number }
 type TrendPoint = { week: string; count: number }
 type MarketingRow = {
   id: string | number
@@ -23,8 +23,10 @@ type KpiData = {
   otherCount: number
   won: number
   lost: number
+  disqualified: number
   conversionRate: number
   lossRate: number
+  disqualifiedRate: number
   trend: TrendPoint[]
   marketing: MarketingRow[]
   marketingTotals: { spend: number; leads: number; impressions: number; clicks: number; avgCostPerLead: number }
@@ -62,9 +64,14 @@ export default function KpiReport({ data, pipeline }: KpiReportProps) {
           <Tile
             label="Tasa de conversión"
             value={`${data.conversionRate}%`}
-            sub={`${data.won} lead(s) en etapa "ganado"`}
+            sub={`${data.won} lead(s) ganados`}
           />
           <Tile label="Tasa de pérdida" value={`${data.lossRate}%`} sub={`${data.lost} lead(s) perdidos`} />
+          <Tile
+            label="Descalificados"
+            value={`${data.disqualifiedRate}%`}
+            sub={`${data.disqualified} lead(s) descalificados`}
+          />
         </div>
       </section>
 
@@ -72,7 +79,7 @@ export default function KpiReport({ data, pipeline }: KpiReportProps) {
         <h2 className="font-semibold text-brand-1 mb-3">Progreso por etapa</h2>
         <div className="bg-white rounded-xl border border-neutral-200 p-4 flex flex-col gap-3">
           {data.byStage.map((stage) => (
-            <div key={stage.key} className="flex items-center gap-3">
+            <div key={stage.id} className="flex items-center gap-3">
               <span className="w-32 text-sm text-neutral-600 truncate">{stage.label}</span>
               <div className="flex-1 h-3 bg-neutral-100 rounded-full overflow-hidden">
                 <div className="h-full bg-brand-3" style={{ width: `${stage.pct}%` }} />

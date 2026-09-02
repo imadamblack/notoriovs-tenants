@@ -459,15 +459,11 @@ export interface Tenant {
    */
   dashboardPassword?: string | null;
   /**
-   * Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. El "key" es el valor que se guarda en Lead.status; evita cambiarlo una vez que ya hay leads en esa etapa (si solo quieres renombrarla, edita el "label").
+   * Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. Cada lead guarda en Lead.stage el "id" interno (autogenerado por Payload) de la etapa en la que está, no el nombre, así que puedes renombrar una etapa o reordenarlas libremente sin romper nada. Ese id solo se pierde si BORRAS la etapa y creas una "igual" en su lugar: los leads que estaban ahí quedan huérfanos y caen en la columna "Otro" del Kanban hasta que se reasignan a mano.
    */
   leadPipeline?:
     | {
         label: string;
-        /**
-         * Sin espacios ni acentos, ej: "cita-agendada".
-         */
-        key: string;
         /**
          * Se usa para calcular la tasa de conversión en el reporte de KPIs.
          */
@@ -539,9 +535,13 @@ export interface Lead {
   whatsapp?: string | null;
   email?: string | null;
   /**
-   * Debe coincidir con el "key" de una etapa definida en Tenants → Dashboard Cliente → Pipeline. Se asigna automáticamente a la primera etapa cuando se crea el lead.
+   * Guarda el "id" interno de una etapa definida en Tenants → Dashboard Cliente → Pipeline (no su nombre). Se asigna automáticamente a la primera etapa cuando se crea el lead; no se edita a mano desde aquí.
    */
-  status: string;
+  stage: string;
+  /**
+   * Resultado del lead, independiente de la etapa en la que esté. Se actualiza solo al mover la etapa hacia una marcada como "Ganado"/"Perdido" en el pipeline del tenant; también se puede fijar a mano (ej. "Descalificado") desde el panel de detalle del lead.
+   */
+  status: 'open' | 'won' | 'lost' | 'disqualified';
   source?: ('quiz' | 'manual') | null;
   /**
    * Notas visibles y editables desde el dashboard de cliente.
@@ -948,7 +948,6 @@ export interface TenantsSelect<T extends boolean = true> {
     | T
     | {
         label?: T;
-        key?: T;
         isWon?: T;
         isLost?: T;
         id?: T;
@@ -966,6 +965,7 @@ export interface LeadsSelect<T extends boolean = true> {
   phone?: T;
   whatsapp?: T;
   email?: T;
+  stage?: T;
   status?: T;
   source?: T;
   notes?: T;
