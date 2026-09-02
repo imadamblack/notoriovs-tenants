@@ -44,13 +44,13 @@ Todo el trabajo de esta funcionalidad vive en la rama `feature/tenant-leads-dash
 
 ## 6. Antes de deployar a producción
 
-- [ ] **Revisar cómo se aplican los cambios de esquema a la base de Postgres de producción.** Este proyecto no tenía carpeta `migrations/` ni scripts `payload migrate*` configurados, lo que sugiere que hoy depende del modo "push" automático de Payload (que solo corre en desarrollo por default). Se agregaron los scripts `migrate:create` / `migrate` / `migrate:status` a `package.json` (usan las convenciones estándar de Payload, guardan en `src/migrations` por default), pero **generarlas y correrlas requiere una conexión real a la base de datos** que no estuvo disponible en el entorno donde se preparó este PR (sin salida de red al host de Neon). Antes de deployar a producción, correr esto una vez en un entorno con acceso a la DB real:
-  1. `npm run migrate:create` — genera la migración con el diff de esquema (tablas `leads`, `marketing_reports`, más las que agrega el plugin de multi-tenant en `users`) contra el estado actual de la DB de producción (o de un clon/staging de la misma).
-  2. Revisar el SQL generado a mano antes de aplicarlo — sobre todo cualquier `ALTER TABLE ... NOT NULL` en tablas con filas existentes (ver el punto de `stage` requerido en la sección 5).
-  3. `npm run migrate` como paso de deploy, antes de que la nueva versión del código empiece a recibir tráfico.
-  - Esto sigue siendo lo único de todo el backlog que, si se salta, puede tumbar producción.
-- [ ] Probar el flujo completo en un ambiente de staging/preview si existe, antes del deploy final.
-- [ ] Confirmar `npm run build` en la Mac real del proyecto (ver punto 1) y correr la QA manual de la sección 5 antes de mergear a `main`.
+- [x] **Migración de esquema para Postgres de producción — hecho.** El proyecto no tenía carpeta `migrations/` ni scripts `payload migrate*`, así que dependía del modo "push" (solo corre en desarrollo). Se agregaron los scripts `migrate:create` / `migrate` / `migrate:status` a `package.json`.
+  - Al correr `npm run migrate:create` por primera vez, Payload generó un archivo que intentaba recrear **todo** el esquema desde cero (`CREATE TABLE "users"`, `"media"`, `"tenants"`, etc.), aunque esas tablas ya existían con datos reales. Es el comportamiento esperado al adoptar migraciones sobre un proyecto que venía usando modo push: como no había ninguna migración previa, no tenía contra qué comparar y asumió una base vacía.
+  - En vez de editar esa migración a mano adivinando qué tablas ya existían, se reescribió para que sea **idempotente**: cada `CREATE TABLE` / `CREATE INDEX` lleva `IF NOT EXISTS`, cada `CREATE TYPE` / `ALTER TABLE ... ADD CONSTRAINT` quedó envuelto en un bloque `DO $$ ... EXCEPTION WHEN duplicate_object THEN null; END $$;` (Postgres no soporta `IF NOT EXISTS` nativo para esos dos), y se agregaron 4 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` explícitos para las columnas nuevas en tablas que ya existían (`tenants.dashboard_password`, `payload_locked_documents_rels.leads_id` y `.marketing_reports_id`, `media.folder_id`). El `down()` también se reescribió para revertir solo lo que este PR agrega de verdad (`leads`, `marketing_reports`, `users_tenants`, `tenants_lead_pipeline`, esas 2 columnas, los 2 enums de leads) — ya no borra `users`/`media`/`tenants`/tablas del sitio.
+  - Se probó primero contra una rama (branch) de Neon — una copia completa de producción — hasta correr limpio, y se confirmó ahí que los tenants y datos existentes seguían intactos, que Leads/Marketing Reports aparecían en el admin, y que el selector de tenant filtraba bien.
+  - **Ya se corrió `npm run migrate` contra producción y terminó sin errores.** El archivo final vive en `src/migrations/20260902_010237.ts`.
+- [ ] Probar el flujo completo en un ambiente de staging/preview si existe, antes del deploy final del código (la migración de base de datos ya está aplicada; falta el deploy de la app en sí).
+- [ ] Confirmar `npm run build` en la Mac real del proyecto (ver punto 1) antes de mergear a `main`.
 
 ## 7. Mejoras futuras (no bloquean el lanzamiento)
 
