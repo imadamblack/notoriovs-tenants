@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Lead, LeadUpdateEvent, PipelineStage } from '@/components/dashboard/DashboardApp'
+import {formatPhone} from '@/utils/formatters'
 
 type KanbanBoardProps = {
   subdomain: string
@@ -198,6 +199,9 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [draggingLead, setDraggingLead] = useState<Lead | null>(null)
   const [pendingLeadId, setPendingLeadId] = useState<string | null>(null)
+  // Progreso de scroll horizontal del tablero (0 a 1), para la barra que
+  // se va rellenando conforme el usuario recorre las columnas hacia la derecha.
+  const [boardScrollProgress, setBoardScrollProgress] = useState(0)
 
   // Refs a los contenedores con scroll de cada columna y de la Lista, para
   // el scroll infinito: se leen en el handler de `onScroll` y también para
@@ -206,6 +210,7 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
   // siguiente página si no se revisa aparte.
   const columnScrollRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const listScrollRef = useRef<HTMLDivElement | null>(null)
+  const boardScrollRef = useRef<HTMLDivElement | null>(null)
 
   const pipelineIds = useMemo(() => new Set(pipeline.map((s) => s.id)), [pipeline])
   const showOtherColumn = otherCount > 0
@@ -216,6 +221,15 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
     () => [...pipeline, ...(showOtherColumn ? [{id: '__other__', label: 'Otro'}] : [])],
     [pipeline, showOtherColumn],
   )
+
+  // Índice de columna "actual" para la barra de progreso horizontal del
+  // tablero: se deriva del scroll (0 = primera columna, boardColumns.length-1
+  // = última) para que la barra se vaya rellenando conforme el usuario
+  // recorre las columnas hacia la derecha.
+  const currentColumnIndex = useMemo(() => {
+    if (boardColumns.length <= 1) return 0
+    return Math.min(boardColumns.length - 1, Math.round(boardScrollProgress * (boardColumns.length - 1)))
+  }, [boardScrollProgress, boardColumns.length])
 
   // Espera a que el usuario deje de teclear antes de pegarle al servidor.
   // Antes esto era gratis (el filtro corría en memoria sobre lo que ya
@@ -426,6 +440,14 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
     }
   }, [listLeads, view, listLoading, listLoadingMore, listHasNextPage, listPage, loadList])
 
+  // Progreso de scroll horizontal del tablero: alimenta `boardScrollProgress`
+  // para que la barra de abajo se rellene conforme se recorren las columnas.
+  const handleBoardScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const max = el.scrollWidth - el.clientWidth
+    setBoardScrollProgress(max > 0 ? el.scrollLeft / max : 0)
+  }, [])
+
   const handleDrop = async (stageKey: string) => {
     setDragOverKey(null)
     const lead = draggingLead
@@ -490,27 +512,23 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
           {/*  Lead*/}
           {/*</button>*/}
         </div>
-
-        <div className="flex items-center gap-2 text-neutral-400 -ft-3">
-          {visibleTotal} leads
+        <div className="flex items-center gap-2 -ft-3 text-neutral-400">
+          <span>↓</span>
+          <select
+            id="filter"
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="!bg-neutral-900 w-[8rem] !border !border-neutral-800 !text-neutral-200 rounded-lg px-4 py-1.5 -ft-4"
+          >
+            {Object.entries(SORT_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 -ft-3 text-neutral-400">
-            <span>↓</span>
-            <select
-              id="filter"
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="!bg-neutral-900 w-[8rem] !border !border-neutral-800 !text-neutral-200 rounded-lg px-4 py-1.5 -ft-4"
-            >
-              {Object.entries(SORT_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
 
           <div className="relative w-full max-w-xs">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
@@ -524,11 +542,33 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
             />
           </div>
         </div>
+
+        <div className="flex items-center gap-2 text-neutral-400 -ft-3">
+          {visibleTotal} leads
+        </div>
       </div>
 
       {/* Board */}
       {view === 'kanban' ? (
-        <div className="flex flex-grow gap-3 overflow-x-auto p-4 min-h-0">
+        <div className="flex flex-col flex-grow min-h-0">
+          {boardColumns.length > 1 && (
+            <div className="md:hidden flex shrink-0">
+              {boardColumns.map((col, idx) => {
+                return (
+                  <span
+                    key={col.id}
+                    className={`h-1.5 flex-1 ${idx === currentColumnIndex ? 'bg-brand-3' : 'bg-neutral-700'}`}
+                  />
+                )
+              })}
+            </div>
+          )}
+          <div
+            ref={boardScrollRef}
+            onScroll={handleBoardScroll}
+            className="flex flex-grow gap-3 overflow-x-auto md:p-4 min-h-0 snap-x snap-mandatory"
+          >
+
           {boardColumns.map((col) => {
             const state = columnData[col.id] ?? emptyColumn
             const count = stageCounts[col.id] ?? (col.id === '__other__' ? otherCount : state.totalDocs)
@@ -549,14 +589,14 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
                   }
                   handleDrop(col.id)
                 }}
-                className={`flex-shrink-0 w-[280px] rounded-xl border flex flex-col h-full min-h-0 ${
+                className={`flex-shrink-0 w-full md:w-[280px] md:rounded-xl border flex flex-col h-full min-h-0 snap-center ${
                   dragOverKey === col.id
                     ? 'border-brand-3 bg-brand-3/5'
                     : 'border-neutral-800 bg-neutral-900'
                 }`}
               >
-                <div className="px-3.5 py-3 border-b border-neutral-800 flex items-center justify-between shrink-0">
-                  <span className="font-semibold text-neutral-100 -ft-3 truncate">{col.label}</span>
+                <div className="px-4 py-4 border-b border-neutral-800 flex items-center justify-between shrink-0">
+                  <span className="font-semibold text-neutral-100 -ft-2 truncate">{col.label}</span>
                   <span className="-ft-4 bg-neutral-800 text-neutral-400 rounded-full px-2 py-0.5 shrink-0 ml-2">
                     {count}
                   </span>
@@ -601,7 +641,7 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
                         )} ${isPending ? 'opacity-40 pointer-events-none' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium -ft-3 text-neutral-100 truncate">{lead.name || 'Sin nombre'}</p>
+                          <p className="font-medium -ft-1 text-neutral-100 truncate">{lead.name || 'Sin nombre'}</p>
                           {badge && (
                             <span
                               className={`shrink-0 text-[10px] font-medium rounded-full px-2 py-0.5 ${badge.className}`}>
@@ -609,8 +649,8 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
                             </span>
                           )}
                         </div>
-                        <p className="-ft-4 text-neutral-400 truncate mt-0.5">
-                          {lead.whatsapp || lead.phone || lead.email || '—'}
+                        <p className="-ft-2 text-neutral-400 truncate mt-0.5">
+                          {formatPhone(lead.whatsapp || lead.phone || lead.email || '—')}
                         </p>
                         <div className="flex items-center justify-between mt-2">
                           <div className="flex items-center gap-1.5">
@@ -645,6 +685,7 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
               </div>
             )
           })}
+          </div>
         </div>
       ) : (
         <div ref={listScrollRef} onScroll={handleListScroll} className="flex-grow overflow-y-auto p-4 min-h-0">

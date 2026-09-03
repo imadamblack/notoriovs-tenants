@@ -2,6 +2,7 @@
 
 import {useRef, useState} from 'react'
 import type {Lead, PipelineStage} from '@/components/dashboard/DashboardApp'
+import {formatPhone} from '@/utils/formatters'
 
 type LeadDetailPanelProps = {
   lead: Lead
@@ -52,25 +53,24 @@ function daysIdle(lead: Lead): number | null {
   return Math.max(0, Math.floor(ms / 86400000))
 }
 
-function idleBadge(days: number | null) {
-  if (days === null) return null
-  if (days < 1) return {label: '<1d', className: 'bg-neutral-700 text-neutral-200'}
-  if (days < 15) return {label: `${days}d`, className: 'bg-red-600/90 text-white'}
-  if (days < 45) return {label: `${days}d`, className: 'bg-red-700 text-white'}
-  return {label: `${days}d`, className: 'bg-red-900 text-red-100'}
+function idleBadge(status: string, days: number | null) {
+  if (status === 'open') {
+    if (days === null) return null
+    if (days < 1) return {label: '<1d', className: 'bg-neutral-700 text-neutral-200'}
+    if (days < 15) return {label: `${days}d`, className: 'bg-red-600/90 text-white'}
+    if (days < 45) return {label: `${days}d`, className: 'bg-red-700 text-white'}
+    return {label: `${days}d`, className: 'bg-red-900 text-red-100'}
+  }
+  const STATUS_BADGE: Record<string, { label: string; className: string } | undefined> = {
+    won: {label: 'Ganado', className: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30'},
+    lost: {label: 'Perdido', className: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30'},
+    disqualified: {label: 'Descalificado', className: 'bg-neutral-600/20 text-neutral-400 ring-1 ring-neutral-600/30'},
+  }
+
+  return STATUS_BADGE[status] || null
 }
 
 function ReadField({id, label, value}: { id: string, label: string; value: string }) {
-  function formatPhone(phone: string | number): string {
-    const digits = String(phone).replace(/\D/g, '');
-
-    return digits.replace(
-      /^52(1)?(\d{3})(\d{3})(\d{4})$/,
-      (_, one: string | undefined, area: string, prefix: string, line: string) =>
-        `+52${one ? ' 1' : ''} ${area} ${prefix} ${line}`
-    );
-  }
-
   switch (label) {
     case 'Nombre':
     case 'Teléfono':
@@ -224,19 +224,19 @@ export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadD
 
   const whatsappNumber = (form.whatsapp || form.phone || '').replace(/\D/g, '')
   const currentStageIndex = pipeline.findIndex((s) => s.id === form.stage)
-  const badgeIdle = form.status === 'open' ? idleBadge(daysIdle(lead)) : null
+  const badgeIdle = idleBadge(lead.status, daysIdle(lead));
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[39rem] h-full bg-neutral-900 shadow-xl overflow-y-auto p-8 flex flex-col gap-5"
+        className="w-full max-w-[41rem] h-full bg-neutral-900 shadow-xl overflow-y-scroll overflow-x-hidden p-8 flex flex-col gap-5"
       >
-        <div className="flex items-center justify-between pb-8">
+        <div className="flex items-center justify-between">
           <div className="flex items-center min-w-0">
             <div
               onClick={mode === 'read' ? onClose : handleCancelEdit}
-              className="mr-6 !text-neutral-400 hover:!text-brand-2 ft-2 cursor-pointer">
+              className="mr-6 !text-neutral-400 hover:!text-brand-2 ft-8 cursor-pointer">
               ‹
             </div>
           </div>
@@ -259,7 +259,7 @@ export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadD
         {mode === 'read' ? (
           <>
             <div className="flex gap-4">
-              <h2 className="flex flex-grow ft-1 font-bold text-neutral-200 truncate">{form.name}</h2>
+              <h2 className="flex flex-grow ft-2 font-bold text-neutral-200 truncate">{form.name}</h2>
               {badgeIdle && (
                 <span
                   className={`flex items-center justify-center px-4 text-[1rem] font-semibold rounded-full ${badgeIdle.className}`}
@@ -269,17 +269,12 @@ export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadD
               )}
             </div>
             <div className="flex flex-col gap-6">
-
               <div className="flex gap-4">
-                {/* <select> nativo: en mobile abre el picker propio del SO
-                    (en vez de un menú custom que puede fallar con el
-                    teclado virtual o el scroll), y es accesible por
-                    teclado/lector de pantalla sin trabajo extra. */}
                 <select
                   value={form.stage}
                   onChange={(e) => handleQuickStageChange(e.target.value)}
                   aria-label="Cambiar etapa"
-                  className="flex-grow !bg-neutral-800 !text-neutral-200 border-0 rounded-lg h-16 px-4 -ft-3 font-medium truncate cursor-pointer"
+                  className="flex-grow !bg-neutral-800 !text-neutral-200 border-0 rounded-lg h-16 px-4 -ft-1 font-medium truncate cursor-pointer"
                 >
                   {pipeline.map((stage) => (
                     <option key={stage.id} value={stage.id}>
@@ -304,7 +299,7 @@ export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadD
                   </select>
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 !bg-neutral-800 !text-neutral-200 rounded-lg flex items-center justify-center -ft-2"
+                    className="pointer-events-none absolute inset-0 !bg-neutral-800 !text-neutral-200 rounded-lg flex items-center justify-center -ft-1"
                   >
                     ⋮
                   </div>
@@ -323,13 +318,9 @@ export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadD
                   )
                 })}
               </div>
-
-              <span className="-ft-4 text-neutral-400 h-4">
-                {quickSaving ? 'Guardando…' : quickSaved ? 'Guardado ✓' : ''}
-              </span>
             </div>
 
-            <div className="flex bg-neutral-800 rounded-full p-1">
+            <div className="flex bg-neutral-800 rounded-full mt-8 p-1">
               <button
                 onClick={() => setReadTab('notas')}
                 className={`flex-1 rounded-full py-2 -ft-4 hover:!translate-y-0 ${
@@ -365,7 +356,6 @@ export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadD
                 </>
               ) : (
                 <label className="flex flex-col gap-1 -ft-3 text-neutral-200">
-                  <span className="font-semibold">Notas internas</span>
                   <textarea
                     value={form.notes}
                     onChange={(e) => setForm((f) => ({...f, notes: e.target.value}))}
