@@ -62,7 +62,7 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
     const step = steps[formStep];
 
     if (step?.type === 'checkpoint' && step.name) {
-      fbEvent(step.name);
+      fbEvent(step.name, subdomain);
       if (typeof window !== 'undefined') {
         window.gtag?.('event', step.name.replace('-', '_'));
       }
@@ -123,7 +123,7 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
       });
       const resJson = await res.json().catch(() => ({}));
 
-      fbEvent('Lead', {email: data.email, phone: data.whatsapp, externalID: resJson.id});
+      fbEvent('Lead', subdomain, {email: data.email, phone: data.whatsapp, externalID: resJson.id});
       gtagSendEvent('', {fullName: data.fullName, phone: data.whatsapp});
       setCookie('lead', {...data, id: resJson.id, utm});
 
