@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import LeadDetailPanel from '@/components/dashboard/LeadDetailPanel'
 import KpiReport from '@/components/dashboard/KpiReport'
+import DashboardNav from '@/components/dashboard/ui/organisms/DashboardNav'
 
 export type PipelineStage = { id: string; label: string; isWon?: boolean | null; isLost?: boolean | null }
 
@@ -34,17 +35,17 @@ export type Lead = {
 // arrastrado, donde el propio drag ya conoce su origen).
 export type LeadUpdateEvent = { lead: Lead; previousStage: string }
 
+export type DashboardTab = 'kanban' | 'kpis'
+
 type DashboardAppProps = {
   subdomain: string
   companyName?: string | null
   pipeline: PipelineStage[]
 }
 
-type Tab = 'kanban' | 'kpis'
-
 export default function DashboardApp({ subdomain, companyName, pipeline }: DashboardAppProps) {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('kanban')
+  const [tab, setTab] = useState<DashboardTab>('kanban')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [updateEvent, setUpdateEvent] = useState<LeadUpdateEvent | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,33 +93,7 @@ export default function DashboardApp({ subdomain, companyName, pipeline }: Dashb
 
   return (
     <div className="fixed inset-0 bg-neutral-800 flex flex-col">
-      <header className="bg-neutral-800 border-b border-neutral-600 px-6 py-2 flex items-center justify-between">
-        <div>
-
-          <h1 className="ft-0 font-bold text-neutral-200">{companyName}</h1>
-        </div>
-        <nav className="flex items-center gap-2">
-          <button
-            onClick={() => setTab('kanban')}
-            className={`!border-none px-4 py-2 -ft-2 font-medium ${
-              tab === 'kanban' ? '!bg-brand-1 !text-white' : '!bg-transparent !text-neutral-500'
-            }`}
-          >
-            Leads
-          </button>
-          <button
-            onClick={() => setTab('kpis')}
-            className={`!border-none px-4 py-2 -ft-2 font-medium ${
-              tab === 'kpis' ? '!bg-brand-1 !text-white' : '!bg-transparent !text-neutral-500'
-            }`}
-          >
-            Reportes
-          </button>
-          <button onClick={handleLogout} className="!bg-transparent !text-neutral-400 -ft-2 ml-2 hover:!text-brand-2">
-            Salir
-          </button>
-        </nav>
-      </header>
+      <DashboardNav companyName={companyName} tab={tab} onTabChange={setTab} onLogout={handleLogout} />
 
       <main className="flex-1 overflow-auto min-h-0">
         {tab === 'kanban' ? (

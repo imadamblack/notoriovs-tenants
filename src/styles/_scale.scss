@@ -1,0 +1,46 @@
+@use 'sass:math';
+@use 'sass:map';
+
+$fluid-min-vp: 32rem;
+$fluid-max-vp: 128rem;
+
+@function fluid-clamp($min, $max) {
+  $vp-range: $fluid-max-vp - $fluid-min-vp;
+  $slope: math.div($max - $min, $vp-range);
+  $intercept: $min - ($slope * $fluid-min-vp);
+  @return clamp(#{$min}, calc(#{$intercept} + #{$slope * 100}vw), #{$max});
+}
+
+$titleLead: 1.1;
+$subtitleLead: 1.2;
+$baseLead: 1.5;
+
+$fluid_steps: (
+  ft-11: (minSize: 3.26rem, maxSize: 6.2rem,  lead: $titleLead),
+  ft-10: (minSize: 3.06rem, maxSize: 5.5rem,  lead: $titleLead),
+  ft-9:  (minSize: 2.86rem, maxSize: 4.9rem,  lead: $titleLead),
+  ft-8:  (minSize: 2.68rem, maxSize: 4.36rem, lead: $titleLead),
+  ft-7:  (minSize: 2.5rem,  maxSize: 3.88rem, lead: $titleLead),
+  ft-6:  (minSize: 2.36rem, maxSize: 3.45rem, lead: $titleLead),
+  ft-5:  (minSize: 2.2rem,  maxSize: 3.05rem, lead: $titleLead),
+  ft-4:  (minSize: 2.1rem,  maxSize: 2.7rem,  lead: $subtitleLead),
+  ft-3:  (minSize: 1.95rem, maxSize: 2.4rem,  lead: $subtitleLead),
+  ft-2:  (minSize: 1.8rem,  maxSize: 2.15rem, lead: $baseLead),
+  ft-1:  (minSize: 1.7rem,  maxSize: 1.9rem,  lead: $baseLead),
+  ft-0:  (minSize: 1.6rem,  maxSize: 1.7rem,  lead: $baseLead),
+  -ft-1: (minSize: 1.4rem,  maxSize: 1.6rem,  lead: $baseLead),
+  -ft-2: (minSize: 1.25rem, maxSize: 1.5rem,  lead: $baseLead),
+  -ft-3: (minSize: 1.1rem,  maxSize: 1.3rem,  lead: $baseLead),
+  -ft-4: (minSize: 1.1rem,  maxSize: 1.1rem,  lead: $baseLead),
+);
+
+@mixin fluid-scale-classes {
+  @each $class, $props in $fluid_steps {
+    $min: map.get($props, minSize);
+    $max: map.get($props, maxSize);
+    .#{$class} {
+      font-size: if($min == $max, $min, fluid-clamp($min, $max));
+      line-height: map.get($props, lead);
+    }
+  }
+}

@@ -1,0 +1,14 @@
+// Tokens del scope dashboard
+.dashboard-root {
+  --dashboard-color-primary: #{theme('colors.brand.3')};
+  --dashboard-color-primary-contrast: #{theme('colors.white')};
+
+  --dashboard-color-surface: #{theme('colors.neutral.900')};
+  --dashboard-color-surface-alt: #{theme('colors.neutral.800')};
+  --dashboard-color-border: #{theme('colors.neutral.700')};
+
+  --dashboard-color-text: #{theme('colors.neutral.100')};
+  --dashboard-color-text-muted: #{theme('colors.neutral.400')};
+
+  --dashboard-radius: #{theme('borderRadius.lg')};
+}

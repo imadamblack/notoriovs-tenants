@@ -19,7 +19,7 @@ Todo el trabajo de esta funcionalidad vive en la rama `feature/tenant-leads-dash
 ## 3. Configuración por tenant (Payload admin)
 
 - [ ] Definir `dashboardPassword` en cada tenant que se quiera activar (Tenants → Dashboard Cliente). Mientras esté vacío, ese tenant ve un mensaje de "dashboard no disponible" en vez del login.
-- [ ] Revisar el pipeline default (`Nuevo → Contactado → Calificado → Ganado → Perdido`) por tenant y ajustarlo si algún cliente maneja etapas distintas (ej. inmobiliarias con "Cita agendada" o "Visitó").
+- [ ] Revisar el pipeline default (`Nuevo → Contactado → Calificado → Cotizado → Ganado`) por tenant y ajustarlo si algún cliente maneja etapas distintas (ej. inmobiliarias con "Cita agendada" o "Visitó").
 - [ ] Confirmar que "Ganado"/"Perdido" (o como se llamen en cada tenant) tengan marcado `isWon`/`isLost` en el pipeline. **Actualización:** `Leads` ahora separa `stage` (la etapa/columna del Kanban) de `status` (abierto/ganado/perdido/descalificado, fijo para todos los tenants). `isWon`/`isLost` ya no se usan para calcular la conversión directamente; solo sirven para que el `status` se autoactualice cuando un lead se mueve a esa etapa. La conversión del reporte de KPIs se calcula ya directo de `status`.
 - [ ] Decidir si algún usuario interno de Payload debe quedar restringido a ciertos tenants, o si todos siguen viendo todo (hoy `userHasAccessToAllTenants` está en `true` para todos).
 
