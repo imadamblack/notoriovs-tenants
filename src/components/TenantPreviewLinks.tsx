@@ -14,6 +14,7 @@ const VIEWS = [
   { label: 'Ver Quiz', path: '/survey' },
   { label: 'Ver Gracias', path: '/thankyou' },
   { label: 'Ver No Elegible', path: '/not-elegible' },
+  { label: 'Ver Dashboard', path: '/dashboard' },
 ]
 
 const btnStyle: React.CSSProperties = {
