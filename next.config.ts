@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(__filename)
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['@payloadcms/db-postgres'],
   images: {
     localPatterns: [
       {
@@ -33,5 +34,10 @@ const nextConfig: NextConfig = {
     root: path.resolve(dirname),
   },
 }
+
+module.exports = {
+  allowedDevOrigins: ['192.168.100.72'],
+}
+
 
 export default withPayload(nextConfig, { devBundleServerPackages: false })

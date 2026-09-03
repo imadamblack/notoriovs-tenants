@@ -4,6 +4,7 @@ import { getTenantBySubdomain } from '@/utils/getTenant'
 import { verifyDashboardToken, DASHBOARD_COOKIE_NAME } from '@/utils/dashboardAuth'
 import DashboardLogin from '@/components/dashboard/DashboardLogin'
 import DashboardApp from '@/components/dashboard/DashboardApp'
+import DashboardUnavailable from '@/components/dashboard/DashboardUnavailable'
 
 type DashboardPageProps = {
   params: Promise<{ subdomain: string }>
@@ -18,16 +19,7 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
   if (!tenant) notFound()
 
   if (!tenant.dashboardPassword) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-brand-4 px-4">
-        <div className="max-w-md text-center bg-white rounded-2xl shadow-sm p-8">
-          <h1 className="ft-3 font-bold text-brand-1 mb-2">Dashboard no disponible</h1>
-          <p className="text-neutral-600">
-            Este tenant todavía no tiene un dashboard configurado. Contacta a Notoriovs para activarlo.
-          </p>
-        </div>
-      </div>
-    )
+    return <DashboardUnavailable />
   }
 
   const cookieStore = await cookies()

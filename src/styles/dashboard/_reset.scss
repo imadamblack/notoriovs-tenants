@@ -1,0 +1,60 @@
+.dashboard-root {
+  //h1, h2, h3, h4, h5, h6, p, label {
+  //  color: inherit;
+  //}
+
+  label {
+    @extend .-ft-3;
+    @apply font-normal;
+  }
+
+  button, .button {
+    @apply flex justify-center items-center gap-2
+    font-medium transition-all duration-200
+    disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+
+    &:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+  }
+
+  input, select, textarea {
+    @apply border transition-colors;
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  select {
+    background-image: none;
+  }
+}
+
+// :where() deja esto a la misma especificidad que button{}/input{}
+// globales (gana por orden de carga: dashboard.scss carga después de
+// globals.scss) pero por debajo de cualquier clase de instancia
+// (bg-*, px-*, w-*, rounded-*, etc.), que la sigue pudiendo pisar sin
+// !important.
+:where(.dashboard-root) {
+  button, .button {
+    @apply w-max px-4 py-2 rounded-lg;
+    background-color: var(--dashboard-color-surface-alt);
+    color: var(--dashboard-color-text);
+  }
+
+  input, select, textarea {
+    @apply w-full px-3 py-2 rounded-lg;
+    background-color: var(--dashboard-color-surface);
+    border-color: var(--dashboard-color-border);
+    color: var(--dashboard-color-text);
+
+    &::placeholder {
+      color: var(--dashboard-color-text-muted);
+    }
+
+    &:focus {
+      border-color: var(--dashboard-color-primary);
+    }
+  }
+}

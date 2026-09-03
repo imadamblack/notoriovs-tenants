@@ -19,14 +19,20 @@ const logoMarkup = `
 </svg>
 `
 
-export const AdminLogo: React.FC = () => {
+type AdminLogoProps = {
+  color?: string
+}
+
+export const AdminLogo = ({ color = '--theme-elevation-1000' }: AdminLogoProps = {}) => {
   return (
     <span
       style={{
         display: 'inline-block',
-        width: '2.5rem',
-        height: '2.5rem',
-        color: 'var(--theme-elevation-1000)',
+        width: '100%',
+        maxWidth: '2.5rem',
+        height: '100%',
+        maxHeight: '2.5rem',
+        color: `var(${color})`,
       }}
       dangerouslySetInnerHTML={{ __html: logoMarkup }}
     />
