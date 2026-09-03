@@ -30,7 +30,7 @@ export default async function TenantNotEligiblePage({params}: TenantNotEligibleP
 
   return (
     <main className="py-12 flex-grow">
-      <NotEligibleTracking />
+      <NotEligibleTracking subdomain={subdomain} />
       <div className="reading-container bg-neutral-100 flex flex-col">
         {logo != null && typeof logo === 'object' ? (
           <div className="relative flex justify-start w-40 h-16">

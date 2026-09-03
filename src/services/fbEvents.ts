@@ -1,13 +1,9 @@
-import { getSubdomainFromHost } from '@/utils/subdomain';
-
 declare global {
   interface Window {
     fbq?: (...args: unknown[]) => void;
     gtag?: (...args: unknown[]) => void;
   }
 }
-
-const ROOT_DOMAIN = 'notoriovs.com';
 
 type FbUserData = {
   phone?: string;
@@ -17,6 +13,7 @@ type FbUserData = {
 
 export default function fbEvent(
   eventName: string,
+  subdomain: string,
   userData: FbUserData = {
     phone: '',
     email: '',
@@ -40,8 +37,10 @@ export default function fbEvent(
     console.error('fbq error:', err);
   }
 
-  const subdomain =
-    typeof window !== 'undefined' ? getSubdomainFromHost(window.location.hostname, ROOT_DOMAIN) : '';
+  if (!subdomain) {
+    console.error('fbEvent: falta subdomain, evento no se reenvía a /api/fb-event');
+    return Promise.resolve({ skipped: true, reason: 'Falta subdomain' });
+  }
 
   const payload = JSON.stringify({
     eventName,
