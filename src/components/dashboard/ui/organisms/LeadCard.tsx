@@ -14,8 +14,8 @@ function cardTone(lead: Lead, days: number | null) {
   if (lead.status === 'disqualified') {
     return 'bg-neutral-900/50 border-neutral-800 opacity-60'
   }
-  if (days === null || days < 2) return 'bg-neutral-800 border-neutral-800'
-  if (days < 15) return 'bg-gradient-to-br from-red-950/50 via-neutral-900 to-neutral-900 border-red-900/30'
+  if (days === null || days < 7) return 'bg-neutral-800 border-neutral-800'
+  if (days < 15) return 'bg-gradient-to-br from-yellow-900/40 via-yellow-950/30 to-neutral-900 border-red-900/30'
   if (days < 45) return 'bg-gradient-to-br from-red-950/80 via-red-950/40 to-neutral-900 border-red-900/40'
   return 'bg-gradient-to-br from-red-950 via-[#3a0a0a] to-black border-red-800/50'
 }
@@ -43,7 +43,7 @@ export default function LeadCard({ lead, pending, onClick, onDragStart, onDragEn
       className={`rounded-lg border p-3 cursor-pointer transition-shadow hover:shadow-lg hover:shadow-black/30 ${cardTone(lead, days)} ${pending ? 'opacity-40 pointer-events-none' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="font-medium -ft-1 text-neutral-100 truncate">{lead.name || 'Sin nombre'}</p>
+        <p className="font-medium -ft-1 text-neutral-100 truncate">{lead.name || `Lead ${lead.id}`}</p>
         {badge && <Badge label={badge.label} tone={badge.tone} className="shrink-0" />}
       </div>
       <p className="-ft-2 text-neutral-400 truncate mt-0.5">

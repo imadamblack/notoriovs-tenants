@@ -35,7 +35,7 @@ export function daysIdle(lead: Pick<Lead, 'updatedAt' | 'createdAt'>): number | 
 }
 
 export function idleTone(days: number): BadgeTone {
-  if (days < 1) return 'neutral'
+  if (days < 7) return 'neutral'
   if (days < 15) return 'urgent-1'
   if (days < 45) return 'urgent-2'
   return 'urgent-3'
