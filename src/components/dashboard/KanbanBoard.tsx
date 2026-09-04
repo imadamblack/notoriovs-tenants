@@ -4,6 +4,8 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import type {Lead, LeadUpdateEvent, PipelineStage} from '@/components/dashboard/DashboardApp'
 import Select from '@/components/dashboard/ui/atoms/Select'
 import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
+import IconClock from '@/components/dashboard/ui/atoms/icons/IconClock'
+import IconFilter from '@/components/dashboard/ui/atoms/icons/IconFilter'
 import SearchInput from '@/components/dashboard/ui/molecules/SearchInput'
 import ViewToggle, {type BoardView} from '@/components/dashboard/ui/molecules/ViewToggle'
 import BoardScrollIndicator from '@/components/dashboard/ui/molecules/BoardScrollIndicator'
@@ -13,6 +15,7 @@ import LeadListTable from '@/components/dashboard/ui/organisms/LeadListTable'
 type KanbanBoardProps = {
   subdomain: string
   pipeline: PipelineStage[]
+  stuckAfterDays?: number | null
   onCardClick: (lead: Lead) => void
   onStageChange: (lead: Lead, stage: string) => Promise<Lead | null>
   updateEvent: LeadUpdateEvent | null
@@ -24,6 +27,35 @@ const SORT_LABELS: Record<SortKey, string> = {
   created_desc: 'Más recientes',
   created_asc: 'Más antiguos',
   name_asc: 'Nombre A-Z',
+}
+
+// Filtro de tiempo: sobre `createdAt` (cuándo llegó el lead), ventana
+// rodante desde ahora (24h/7d/30d/90d), no día de calendario (ver el
+// comentario de SINCE_DAYS en leadDashboardFilters.ts, del lado del
+// servidor). 'all' ("Máximo") no manda parámetro, es el estado actual.
+type SinceKey = 'today' | '7d' | '30d' | '3m' | 'all'
+
+const SINCE_LABELS: Record<SinceKey, string> = {
+  today: 'Hoy',
+  '7d': '7 días',
+  '30d': '30 días',
+  '3m': '3 meses',
+  all: 'Máximo',
+}
+
+// Filtro de status. 'stuck' ("Estancados") es sintético: no es un valor de
+// Lead.status, se resuelve en el servidor a "abierto y sin actividad hace
+// más de Tenant.leadStuckAfterDays" (ver leadDashboardFilters.ts). 'all'
+// ("Todos") no manda parámetro.
+type StatusFilterKey = 'all' | 'stuck' | 'open' | 'won' | 'lost' | 'disqualified'
+
+const STATUS_FILTER_LABELS: Record<StatusFilterKey, string> = {
+  all: 'Todos',
+  stuck: 'Estancados',
+  open: 'Abiertos',
+  won: 'Ganados',
+  lost: 'Perdidos',
+  disqualified: 'Descalificados',
 }
 
 // Cuántas tarjetas/filas trae cada página. El Kanban pide de a poco por
@@ -59,11 +91,13 @@ const emptyColumn: ColumnState = {
 // es lo que hace viable un tenant con miles de leads sin traer todo a la vez
 // (ver `handleColumnScroll`/`handleListScroll`: cargan la siguiente página
 // al acercarse al fondo del contenedor, sin botón).
-export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageChange, updateEvent}: KanbanBoardProps) {
+export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCardClick, onStageChange, updateEvent}: KanbanBoardProps) {
   const [view, setView] = useState<BoardView>('kanban')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
+  const [sinceKey, setSinceKey] = useState<SinceKey>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
 
   const [columnData, setColumnData] = useState<Record<string, ColumnState>>({})
   const [stageCounts, setStageCounts] = useState<Record<string, number>>({})
@@ -107,9 +141,11 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
     (extra: Record<string, string>) => {
       const params = new URLSearchParams({subdomain, sort: sortKey, ...extra})
       if (debouncedSearch) params.set('search', debouncedSearch)
+      if (sinceKey !== 'all') params.set('since', sinceKey)
+      if (statusFilter !== 'all') params.set('status', statusFilter)
       return params
     },
-    [subdomain, sortKey, debouncedSearch],
+    [subdomain, sortKey, debouncedSearch, sinceKey, statusFilter],
   )
 
   const loadColumn = useCallback(
@@ -152,13 +188,15 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
   const loadCounts = useCallback(async () => {
     const params = new URLSearchParams({subdomain})
     if (debouncedSearch) params.set('search', debouncedSearch)
+    if (sinceKey !== 'all') params.set('since', sinceKey)
+    if (statusFilter !== 'all') params.set('status', statusFilter)
     const res = await fetch(`/api/tenant-dashboard/leads/counts?${params}`)
     if (!res.ok) return
     const data = await res.json()
     setStageCounts(data.counts || {})
     setOtherCount(data.other || 0)
     setTotalCount(data.total || 0)
-  }, [subdomain, debouncedSearch])
+  }, [subdomain, debouncedSearch, sinceKey, statusFilter])
 
   const loadList = useCallback(
     async (page: number) => {
@@ -335,9 +373,9 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
 
         <div className="flex flex-grow items-center justify-between md:justify-end gap-4">
           <div className="flex items-center gap-2">
-            <div className="relative h-[4rem] w-[4rem] shrink-0" title={`Ordenar: ${SORT_LABELS[sortKey]}`}>
+            <div className="relative h-[4.7rem] w-[4.7rem] shrink-0" title={`Ordenar: ${SORT_LABELS[sortKey]}`}>
               <Select
-                id="filter"
+                id="sort-select"
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
                 aria-label="Ordenar leads"
@@ -353,7 +391,69 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-neutral-50 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_8px_24px_-8px_rgba(0,0,0,0.5)] peer-hover:border-white/30 peer-hover:bg-white/[0.16] peer-focus:border-white/30 peer-focus:bg-white/[0.16]"
               >
-                <IconSort/>
+                <span className="w-6 h-6">
+                  <IconSort/>
+                </span>
+              </div>
+            </div>
+
+            <div
+              className={`relative h-[4.7rem] w-[4.7rem] shrink-0 ${statusFilter === 'stuck' ? 'opacity-40' : ''}`}
+              title={statusFilter === 'stuck' ? 'Filtro de tiempo desactivado con "Estancados"' : `Tiempo: ${SINCE_LABELS[sinceKey]}`}
+            >
+              <Select
+                id="since-select"
+                value={sinceKey}
+                disabled={statusFilter === 'stuck'}
+                onChange={(e) => setSinceKey(e.target.value as SinceKey)}
+                aria-label="Filtrar leads por tiempo"
+                className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+              >
+                {Object.entries(SINCE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-neutral-50 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_8px_24px_-8px_rgba(0,0,0,0.5)] peer-hover:border-white/30 peer-hover:bg-white/[0.16] peer-focus:border-white/30 peer-focus:bg-white/[0.16]"
+              >
+                <span className="w-6 h-6">
+                  <IconClock/>
+                </span>
+              </div>
+            </div>
+
+            <div className="relative h-[4.7rem] w-[4.7rem] shrink-0" title={`Status: ${STATUS_FILTER_LABELS[statusFilter]}`}>
+              <Select
+                id="status-select"
+                value={statusFilter}
+                onChange={(e) => {
+                  const next = e.target.value as StatusFilterKey
+                  setStatusFilter(next)
+                  // "Estancados" ya filtra por tiempo sin actividad; dejar
+                  // el filtro de "Tiempo" (que filtra por fecha de creación)
+                  // prendido casi siempre da 0 resultados (un lead creado,
+                  // digamos, hoy no puede llevar semanas sin actividad).
+                  if (next === 'stuck') setSinceKey('all')
+                }}
+                aria-label="Filtrar leads por status"
+                className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+              >
+                {Object.entries(STATUS_FILTER_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-neutral-50 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_8px_24px_-8px_rgba(0,0,0,0.5)] peer-hover:border-white/30 peer-hover:bg-white/[0.16] peer-focus:border-white/30 peer-focus:bg-white/[0.16]"
+              >
+                <span className="w-6 h-6">
+                  <IconFilter/>
+                </span>
               </div>
             </div>
           </div>
@@ -386,6 +486,7 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
                   error={state.error}
                   isDragOver={dragOverKey === col.id}
                   pendingLeadId={pendingLeadId}
+                  stuckAfterDays={stuckAfterDays}
                   scrollRef={(el) => {
                     columnScrollRefs.current[col.id] = el
                   }}
@@ -421,6 +522,7 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
           <LeadListTable
             leads={listLeads}
             pipeline={pipeline}
+            stuckAfterDays={stuckAfterDays}
             onRowClick={onCardClick}
             loading={listLoading}
             loadingMore={listLoadingMore}

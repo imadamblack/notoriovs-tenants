@@ -41,9 +41,10 @@ type DashboardAppProps = {
   subdomain: string
   companyName?: string | null
   pipeline: PipelineStage[]
+  stuckAfterDays?: number | null
 }
 
-export default function DashboardApp({ subdomain, companyName, pipeline }: DashboardAppProps) {
+export default function DashboardApp({ subdomain, companyName, pipeline, stuckAfterDays }: DashboardAppProps) {
   const router = useRouter()
   const [tab, setTab] = useState<DashboardTab>('kanban')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -100,6 +101,7 @@ export default function DashboardApp({ subdomain, companyName, pipeline }: Dashb
           <KanbanBoard
             subdomain={subdomain}
             pipeline={pipeline}
+            stuckAfterDays={stuckAfterDays}
             onCardClick={setSelectedLead}
             onStageChange={(lead, stage) => updateLead(lead, { stage })}
             updateEvent={updateEvent}
@@ -115,6 +117,7 @@ export default function DashboardApp({ subdomain, companyName, pipeline }: Dashb
         <LeadDetailPanel
           lead={selectedLead}
           pipeline={pipeline}
+          stuckAfterDays={stuckAfterDays}
           onClose={() => setSelectedLead(null)}
           onSave={async (patch) => Boolean(await updateLead(selectedLead, patch))}
         />

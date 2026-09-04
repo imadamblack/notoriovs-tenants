@@ -60,6 +60,7 @@ export type TenantDoc = {
   tracking?: TenantTracking | null
   dashboardPassword?: string | null
   leadPipeline?: TenantLeadStage[] | null
+  leadStuckAfterDays?: number | null
   thankYouPage?: {
     title?: string | null
     subtitle?: string | null

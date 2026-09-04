@@ -16,6 +16,7 @@ import LeadEditForm from '@/components/dashboard/ui/organisms/LeadEditForm'
 type LeadDetailPanelProps = {
   lead: Lead
   pipeline: PipelineStage[]
+  stuckAfterDays?: number | null
   onClose: () => void
   onSave: (patch: Partial<Lead>) => Promise<boolean>
 }
@@ -44,7 +45,7 @@ function buildFormFromLead(lead: Lead): LeadForm {
   }
 }
 
-export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadDetailPanelProps) {
+export default function LeadDetailPanel({lead, pipeline, stuckAfterDays, onClose, onSave}: LeadDetailPanelProps) {
   const [mode, setMode] = useState<'read' | 'write'>('read')
   const [form, setForm] = useState<LeadForm>(() => buildFormFromLead(lead))
   const [saving, setSaving] = useState(false)
@@ -150,7 +151,7 @@ export default function LeadDetailPanel({lead, pipeline, onClose, onSave}: LeadD
       >
         <LeadDetailHeader
           name={form.name}
-          badge={mode === 'read' ? leadBadge(lead) : null}
+          badge={mode === 'read' ? leadBadge(lead, stuckAfterDays) : null}
           mode={mode}
           onBack={mode === 'read' ? onClose : handleCancelEdit}
           onEdit={() => setMode('write')}

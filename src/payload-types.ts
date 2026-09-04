@@ -472,6 +472,10 @@ export interface Tenant {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Un lead abierto (status "Abierto") que lleva sin actualizarse al menos esta cantidad de días aparece como "Estancado" en el filtro de status del dashboard, y es también el corte donde su tarjeta empieza a verse "vieja" (el badge de días y el degradado de color de la tarjeta en el Kanban). Vacío usa el default de 21 días. Los siguientes niveles de urgencia (más rojo) se calculan automáticamente como 2x y 4x este número, así que siempre quedan ordenados sin importar qué tan alto o bajo lo pongas aquí.
+   */
+  leadStuckAfterDays?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -952,6 +956,7 @@ export interface TenantsSelect<T extends boolean = true> {
         isLost?: T;
         id?: T;
       };
+  leadStuckAfterDays?: T;
   updatedAt?: T;
   createdAt?: T;
 }

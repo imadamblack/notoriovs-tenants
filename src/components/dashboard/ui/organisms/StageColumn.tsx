@@ -15,6 +15,7 @@ type StageColumnProps = {
   error: boolean
   isDragOver: boolean
   pendingLeadId: string | null
+  stuckAfterDays?: number | null
   scrollRef: (el: HTMLDivElement | null) => void
   onScroll: (e: UIEvent<HTMLDivElement>) => void
   onDragOver: (e: DragEvent<HTMLDivElement>) => void
@@ -35,6 +36,7 @@ export default function StageColumn({
   error,
   isDragOver,
   pendingLeadId,
+  stuckAfterDays,
   scrollRef,
   onScroll,
   onDragOver,
@@ -66,6 +68,7 @@ export default function StageColumn({
             key={lead.id}
             lead={lead}
             pending={pendingLeadId === String(lead.id)}
+            stuckAfterDays={stuckAfterDays}
             onClick={() => onCardClick(lead)}
             onDragStart={() => onCardDragStart(lead)}
             onDragEnd={onCardDragEnd}

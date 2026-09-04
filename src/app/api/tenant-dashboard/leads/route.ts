@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import type { Where } from 'payload'
 import config from '@payload-config'
 import { requireDashboardTenant } from '@/utils/requireDashboardAuth'
+import { applyStatusAndSinceFilters, SEARCH_FIELDS } from '@/utils/leadDashboardFilters'
 
 // Todas las rutas bajo /api/tenant-dashboard/* usan la Local API de Payload
 // con `overrideAccess: true` (Leads.access exige `req.user`, que aquí nunca
@@ -15,13 +16,6 @@ const SORT_MAP: Record<string, string> = {
   created_asc: 'createdAt',
   name_asc: 'name',
 }
-
-const ALLOWED_STATUSES_FILTER = new Set(['open', 'won', 'lost', 'disqualified'])
-
-// Campos donde busca el cuadro de "Buscar leads" del dashboard (Kanban y
-// Lista). `contains` en Postgres se traduce a ILIKE '%valor%' (case
-// insensitive), ver @payloadcms/drizzle/dist/queries/sanitizeQueryValue.js.
-const SEARCH_FIELDS = ['name', 'phone', 'whatsapp', 'email'] as const
 
 function clampLimit(raw: string | null): number {
   const parsed = Number(raw)
@@ -53,6 +47,7 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams
   const stage = params.get('stage')?.trim() || undefined
   const status = params.get('status')?.trim() || undefined
+  const since = params.get('since')?.trim() || undefined
   const search = params.get('search')?.trim() || undefined
   const sort = SORT_MAP[params.get('sort') || 'created_desc'] || SORT_MAP.created_desc
   const page = clampPage(params.get('page'))
@@ -71,9 +66,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (status && ALLOWED_STATUSES_FILTER.has(status)) {
-    and.push({ status: { equals: status } })
-  }
+  applyStatusAndSinceFilters(and, tenant, status, since)
 
   if (search) {
     and.push({

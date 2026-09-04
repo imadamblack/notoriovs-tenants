@@ -1,17 +1,18 @@
 import type { Lead, PipelineStage } from '@/components/dashboard/DashboardApp'
 import DataTable, { type DataTableColumn } from '@/components/dashboard/ui/molecules/DataTable'
 import Badge from '@/components/dashboard/ui/atoms/Badge'
-import { statusLabel, statusTone, formatLeadDate } from '@/components/dashboard/leadPresentation'
+import { leadBadge, formatLeadDate } from '@/components/dashboard/leadPresentation'
 
 type LeadListTableProps = {
   leads: Lead[]
   pipeline: PipelineStage[]
+  stuckAfterDays?: number | null
   onRowClick: (lead: Lead) => void
   loading: boolean
   loadingMore: boolean
 }
 
-export default function LeadListTable({ leads, pipeline, onRowClick, loading, loadingMore }: LeadListTableProps) {
+export default function LeadListTable({ leads, pipeline, stuckAfterDays, onRowClick, loading, loadingMore }: LeadListTableProps) {
   const stageLabel = (id: string) => pipeline.find((s) => s.id === id)?.label || id || 'Sin etapa'
 
   const columns: DataTableColumn<Lead>[] = [
@@ -21,12 +22,13 @@ export default function LeadListTable({ leads, pipeline, onRowClick, loading, lo
     {
       key: 'status',
       header: 'Status',
-      render: (lead) =>
-        lead.status !== 'open' ? (
-          <Badge label={statusLabel(lead.status)} tone={statusTone(lead.status)} />
-        ) : (
-          <span className="text-[10px] text-neutral-500">Abierto</span>
-        ),
+      // Mismo badge que ya usa la tarjeta del Kanban (leadBadge): para un
+      // lead abierto muestra los días sin actividad (con el mismo tono de
+      // "Estancado" si aplica), no solo un texto plano "Abierto".
+      render: (lead) => {
+        const badge = leadBadge(lead, stuckAfterDays)
+        return badge ? <Badge label={badge.label} tone={badge.tone} /> : <span className="text-[10px] text-neutral-500">—</span>
+      },
     },
     { key: 'createdAt', header: 'Creado', render: (lead) => formatLeadDate(lead.createdAt) || '—' },
   ]
