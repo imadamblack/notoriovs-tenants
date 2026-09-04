@@ -24,6 +24,7 @@ export default function DashboardNav({companyName, tab, onTabChange, onLogout}: 
       <nav className="flex items-center gap-2">
         <Button
           variant={tab === 'kanban' ? 'glass' : 'ghost'}
+          className={tab === 'kanban' ? '!text-brand-5' : ''}
           size="md"
           onClick={() => onTabChange('kanban')}
         >
@@ -32,6 +33,7 @@ export default function DashboardNav({companyName, tab, onTabChange, onLogout}: 
         <Button
           variant={tab === 'kpis' ? 'glass' : 'ghost'}
           size="md"
+          className={tab === 'kpis' ? '!text-brand-5' : ''}
           onClick={() => onTabChange('kpis')}
         >
           <IconMonitoring />

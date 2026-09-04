@@ -28,7 +28,7 @@ const columns: DataTableColumn<MarketingRow>[] = [
 export default function KpiMarketingSection({ marketing, totals }: KpiMarketingSectionProps) {
   return (
     <section>
-      <SectionHeading>Marketing (semanal)</SectionHeading>
+      <SectionHeading>Marketing</SectionHeading>
       {marketing.length === 0 ? (
         <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-4">
           Aún no hay reportes de marketing capturados para este tenant.

@@ -46,7 +46,7 @@ export default function KpiReport({ data, pipeline }: KpiReportProps) {
   if (!data) return <p className="text-neutral-400 text-sm">Cargando…</p>
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="container flex flex-col gap-8 p-6">
       <KpiSummarySection
         total={data.total}
         conversionRate={data.conversionRate}

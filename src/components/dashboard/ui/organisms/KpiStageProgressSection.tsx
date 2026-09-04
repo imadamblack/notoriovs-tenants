@@ -10,9 +10,9 @@ type KpiStageProgressSectionProps = {
 
 export default function KpiStageProgressSection({ byStage, hasPipeline, otherCount }: KpiStageProgressSectionProps) {
   return (
-    <section>
-      <SectionHeading>Progreso por etapa</SectionHeading>
-      <div className="bg-white rounded-xl border border-neutral-200 p-4 flex flex-col gap-3">
+    <div className="bg-neutral-900 p-4 flex-1 min-w-[160px]">
+      <p className="-ft-2 tracking-wide text-neutral-400">Progreso por etapa</p>
+      <div className="bg-neutral-900 p-4 flex flex-col gap-3">
         {byStage.map((stage) => (
           <div key={stage.id} className="flex items-center gap-3">
             <span className="w-32 text-sm text-neutral-600 truncate">{stage.label}</span>
@@ -29,6 +29,6 @@ export default function KpiStageProgressSection({ byStage, hasPipeline, otherCou
           </p>
         )}
       </div>
-    </section>
+    </div>
   )
 }

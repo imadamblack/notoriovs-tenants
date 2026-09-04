@@ -22,8 +22,8 @@ export default function KpiSummarySection({
 }: KpiSummarySectionProps) {
   return (
     <section>
-      <SectionHeading>Resumen del pipeline</SectionHeading>
-      <div className="flex flex-wrap gap-3">
+      <SectionHeading>Ventas</SectionHeading>
+      <div className="flex flex-wrap gap-4">
         <StatTile label="Leads totales" value={String(total)} />
         <StatTile label="Tasa de conversión" value={`${conversionRate}%`} sub={`${won} lead(s) ganados`} />
         <StatTile label="Tasa de pérdida" value={`${lossRate}%`} sub={`${lost} lead(s) perdidos`} />
