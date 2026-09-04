@@ -1,8 +1,5 @@
 import React from 'react'
 
-// Inline SVG markup (from public/logo.svg) with fill switched to `currentColor`
-// so it can adapt to Payload's light/dark admin theme via the wrapper's `color`.
-
 const favicon = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2499.93 2373.6" fill="currentColor">
   <g>
@@ -17,6 +14,8 @@ const favicon = `
   </g>
 </svg>
 `
+
+export const faviconMarkup = favicon.trim()
 
 export const Favicon: React.FC = () => {
   return (

@@ -1,8 +1,4 @@
 .dashboard-root {
-  //h1, h2, h3, h4, h5, h6, p, label {
-  //  color: inherit;
-  //}
-
   label {
     @extend .-ft-3;
     @apply font-normal;
@@ -31,11 +27,6 @@
   }
 }
 
-// :where() deja esto a la misma especificidad que button{}/input{}
-// globales (gana por orden de carga: dashboard.scss carga después de
-// globals.scss) pero por debajo de cualquier clase de instancia
-// (bg-*, px-*, w-*, rounded-*, etc.), que la sigue pudiendo pisar sin
-// !important.
 :where(.dashboard-root) {
   button, .button {
     @apply w-max px-4 py-2 rounded-lg;
