@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Lead, LeadUpdateEvent, PipelineStage } from '@/components/dashboard/DashboardApp'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import type {Lead, LeadUpdateEvent, PipelineStage} from '@/components/dashboard/DashboardApp'
 import Select from '@/components/dashboard/ui/atoms/Select'
+import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
 import SearchInput from '@/components/dashboard/ui/molecules/SearchInput'
-import ViewToggle, { type BoardView } from '@/components/dashboard/ui/molecules/ViewToggle'
+import ViewToggle, {type BoardView} from '@/components/dashboard/ui/molecules/ViewToggle'
 import BoardScrollIndicator from '@/components/dashboard/ui/molecules/BoardScrollIndicator'
 import StageColumn from '@/components/dashboard/ui/organisms/StageColumn'
 import LeadListTable from '@/components/dashboard/ui/organisms/LeadListTable'
@@ -325,37 +326,47 @@ export default function KanbanBoard({subdomain, pipeline, onCardClick, onStageCh
     <div className="flex flex-col flex-grow bg-neutral-800 shadow-2xl overflow-hidden min-h-0">
 
       <div className="px-5 py-3 border-b border-neutral-600 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <ViewToggle value={view} onChange={setView} />
-        </div>
-        <div className="flex items-center gap-2 -ft-3 text-neutral-400">
-          <span>↓</span>
-          <Select
-            id="filter"
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="w-[8rem] px-4 py-1.5 -ft-4"
-          >
-            {Object.entries(SORT_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </Select>
+        <div className="hidden md:flex items-center gap-4">
+          <ViewToggle value={view} onChange={setView}/>
+          <div className="flex items-center gap-2 text-neutral-400 -ft-3">
+            {visibleTotal} leads
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar leads" />
-        </div>
+        <div className="flex flex-grow items-center justify-between md:justify-end gap-4">
+          <div className="flex items-center gap-2">
+            <div className="relative h-[4rem] w-[4rem] shrink-0" title={`Ordenar: ${SORT_LABELS[sortKey]}`}>
+              <Select
+                id="filter"
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                aria-label="Ordenar leads"
+                className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+              >
+                {Object.entries(SORT_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-neutral-50 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_8px_24px_-8px_rgba(0,0,0,0.5)] peer-hover:border-white/30 peer-hover:bg-white/[0.16] peer-focus:border-white/30 peer-focus:bg-white/[0.16]"
+              >
+                <IconSort/>
+              </div>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-2 text-neutral-400 -ft-3">
-          {visibleTotal} leads
+          <div className="flex items-center gap-4">
+            <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar leads"/>
+          </div>
         </div>
       </div>
 
       {view === 'kanban' ? (
         <div className="flex flex-col flex-grow min-h-0">
-          <BoardScrollIndicator count={boardColumns.length} activeIndex={currentColumnIndex} />
+          <BoardScrollIndicator count={boardColumns.length} activeIndex={currentColumnIndex}/>
           <div
             ref={boardScrollRef}
             onScroll={handleBoardScroll}

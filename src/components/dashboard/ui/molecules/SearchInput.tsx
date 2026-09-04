@@ -6,11 +6,11 @@ type SearchInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>
 
 export default function SearchInput({ className = '', ...props }: SearchInputProps) {
   return (
-    <div className="relative w-full max-w-xs">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+    <div className="relative w-full">
+      <span className="absolute w-8 h-8 left-6 top-1/2 -translate-y-1/2 text-neutral-300">
         <IconSearch />
       </span>
-      <Input type="text" className={`w-[20rem] pl-9 pr-3 -ft-3 ${className}`} {...props} />
+      <Input type="text" className={`w-full !rounded-full pl-[4.2rem] pr-4 py-4 ft-0 ${className}`} {...props} />
     </div>
   )
 }
