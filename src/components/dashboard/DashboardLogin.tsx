@@ -1,8 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import CenteredScreenCard from '@/components/dashboard/ui/molecules/CenteredScreenCard'
+import {useState} from 'react'
+import {useRouter} from 'next/navigation'
 import LoginForm from '@/components/dashboard/ui/organisms/LoginForm'
 
 type DashboardLoginProps = {
@@ -10,7 +9,7 @@ type DashboardLoginProps = {
   companyName?: string | null
 }
 
-export default function DashboardLogin({ subdomain, companyName }: DashboardLoginProps) {
+export default function DashboardLogin({subdomain, companyName}: DashboardLoginProps) {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -24,8 +23,8 @@ export default function DashboardLogin({ subdomain, companyName }: DashboardLogi
     try {
       const res = await fetch('/api/tenant-dashboard/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, password }),
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({subdomain, password}),
       })
 
       if (!res.ok) {
@@ -43,15 +42,17 @@ export default function DashboardLogin({ subdomain, companyName }: DashboardLogi
   }
 
   return (
-    <CenteredScreenCard>
-      <LoginForm
-        companyName={companyName}
-        password={password}
-        onPasswordChange={setPassword}
-        error={error}
-        loading={loading}
-        onSubmit={handleSubmit}
-      />
-    </CenteredScreenCard>
+    <div className="min-h-[100dvh] flex items-center justify-center bg-neutral-950 px-4">
+      <div className="reading-container">
+        <LoginForm
+          companyName={companyName}
+          password={password}
+          onPasswordChange={setPassword}
+          error={error}
+          loading={loading}
+          onSubmit={handleSubmit}
+        />
+      </div>
+    </div>
   )
 }
