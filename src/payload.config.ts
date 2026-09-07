@@ -56,9 +56,19 @@ export default buildConfig({
   }),
   sharp,
   plugins: [
+    // `disablePayloadAccessControl: true` hace que la `url` de cada media
+    // apunte al blob público en vez de a `/api/media/file/...`. Sin esto,
+    // cada imagen de una landing o de un quiz obliga a la app a descargarla
+    // del blob y reenviarla en cada visita: una invocación serverless por
+    // imagen y por visitante, que es justo el costo que pesa en tráfico
+    // pagado móvil. El media de este proyecto es público de todas formas
+    // (`Media.access.read` es `() => true`), así que no se pierde ningún
+    // control de acceso al saltarse esa capa.
     vercelBlobStorage({
       collections: {
-        media: true,
+        media: {
+          disablePayloadAccessControl: true,
+        },
       },
       addRandomSuffix: true,
       token: process.env.BLOB_READ_WRITE_TOKEN || '',
