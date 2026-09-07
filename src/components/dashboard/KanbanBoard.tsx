@@ -373,7 +373,7 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
 
         <div className="flex flex-grow items-center justify-between md:justify-end gap-4">
           <div className="flex items-center gap-2">
-            <div className="relative h-[4.7rem] w-[4.7rem] shrink-0" title={`Ordenar: ${SORT_LABELS[sortKey]}`}>
+            <div className="relative h-12 w-12 shrink-0" title={`Ordenar: ${SORT_LABELS[sortKey]}`}>
               <Select
                 id="sort-select"
                 value={sortKey}
@@ -389,16 +389,16 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
               </Select>
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-neutral-50 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_8px_24px_-8px_rgba(0,0,0,0.5)] peer-hover:border-white/30 peer-hover:bg-white/[0.16] peer-focus:border-white/30 peer-focus:bg-white/[0.16]"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center text-neutral-400 peer-hover:text-neutral-200"
               >
-                <span className="w-6 h-6">
+                <span className="w-8 h-8">
                   <IconSort/>
                 </span>
               </div>
             </div>
 
             <div
-              className={`relative h-[4.7rem] w-[4.7rem] shrink-0 ${statusFilter === 'stuck' ? 'opacity-40' : ''}`}
+              className={`relative h-12 w-12 rounded-full shrink-0 ${statusFilter === 'stuck' ? 'opacity-40' : ''}`}
               title={statusFilter === 'stuck' ? 'Filtro de tiempo desactivado con "Estancados"' : `Tiempo: ${SINCE_LABELS[sinceKey]}`}
             >
               <Select
@@ -417,25 +417,21 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
               </Select>
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-neutral-50 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_8px_24px_-8px_rgba(0,0,0,0.5)] peer-hover:border-white/30 peer-hover:bg-white/[0.16] peer-focus:border-white/30 peer-focus:bg-white/[0.16]"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center rounded-full text-neutral-400 peer-hover:text-neutral-200"
               >
-                <span className="w-6 h-6">
+                <span className="w-8 h-8">
                   <IconClock/>
                 </span>
               </div>
             </div>
 
-            <div className="relative h-[4.7rem] w-[4.7rem] shrink-0" title={`Status: ${STATUS_FILTER_LABELS[statusFilter]}`}>
+            <div className="relative h-12 w-12 rounded-full shrink-0" title={`Status: ${STATUS_FILTER_LABELS[statusFilter]}`}>
               <Select
                 id="status-select"
                 value={statusFilter}
                 onChange={(e) => {
                   const next = e.target.value as StatusFilterKey
                   setStatusFilter(next)
-                  // "Estancados" ya filtra por tiempo sin actividad; dejar
-                  // el filtro de "Tiempo" (que filtra por fecha de creación)
-                  // prendido casi siempre da 0 resultados (un lead creado,
-                  // digamos, hoy no puede llevar semanas sin actividad).
                   if (next === 'stuck') setSinceKey('all')
                 }}
                 aria-label="Filtrar leads por status"
@@ -449,9 +445,9 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
               </Select>
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-neutral-50 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_8px_24px_-8px_rgba(0,0,0,0.5)] peer-hover:border-white/30 peer-hover:bg-white/[0.16] peer-focus:border-white/30 peer-focus:bg-white/[0.16]"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center rounded-full text-neutral-400 peer-hover:text-neutral-200"
               >
-                <span className="w-6 h-6">
+                <span className="w-8 h-8">
                   <IconFilter/>
                 </span>
               </div>

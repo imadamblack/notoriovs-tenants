@@ -37,3 +37,5 @@ yarn-error.log*
 
 # Claude
 .claude
+# Tickets y notas de trabajo locales (no viajan con el repo)
+.scratch/
