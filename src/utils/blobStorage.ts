@@ -16,10 +16,8 @@
 export type BlobEnv = {
   /** Override del origen. Lo usa el emulador local de Vercel Blob. */
   STORAGE_VERCEL_BLOB_BASE_URL?: string
-  /** `vercel_blob_rw_<storeId>_<random>`. El plugin deriva el store de aquí. */
+  /** `vercel_blob_rw_<storeId>_<random>`. Única fuente del id del store. */
   BLOB_READ_WRITE_TOKEN?: string
-  /** El id del store, cuando se configuró por separado. */
-  BLOB_STORE_ID?: string
   // Abierto para poder recibir `process.env` tal cual.
   [key: string]: string | undefined
 }
@@ -32,18 +30,25 @@ export type BlobRemotePattern = {
 
 const TOKEN_PATTERN = /^vercel_blob_rw_([a-z\d]+)_[a-z\d]+$/i
 
+/**
+ * `public` es el `access` con el que `payload.config.ts` monta el plugin (su
+ * valor por defecto, que no cambiamos). Si algún día se monta como privado,
+ * este host cambia con él.
+ */
 const hostnameForStore = (storeId: string) => `${storeId}.public.blob.vercel-storage.com`
 
 /**
- * Origen público del store, o `null` si el entorno no permite saber cuál es
- * (por ejemplo, un build de preview sin credenciales de blob).
+ * Origen público del store, o `null` si el entorno no lo define.
+ *
+ * Deriva el store igual que `@payloadcms/storage-vercel-blob`: sale del token,
+ * y de ningún otro lado. Sin token el plugin se apaga por completo y ninguna
+ * media llega a tener una `url` de blob, así que ahí no hay nada que
+ * autorizar.
  */
 function getBlobBaseUrl(env: BlobEnv): string | null {
   if (env.STORAGE_VERCEL_BLOB_BASE_URL) return env.STORAGE_VERCEL_BLOB_BASE_URL
 
-  // Mismo orden de derivación que `@payloadcms/storage-vercel-blob`: el store
-  // vive dentro del token, y `BLOB_STORE_ID` es el respaldo explícito.
-  const storeId = env.BLOB_READ_WRITE_TOKEN?.match(TOKEN_PATTERN)?.[1] || env.BLOB_STORE_ID
+  const storeId = env.BLOB_READ_WRITE_TOKEN?.match(TOKEN_PATTERN)?.[1]
 
   if (!storeId) return null
 
@@ -51,18 +56,17 @@ function getBlobBaseUrl(env: BlobEnv): string | null {
 }
 
 /**
- * El origen de media que el optimizador de imágenes de Next debe aceptar.
- *
- * Cuando no se puede derivar el store cae a un comodín sobre el dominio de
- * Vercel Blob: es preferible a romper un build sin credenciales, y el
- * optimizador sigue acotado a ese dominio.
+ * Los orígenes de media que el optimizador de imágenes de Next debe aceptar:
+ * exactamente uno, o ninguno si no hay blob configurado. Se devuelve como
+ * lista para que `images.remotePatterns` la use tal cual — una lista vacía no
+ * autoriza ningún host remoto, que es lo correcto cuando no hay blob.
  */
-export function getBlobRemotePattern(env: BlobEnv): BlobRemotePattern {
+export function getBlobRemotePatterns(env: BlobEnv): BlobRemotePattern[] {
   const baseUrl = getBlobBaseUrl(env)
 
-  if (!baseUrl) return { protocol: 'https', hostname: hostnameForStore('*') }
+  if (!baseUrl) return []
 
   const { protocol, hostname } = new URL(baseUrl)
 
-  return { protocol: protocol === 'http:' ? 'http' : 'https', hostname }
+  return [{ protocol: protocol === 'http:' ? 'http' : 'https', hostname }]
 }

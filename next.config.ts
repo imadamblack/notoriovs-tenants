@@ -3,7 +3,7 @@ import type { NextConfig } from 'next'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import { getBlobRemotePattern } from './src/utils/blobStorage'
+import { getBlobRemotePatterns } from './src/utils/blobStorage'
 
 const __filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(__filename)
@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     // la app, así que el optimizador de Next tiene que aceptarlo como origen
     // remoto. `localPatterns` ya no incluye `/api/media/file/**` porque esa
     // ruta dejó de servir imágenes.
-    remotePatterns: [getBlobRemotePattern(process.env)],
+    remotePatterns: getBlobRemotePatterns(process.env),
     localPatterns: [
       {
         pathname: '/images/**',
