@@ -29,12 +29,30 @@ export function tenantSitePath(subdomain: string): string {
 }
 
 /**
- * Invalida TODAS las páginas públicas de un tenant de un solo golpe.
+ * Sufijos de las páginas públicas de un tenant, relativos a `tenantSitePath`.
+ * `''` es la landing.
  *
- * El tipo `'layout'` invalida el segmento y todo lo que cuelga de él, así que
- * cubre landing, survey, thankyou, not-elegible y privacy-notice sin tener
- * que enumerarlas — una lista que se desincronizaría en cuanto alguien
- * agregue una página nueva.
+ * Enumerarlas es feo pero es la única forma que **funciona**: hay que
+ * invalidar la ruta concreta de cada página. Medido contra un build de
+ * producción, con la caché caliente:
+ *
+ *   revalidatePath('/tenant-site/x/thankyou')           → MISS  ✅
+ *   revalidatePath('/tenant-site/x', 'layout')          → HIT   ❌
+ *   revalidatePath('/tenant-site/x/thankyou', 'page')   → HIT   ❌
+ *   revalidatePath('/tenant-site/[subdomain]', 'layout')→ HIT   ❌
+ *
+ * Ninguna de las que fallan lanza error: `revalidatePath` acepta la llamada
+ * y no invalida nada. Este comentario existe para que nadie "simplifique"
+ * esta lista de vuelta a una sola llamada con `'layout'`, que es lo que
+ * parece correcto leyendo la documentación y no lo es.
+ *
+ * `tenantSiteCache.int.spec.ts` verifica que esta lista siga cubriendo todas
+ * las páginas que existen en el disco.
+ */
+export const TENANT_SITE_PAGES = ['', '/survey', '/thankyou', '/not-elegible', '/privacy-notice'] as const
+
+/**
+ * Invalida las páginas públicas de un tenant.
  *
  * `next/cache` se importa dinámicamente porque este módulo lo termina
  * arrastrando `payload.config.ts`, que también se carga fuera de Next
@@ -55,7 +73,10 @@ export async function revalidateTenantSite(
   try {
     const { revalidatePath } = await import('next/cache')
     for (const subdomain of targets) {
-      revalidatePath(tenantSitePath(subdomain), 'layout')
+      const base = tenantSitePath(subdomain)
+      for (const page of TENANT_SITE_PAGES) {
+        revalidatePath(`${base}${page}`)
+      }
     }
   } catch (err) {
     payload.logger.warn(
