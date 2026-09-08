@@ -10,7 +10,7 @@ type TenantPrivacyNoticeProps = {
 // la versión del sitio default.
 export default async function TenantPrivacyNotice({ params }: TenantPrivacyNoticeProps) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'privacyNotice')
 
   if (!tenant) notFound()
 

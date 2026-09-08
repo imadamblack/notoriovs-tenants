@@ -16,7 +16,7 @@ type TenantSurveyPageProps = {
  */
 export default async function TenantSurveyPage({ params }: TenantSurveyPageProps) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'quiz')
 
   if (!tenant) notFound()
 

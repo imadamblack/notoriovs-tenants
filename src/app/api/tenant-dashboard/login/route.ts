@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Falta subdomain o password' }, { status: 400 })
   }
 
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'dashboardLogin')
   if (!tenant) {
     return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
   }
