@@ -1,6 +1,6 @@
 import type { SurveyStep, SurveyOptInField } from '@/components/stepRenderer'
 
-// Tipos locales que reflejan la forma de `quizSteps` en src/collections/Tenants.ts.
+// Tipos locales que reflejan la forma de `quizSteps` en src/collections/Tenants/quiz.ts.
 // No se generan con `payload generate:types` en este entorno (falta conexión a DB
 // para el build de esbuild nativo), así que se mantienen a mano y deben evolucionar
 // junto con el campo `quizSteps` de la colección.

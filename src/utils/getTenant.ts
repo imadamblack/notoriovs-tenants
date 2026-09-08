@@ -5,7 +5,7 @@ import type { TenantQuizStep } from '@/utils/tenantQuiz'
 
 // Tipos locales (ver nota en tenantQuiz.ts: no se pudo correr
 // `payload generate:types` en este entorno). Deben mantenerse en sync con
-// src/collections/Tenants.ts.
+// src/collections/Tenants/.
 export type TenantLeadStage = {
   // Id autogenerado por Payload para esta fila del array; es lo único que
   // referencia `Lead.stage` (ver comentario en Leads.ts). Puede venir null
