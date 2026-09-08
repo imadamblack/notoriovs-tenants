@@ -1,5 +1,5 @@
 // Catálogo fijo de las 32 entidades federativas de México, usado por el
-// STEP_TYPE 'state-mx' del quiz (src/collections/Tenants.ts). El `value` es
+// STEP_TYPE 'state-mx' del quiz (src/collections/Tenants/quiz.ts). El `value` es
 // el nombre completo tal cual se envía en el payload del webhook.
 export const MEXICO_STATES = [
   { label: 'Aguascalientes', value: 'Aguascalientes' },
