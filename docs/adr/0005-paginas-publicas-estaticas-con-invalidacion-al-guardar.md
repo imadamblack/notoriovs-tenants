@@ -19,9 +19,24 @@ viendo su landing vieja unos minutos después de guardarla. Un TTL largo hace
 lo contrario. La invalidación bajo demanda resuelve las dos: el contenido se
 refresca en segundos y la base solo se toca cuando algo cambió de verdad.
 
-El hook invalida el **segmento completo** (`revalidatePath(path, 'layout')`),
-no una lista de rutas. Una lista se desincroniza en cuanto alguien agrega una
-página nueva, y el síntoma sería un cliente jurando que guardó y no pasó nada.
+El hook invalida **la ruta concreta de cada página**, sin el segundo
+argumento de `revalidatePath`. Enumerarlas es feo, pero es lo único que
+funciona. Medido contra un build de producción, con la caché caliente:
+
+    revalidatePath('/tenant-site/x/thankyou')             MISS  ✅
+    revalidatePath('/tenant-site/x', 'layout')            HIT   ❌
+    revalidatePath('/tenant-site/x/thankyou', 'page')     HIT   ❌
+    revalidatePath('/tenant-site/[subdomain]', 'layout')  HIT   ❌
+
+Lo que hace esto una trampa es que **ninguna de las que fallan lanza error**:
+`revalidatePath` acepta la llamada y no invalida nada. La primera versión de
+este ADR daba por buena la de `'layout'` —parece la correcta leyendo la
+documentación— y llegó a producción invalidando cero páginas durante unas
+horas, sin un solo error en los logs.
+
+El precio de enumerar es que la lista se desincronice cuando alguien agregue
+una página. Eso lo cubre un test que compara `TENANT_SITE_PAGES` contra las
+`page.tsx` que existen en disco.
 
 ## Por qué el host se resuelve en el middleware y no en la página
 

@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import { Tenants } from '@/collections/Tenants'
 import {
+  TENANT_SITE_PAGES,
   TENANT_SITE_REVALIDATE_SECONDS,
   revalidateTenantSite,
   tenantSitePath,
@@ -31,22 +32,27 @@ describe('tenantSitePath', () => {
 })
 
 describe('revalidateTenantSite', () => {
-  it('invalida el segmento completo, no página por página', async () => {
-    // 'layout' arrastra landing, survey, thankyou, not-elegible y
-    // privacy-notice. Si esto fuera una lista de rutas, una página nueva
-    // nacería sin invalidación y nadie se enteraría.
+  it('invalida la ruta concreta de cada página, y sin segundo argumento', async () => {
+    // Esto no es un detalle de estilo: medido contra un build de producción,
+    // `revalidatePath(ruta, 'layout')` y `revalidatePath(ruta, 'page')`
+    // aceptan la llamada, no lanzan error y NO invalidan nada. Ver la nota
+    // en tenantSiteCache.ts.
     await revalidateTenantSite(['acme'], payload)
 
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith('/tenant-site/acme', 'layout')
+    expect(revalidatePath.mock.calls).toEqual([
+      ['/tenant-site/acme'],
+      ['/tenant-site/acme/survey'],
+      ['/tenant-site/acme/thankyou'],
+      ['/tenant-site/acme/not-elegible'],
+      ['/tenant-site/acme/privacy-notice'],
+    ])
   })
 
   it('invalida el subdominio viejo y el nuevo cuando cambia', async () => {
     await revalidateTenantSite(['nuevo', 'viejo'], payload)
 
-    expect(revalidatePath.mock.calls.map(([path]) => path)).toEqual([
-      '/tenant-site/nuevo',
-      '/tenant-site/viejo',
-    ])
+    const subs = new Set(revalidatePath.mock.calls.map(([p]) => p.split('/')[2]))
+    expect([...subs]).toEqual(['nuevo', 'viejo'])
   })
 
   it('no repite la invalidación cuando el subdominio no cambió', async () => {
@@ -54,14 +60,15 @@ describe('revalidateTenantSite', () => {
     // son el mismo.
     await revalidateTenantSite(['acme', 'acme'], payload)
 
-    expect(revalidatePath).toHaveBeenCalledTimes(1)
+    expect(revalidatePath).toHaveBeenCalledTimes(TENANT_SITE_PAGES.length)
   })
 
   it('ignora los subdominios vacíos que llegan en un create', async () => {
     // En `create` no hay `previousDoc`.
     await revalidateTenantSite(['acme', undefined, null, '  '], payload)
 
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith('/tenant-site/acme', 'layout')
+    expect(revalidatePath).toHaveBeenCalledTimes(TENANT_SITE_PAGES.length)
+    expect(revalidatePath).toHaveBeenCalledWith('/tenant-site/acme')
   })
 
   it('no toca la caché si no hay nada que invalidar', async () => {
@@ -121,6 +128,19 @@ describe('configuración de caché de las páginas del tenant', () => {
     if (revalidate) expect(Number(revalidate[1])).toBe(TENANT_SITE_REVALIDATE_SECONDS)
   })
 
+  it('TENANT_SITE_PAGES cubre todas las páginas públicas que existen en disco', () => {
+    // El precio de tener que enumerar las rutas es este riesgo: alguien
+    // agrega una página, se le olvida esta lista, y esa página se queda
+    // congelada hasta que venza el TTL sin que nada avise. Este test es lo
+    // que convierte ese olvido silencioso en un test rojo.
+    const enDisco = pages
+      .map(([name]) => '/' + path.dirname(name).replace(/\\/g, '/'))
+      .filter((ruta) => ruta !== '/dashboard') // dinámico: no se cachea, no se invalida
+      .map((ruta) => (ruta === '/.' ? '' : ruta))
+
+    expect([...TENANT_SITE_PAGES].sort()).toEqual(enDisco.sort())
+  })
+
   it('el dashboard es el único que se sirve dinámico', () => {
     const dynamicPages = pages
       .filter(([, file]) => /^export const dynamic = 'force-dynamic'$/m.test(readFileSync(file, 'utf8')))
@@ -148,22 +168,22 @@ describe('hooks del Tenant', () => {
   it('guardar un tenant refresca su sitio', async () => {
     await run('afterChange', { doc: { subdomain: 'acme' }, previousDoc: { subdomain: 'acme' } })
 
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith('/tenant-site/acme', 'layout')
+    expect(revalidatePath).toHaveBeenCalledTimes(TENANT_SITE_PAGES.length)
+    expect(revalidatePath).toHaveBeenCalledWith('/tenant-site/acme')
   })
 
   it('renombrar el subdominio baja el sitio viejo y publica el nuevo', async () => {
     await run('afterChange', { doc: { subdomain: 'acme-mx' }, previousDoc: { subdomain: 'acme' } })
 
-    expect(revalidatePath.mock.calls.map(([path]) => path)).toEqual([
-      '/tenant-site/acme-mx',
-      '/tenant-site/acme',
-    ])
+    const subs = new Set(revalidatePath.mock.calls.map(([p]) => p.split('/')[2]))
+    expect([...subs]).toEqual(['acme-mx', 'acme'])
   })
 
   it('borrar un tenant baja su sitio', async () => {
     // Sin esto la página cacheada le sobreviviría al documento.
     await run('afterDelete', { doc: { subdomain: 'acme' } })
 
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith('/tenant-site/acme', 'layout')
+    expect(revalidatePath).toHaveBeenCalledTimes(TENANT_SITE_PAGES.length)
+    expect(revalidatePath).toHaveBeenCalledWith('/tenant-site/acme')
   })
 })
