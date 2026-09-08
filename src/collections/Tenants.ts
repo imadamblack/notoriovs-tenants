@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { lexicalEditor, lexicalHTMLField } from '@payloadcms/richtext-lexical'
 import { slugField } from '@/fields/slug'
+import { revalidateTenantSite } from '@/utils/tenantSiteCache'
 
 // Los `value` deben coincidir 1:1 con el union type `SurveyStep['type']`
 // definido en src/components/stepRenderer.tsx. Si agregas un tipo ahí,
@@ -71,9 +72,25 @@ export const Tenants: CollectionConfig = {
         return data
       },
     ],
-    // Notifica a n8n cuando se da de alta un tenant nuevo (no en updates).
-    // Fire-and-forget: no bloquea ni revierte la creación si el webhook falla.
+    // Refresca las páginas públicas del tenant (landing, quiz, gracias, no
+    // elegible, aviso de privacidad), que se sirven prerrenderizadas desde el
+    // CDN. Sin esto, guardar en el admin no cambiaría nada visible hasta que
+    // venciera el TTL. Ver src/utils/tenantSiteCache.ts.
+    //
+    // Corre en TODA operación, no solo en update:
+    //  - create: publica el sitio del tenant nuevo sin necesidad de desplegar
+    //    (y tira el 404 que pudo haberse cacheado si alguien entró antes).
+    //  - update: incluye desactivar el tenant, porque `active: false` hace que
+    //    la página deje de resolverlo y pase a 404.
+    // Si cambió el subdominio hay que invalidar los dos: el viejo se queda
+    // sirviendo el sitio hasta que se le diga lo contrario.
     afterChange: [
+      async ({ doc, previousDoc, req }) => {
+        await revalidateTenantSite([doc.subdomain, previousDoc?.subdomain], req.payload)
+      },
+
+      // Notifica a n8n cuando se da de alta un tenant nuevo (no en updates).
+      // Fire-and-forget: no bloquea ni revierte la creación si el webhook falla.
       async ({ doc, operation, req }) => {
         if (operation !== 'create') return
 
@@ -96,6 +113,14 @@ export const Tenants: CollectionConfig = {
         } catch (err) {
           req.payload.logger.warn(`No se pudo notificar tenant-created a n8n para tenant ${doc.name}: ${err}`)
         }
+      },
+    ],
+
+    // Borrar el tenant también tiene que bajar su sitio: la página cacheada
+    // sobreviviría al documento.
+    afterDelete: [
+      async ({ doc, req }) => {
+        await revalidateTenantSite([doc.subdomain], req.payload)
       },
     ],
   },

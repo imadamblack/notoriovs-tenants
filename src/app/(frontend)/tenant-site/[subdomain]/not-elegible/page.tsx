@@ -3,6 +3,14 @@ import {getTenantBySubdomain} from '@/utils/getTenant'
 import Image from "next/image";
 import NotEligibleTracking from './not-eligible-tracking';
 
+// Prerrenderizada y servida desde el CDN; se invalida al guardar el Tenant
+// (ver revalidateTenantSite). Este TTL es solo la red de seguridad.
+//
+// El literal es obligado: Next lee `revalidate` con análisis estático y
+// rechaza una constante importada. Tiene que coincidir con
+// TENANT_SITE_REVALIDATE_SECONDS, y eso lo verifica un test.
+export const revalidate = 3600
+
 type TenantNotEligiblePageProps = {
   params: Promise<{ subdomain: string }>
 }

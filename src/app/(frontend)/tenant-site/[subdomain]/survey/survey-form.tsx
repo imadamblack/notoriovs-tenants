@@ -1,8 +1,8 @@
 'use client';
 
 import {useForm, FormProvider} from 'react-hook-form';
-import {useEffect, useMemo, useState} from 'react';
-import {useSearchParams, useRouter} from 'next/navigation';
+import {useEffect, useState} from 'react';
+import {useRouter} from 'next/navigation';
 import {setCookie} from 'cookies-next';
 import Image from 'next/image';
 import {motion, AnimatePresence} from 'framer-motion';
@@ -40,10 +40,14 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
     handleSubmit,
     formState: {errors},
   } = methods;
-  const searchParams = useSearchParams();
   const router = useRouter();
 
-  const {utm} = useMemo(() => getTrackingData(searchParams), [searchParams]);
+  // Los UTM se leen de `window.location.search` al enviar, y no con
+  // `useSearchParams`: ese hook obliga a un límite de Suspense y saca al
+  // formulario del HTML prerrenderizado, así que el quiz llegaría en blanco
+  // hasta que hidrate el JS — justo la pantalla a la que caen los anuncios.
+  // Como solo hacen falta al enviar, no necesitan estado ni efecto.
+  const readUtm = () => getTrackingData(new URLSearchParams(window.location.search)).utm;
 
   useEffect(() => {
     if (!started) return;
@@ -112,6 +116,7 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
     }
 
     setSending(true);
+    const utm = readUtm();
     try {
       if (typeof data.telefono === 'string' && data.telefono.trim() !== '') {
         data.whatsapp = '521' + data.telefono.replace(/^\+?((MX)?\s?(52)?)?\s?0?1?|\s|\(|\)|-/g, '');

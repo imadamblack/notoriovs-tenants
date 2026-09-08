@@ -12,6 +12,12 @@ type DashboardPageProps = {
 
 export const metadata = { title: 'Dashboard de leads' }
 
+// El dashboard NO se cachea. `cookies()` ya lo volvería dinámico por sí solo,
+// pero eso es una consecuencia de cómo está escrito hoy, no una decisión: si
+// mañana alguien mueve la lectura de la sesión a otro lado, una página con
+// leads de un cliente no puede terminar servida desde el CDN por accidente.
+export const dynamic = 'force-dynamic'
+
 export default async function TenantDashboardPage({ params }: DashboardPageProps) {
   const { subdomain } = await params
   const [tenant, hasDashboard] = await Promise.all([
