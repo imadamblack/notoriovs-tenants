@@ -46,6 +46,7 @@ export default async function TenantNotEligiblePage({params}: TenantNotEligibleP
               src={(logo as {url?: string}).url || ''}
               alt=""
               fill
+              sizes="160px"
               style={{objectFit: 'contain'}}
             />
           </div>

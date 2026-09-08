@@ -173,6 +173,7 @@ export default function SurveyForm({subdomain, steps, intro, privacyNoticeUrl, l
                   src={(logo as {url?: string}).url || ''}
                   alt=""
                   fill
+                  sizes="160px"
                   style={{objectFit: 'contain', filter: 'brightness(0) invert(1)'}}
                 />
               </div>

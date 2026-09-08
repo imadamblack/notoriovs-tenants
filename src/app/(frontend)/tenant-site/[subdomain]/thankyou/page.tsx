@@ -43,6 +43,7 @@ export default async function TenantThankYouPage({params}: TenantThankYouPagePro
               src={(logo as {url?: string}).url || ''}
               alt=""
               fill
+              sizes="160px"
               style={{objectFit: 'contain'}}
             />
           </div>
