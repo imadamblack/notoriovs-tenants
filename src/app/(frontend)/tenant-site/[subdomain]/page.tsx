@@ -1,10 +1,15 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getTenantBySubdomain } from '@/utils/getTenant'
-import { getSubdomainFromHost } from '@/utils/subdomain'
+import { tenantSitePath } from '@/utils/tenantSiteCache'
 
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'notoriovs.com'
+// Prerrenderizada y servida desde el CDN; se invalida al guardar el Tenant
+// (ver revalidateTenantSite). Este TTL es solo la red de seguridad.
+//
+// El literal es obligado: Next lee `revalidate` con análisis estático y
+// rechaza una constante importada. Tiene que coincidir con
+// TENANT_SITE_REVALIDATE_SECONDS, y eso lo verifica un test.
+export const revalidate = 3600
 
 type TenantLandingProps = {
   params: Promise<{ subdomain: string }>
@@ -159,17 +164,17 @@ export default async function TenantLanding({ params }: TenantLandingProps) {
   // Landing "nullable": si el tenant no configuró título ni bloques, se
   // omite la landing y se va directo al quiz.
   //
-  // `redirect()` de Next siempre construye el Location a partir de la raíz
-  // del host actual (no del pathname reescrito por el middleware). Cuando
-  // esta página se sirve vía el subdominio real del tenant, el host YA es
-  // ese subdominio, así que "/survey" cae en el lugar correcto. Pero cuando
-  // se accede directo a /tenant-site/{subdomain} (preview desde el admin,
-  // mismo host que /admin), "/survey" caería en la raíz del admin y no en
-  // /tenant-site/{subdomain}/survey. Detectamos el caso y ajustamos el target.
+  // El destino es SIEMPRE la ruta interna absoluta, nunca "/survey": esta
+  // página se prerrenderiza una sola vez y se sirve igual a los dos hosts
+  // desde los que se llega (el subdominio real del tenant y el preview del
+  // admin), así que no puede depender del host. Antes se leía con
+  // `headers()`, lo que volvía la página dinámica.
+  //
+  // Quien resuelve el host es el middleware, después: en el host real del
+  // tenant canonicaliza /tenant-site/{sub}/survey de vuelta a /survey, y en
+  // el preview del admin la sirve tal cual.
   if (!hasLanding) {
-    const host = (await headers()).get('host') || ''
-    const isRealTenantHost = getSubdomainFromHost(host, ROOT_DOMAIN) === subdomain
-    redirect(isRealTenantHost ? '/survey' : `/tenant-site/${subdomain}/survey`)
+    redirect(`${tenantSitePath(subdomain)}/survey`)
   }
 
   return (

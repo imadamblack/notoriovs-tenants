@@ -8,6 +8,20 @@ type TenantLayoutProps = {
   params: Promise<{ subdomain: string }>
 }
 
+/**
+ * Vacío a propósito: no se prerrenderiza ningún tenant en el build.
+ *
+ * Lo que hace este export es declarar el segmento como estático con
+ * generación bajo demanda: la página de un subdominio se arma en la primera
+ * visita y se queda cacheada hasta que alguien la invalide. Alternativa
+ * descartada: listar los tenants aquí obligaría a tener la base disponible
+ * durante el build y volvería a hacer falta un deploy para publicar un
+ * tenant nuevo — justo lo que este diseño evita.
+ */
+export function generateStaticParams(): { subdomain: string }[] {
+  return []
+}
+
 const DEFAULT_TITLE = 'Another Real Estate Agency'
 const DEFAULT_DESCRIPTION = 'Agencia boutique de inversión inmobiliaria en preventa'
 
