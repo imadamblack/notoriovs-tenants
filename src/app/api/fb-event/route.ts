@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ skipped: true, reason: 'Falta subdomain' })
     }
 
-    const tenant = await getTenantBySubdomain(subdomain)
+    const tenant = await getTenantBySubdomain(subdomain, 'conversionsApi')
     const pixelId = tenant?.tracking?.metaPixelId
     const capiToken = tenant?.tracking?.metaCapiToken
 

@@ -14,7 +14,7 @@ export const metadata = { title: 'Dashboard de leads' }
 
 export default async function TenantDashboardPage({ params }: DashboardPageProps) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'dashboard')
 
   if (!tenant) notFound()
 

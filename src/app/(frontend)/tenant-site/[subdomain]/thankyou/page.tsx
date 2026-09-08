@@ -11,7 +11,7 @@ type TenantThankYouPageProps = {
 // no configuró estos campos, cae al copy genérico basado en generalInfo.
 export default async function TenantThankYouPage({params}: TenantThankYouPageProps) {
   const {subdomain} = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'thankYou')
 
   if (!tenant) notFound()
 

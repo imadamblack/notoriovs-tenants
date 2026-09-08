@@ -15,7 +15,7 @@ type ResolvedMedia = { url?: string | null; alt?: string | null } | null | undef
 
 export async function generateMetadata({ params }: { params: Promise<{ subdomain: string }> }) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'chrome')
 
   if (!tenant) {
     return {
@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: { params: Promise<{ subdomain
 
 export default async function TenantLayout({ children, params }: TenantLayoutProps) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'chrome')
 
   if (!tenant) notFound()
 

@@ -149,7 +149,7 @@ function LandingBlock({ block }: { block: any }) {
 
 export default async function TenantLanding({ params }: TenantLandingProps) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'landing')
 
   if (!tenant) notFound()
 

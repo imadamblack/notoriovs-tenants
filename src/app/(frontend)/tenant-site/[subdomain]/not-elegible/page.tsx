@@ -15,7 +15,7 @@ type TenantNotEligiblePageProps = {
 // configuró estos campos, cae al copy genérico.
 export default async function TenantNotEligiblePage({params}: TenantNotEligiblePageProps) {
   const {subdomain} = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'notEligible')
 
   if (!tenant) notFound()
 

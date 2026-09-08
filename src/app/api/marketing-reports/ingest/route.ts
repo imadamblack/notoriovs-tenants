@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   if (!subdomain) return NextResponse.json({ error: 'Falta subdomain' }, { status: 400 })
   if (!reports.length) return NextResponse.json({ error: 'Falta "reports" (array)' }, { status: 400 })
 
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'identity')
   if (!tenant) return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
 
   const payload = await getPayload({ config })

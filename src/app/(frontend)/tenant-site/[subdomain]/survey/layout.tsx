@@ -11,7 +11,7 @@ type TenantSurveyLayoutProps = {
 // se arma con el nombre real del tenant.
 export async function generateMetadata({ params }: { params: Promise<{ subdomain: string }> }) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain)
+  const tenant = await getTenantBySubdomain(subdomain, 'chrome')
 
   return {
     title: tenant?.generalInfo?.companyName || tenant?.name || 'Quiz',
