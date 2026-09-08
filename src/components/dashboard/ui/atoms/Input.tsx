@@ -1,7 +1,10 @@
-import type { InputHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, Ref } from 'react'
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string
+  // React 19 pasa `ref` como prop normal; solo hay que tiparlo para que el
+  // spread de abajo lo lleve hasta el <input>.
+  ref?: Ref<HTMLInputElement>
 }
 
 export default function Input({ label, className = '', ...props }: InputProps) {

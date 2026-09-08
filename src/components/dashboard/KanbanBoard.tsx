@@ -455,7 +455,12 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
           </div>
 
           <div className="flex items-center gap-4">
-            <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar leads"/>
+            <SearchInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
+              placeholder="Buscar leads"
+            />
           </div>
         </div>
       </div>

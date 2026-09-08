@@ -6,12 +6,24 @@ import { getSubdomainFromHost } from '@/utils/subdomain'
 // Puede sobreescribirse con la env var ROOT_DOMAIN sin tocar código.
 const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'notoriovs.com'
 
+// Se enumeran las extensiones en vez de aceptar cualquier punto: un slug de
+// tenant podría traerlo y no queremos dejar de reescribir su página.
+const STATIC_FILE = /\.(?:png|jpe?g|gif|svg|ico|webp|avif|txt|xml|json|webmanifest|css|js|map|woff2?|ttf|otf|mp4|webm)$/i
+
 export function middleware(req: NextRequest) {
   const host = req.headers.get('host') || ''
   const pathname = req.nextUrl.pathname
 
   // Admin y API de Payload siempre pasan directo, sin reescritura por tenant.
   if (pathname.startsWith('/admin') || pathname.startsWith('/api')) {
+    return NextResponse.next()
+  }
+
+  // Archivos estáticos de /public (el icono de home screen de iOS, entre
+  // otros). Sin esto, en el host de un tenant la reescritura los manda a
+  // /tenant-site/{sub}/archivo.png, que no existe: iOS no encuentra el
+  // apple-touch-icon y guarda una captura de la página en su lugar.
+  if (STATIC_FILE.test(pathname)) {
     return NextResponse.next()
   }
 
