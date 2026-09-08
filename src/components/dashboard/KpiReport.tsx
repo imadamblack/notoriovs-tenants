@@ -47,12 +47,12 @@ type KpiData = {
 type KpiReportProps = {
   data: KpiData | null
   pipeline: PipelineStage[]
-  loading: boolean
+  refreshing: boolean
   sinceKey: SinceKey
   onSinceChange: (next: SinceKey) => void
 }
 
-export default function KpiReport({ data, pipeline, loading, sinceKey, onSinceChange }: KpiReportProps) {
+export default function KpiReport({ data, pipeline, refreshing, sinceKey, onSinceChange }: KpiReportProps) {
   // La cabecera (con el selector de periodo) se pinta siempre, también
   // mientras carga y con cero leads: si se desmontara, el control
   // desaparecería justo en el momento de usarlo y no habría forma de salir
@@ -61,7 +61,10 @@ export default function KpiReport({ data, pipeline, loading, sinceKey, onSinceCh
     <header className="flex items-center justify-between gap-4">
       <div>
         <h1 className="ft-2 font-semibold text-neutral-100">Reporte</h1>
-        <p className="-ft-3 text-neutral-400">Periodo: {SINCE_LABELS[sinceKey]}</p>
+        <p className="-ft-3 text-neutral-400">
+          Periodo: {SINCE_LABELS[sinceKey]}
+          {refreshing && data && <span className="ml-2 text-neutral-600">actualizando…</span>}
+        </p>
       </div>
       <PeriodFilter id="kpi-since-select" value={sinceKey} onChange={onSinceChange} />
     </header>
@@ -70,7 +73,11 @@ export default function KpiReport({ data, pipeline, loading, sinceKey, onSinceCh
   const periodLabel = sinceKey === 'all' ? null : SINCE_LABELS[sinceKey]
 
   const body = () => {
-    if (loading || !data) return <EmptyState variant="loading" />
+    // Solo la PRIMERA carga muestra un placeholder: a partir de ahí el
+    // reporte se queda montado y las secciones reciben los valores nuevos
+    // en su sitio, sin repintar la pantalla (ver `refreshing` en
+    // DashboardApp).
+    if (!data) return <EmptyState variant="loading" />
 
     if (data.total === 0) {
       return (
@@ -119,7 +126,7 @@ export default function KpiReport({ data, pipeline, loading, sinceKey, onSinceCh
   }
 
   return (
-    <div className="container flex flex-col gap-8 p-6">
+    <div className="container flex flex-col gap-8 p-6" aria-busy={refreshing}>
       {header}
       {body()}
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import LeadDetailPanel from '@/components/dashboard/LeadDetailPanel'
@@ -56,18 +56,35 @@ export default function DashboardApp({ subdomain, companyName, pipeline, stuckAf
   const [updateEvent, setUpdateEvent] = useState<LeadUpdateEvent | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [kpis, setKpis] = useState<any>(null)
-  const [loadingKpis, setLoadingKpis] = useState(true)
+  // `refreshing` NO desmonta el reporte: al cambiar de periodo (o al
+  // guardar un lead) se dejan en pantalla los números anteriores hasta que
+  // llegan los nuevos, y solo cambian los valores. Antes esto era un
+  // `loading` que sustituía todo el body por "Cargando…", así que cada
+  // recarga repintaba la pantalla entera y se veía como un parpadeo.
+  const [refreshing, setRefreshing] = useState(true)
+
+  // Descarta respuestas que llegan fuera de orden: cambiar de periodo dos
+  // veces seguidas dispara dos fetches y el primero puede contestar al
+  // final, dejando en pantalla los números del rango que ya no está
+  // seleccionado.
+  const kpiRequestRef = useRef(0)
 
   const loadKpis = useCallback(async () => {
-    const params = new URLSearchParams({ subdomain })
-    if (sinceKey !== 'all') params.set('since', sinceKey)
-    const res = await fetch(`/api/tenant-dashboard/kpis?${params.toString()}`)
-    if (res.ok) setKpis(await res.json())
+    const requestId = ++kpiRequestRef.current
+    setRefreshing(true)
+    try {
+      const params = new URLSearchParams({ subdomain })
+      if (sinceKey !== 'all') params.set('since', sinceKey)
+      const res = await fetch(`/api/tenant-dashboard/kpis?${params.toString()}`)
+      if (requestId !== kpiRequestRef.current) return
+      if (res.ok) setKpis(await res.json())
+    } finally {
+      if (requestId === kpiRequestRef.current) setRefreshing(false)
+    }
   }, [subdomain, sinceKey])
 
   useEffect(() => {
-    setLoadingKpis(true)
-    loadKpis().finally(() => setLoadingKpis(false))
+    loadKpis()
   }, [loadKpis])
 
   // Único punto que hace el PATCH real contra la API. El Kanban (drag&drop)
@@ -119,7 +136,7 @@ export default function DashboardApp({ subdomain, companyName, pipeline, stuckAf
           <KpiReport
             data={kpis}
             pipeline={pipeline}
-            loading={loadingKpis}
+            refreshing={refreshing}
             sinceKey={sinceKey}
             onSinceChange={setSinceKey}
           />
