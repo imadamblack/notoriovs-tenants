@@ -4,8 +4,9 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import type {Lead, LeadUpdateEvent, PipelineStage} from '@/components/dashboard/DashboardApp'
 import Select from '@/components/dashboard/ui/atoms/Select'
 import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
-import IconClock from '@/components/dashboard/ui/atoms/icons/IconClock'
 import IconFilter from '@/components/dashboard/ui/atoms/icons/IconFilter'
+import PeriodFilter from '@/components/dashboard/ui/molecules/PeriodFilter'
+import { type SinceKey } from '@/utils/dashboardPeriod'
 import SearchInput from '@/components/dashboard/ui/molecules/SearchInput'
 import ViewToggle, {type BoardView} from '@/components/dashboard/ui/molecules/ViewToggle'
 import BoardScrollIndicator from '@/components/dashboard/ui/molecules/BoardScrollIndicator'
@@ -19,6 +20,10 @@ type KanbanBoardProps = {
   onCardClick: (lead: Lead) => void
   onStageChange: (lead: Lead, stage: string) => Promise<Lead | null>
   updateEvent: LeadUpdateEvent | null
+  // El periodo lo controla DashboardApp: es el mismo filtro que usan los
+  // KPIs, no una copia local de esta vista (ver PeriodFilter).
+  sinceKey: SinceKey
+  onSinceChange: (next: SinceKey) => void
 }
 
 type SortKey = 'created_desc' | 'created_asc' | 'name_asc'
@@ -27,20 +32,6 @@ const SORT_LABELS: Record<SortKey, string> = {
   created_desc: 'Más recientes',
   created_asc: 'Más antiguos',
   name_asc: 'Nombre A-Z',
-}
-
-// Filtro de tiempo: sobre `createdAt` (cuándo llegó el lead), ventana
-// rodante desde ahora (24h/7d/30d/90d), no día de calendario (ver el
-// comentario de SINCE_DAYS en leadDashboardFilters.ts, del lado del
-// servidor). 'all' ("Máximo") no manda parámetro, es el estado actual.
-type SinceKey = 'today' | '7d' | '30d' | '3m' | 'all'
-
-const SINCE_LABELS: Record<SinceKey, string> = {
-  today: 'Hoy',
-  '7d': '7 días',
-  '30d': '30 días',
-  '3m': '3 meses',
-  all: 'Máximo',
 }
 
 // Filtro de status. 'stuck' ("Estancados") es sintético: no es un valor de
@@ -91,12 +82,11 @@ const emptyColumn: ColumnState = {
 // es lo que hace viable un tenant con miles de leads sin traer todo a la vez
 // (ver `handleColumnScroll`/`handleListScroll`: cargan la siguiente página
 // al acercarse al fondo del contenedor, sin botón).
-export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCardClick, onStageChange, updateEvent}: KanbanBoardProps) {
+export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCardClick, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
   const [view, setView] = useState<BoardView>('kanban')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
-  const [sinceKey, setSinceKey] = useState<SinceKey>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
 
   const [columnData, setColumnData] = useState<Record<string, ColumnState>>({})
@@ -397,33 +387,12 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
               </div>
             </div>
 
-            <div
-              className={`relative h-12 w-12 rounded-full shrink-0 ${statusFilter === 'stuck' ? 'opacity-40' : ''}`}
-              title={statusFilter === 'stuck' ? 'Filtro de tiempo desactivado con "Estancados"' : `Tiempo: ${SINCE_LABELS[sinceKey]}`}
-            >
-              <Select
-                id="since-select"
-                value={sinceKey}
-                disabled={statusFilter === 'stuck'}
-                onChange={(e) => setSinceKey(e.target.value as SinceKey)}
-                aria-label="Filtrar leads por tiempo"
-                className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
-              >
-                {Object.entries(SINCE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center rounded-full text-neutral-400 peer-hover:text-neutral-200"
-              >
-                <span className="w-8 h-8">
-                  <IconClock/>
-                </span>
-              </div>
-            </div>
+            <PeriodFilter
+              value={sinceKey}
+              onChange={onSinceChange}
+              disabled={statusFilter === 'stuck'}
+              disabledTitle='Filtro de tiempo desactivado con "Estancados"'
+            />
 
             <div className="relative h-12 w-12 rounded-full shrink-0" title={`Status: ${STATUS_FILTER_LABELS[statusFilter]}`}>
               <Select
@@ -432,7 +401,7 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
                 onChange={(e) => {
                   const next = e.target.value as StatusFilterKey
                   setStatusFilter(next)
-                  if (next === 'stuck') setSinceKey('all')
+                  if (next === 'stuck') onSinceChange('all')
                 }}
                 aria-label="Filtrar leads por status"
                 className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"

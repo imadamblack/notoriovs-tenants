@@ -1,11 +1,15 @@
 import SectionHeading from '@/components/dashboard/ui/atoms/SectionHeading'
 import StatTile from '@/components/dashboard/ui/molecules/StatTile'
 import DataTable, { type DataTableColumn } from '@/components/dashboard/ui/molecules/DataTable'
-import type { MarketingRow, MarketingTotals } from '@/components/dashboard/KpiReport'
+import type { MarketingRange, MarketingRow, MarketingTotals } from '@/components/dashboard/KpiReport'
 
 type KpiMarketingSectionProps = {
   marketing: MarketingRow[]
   totals: MarketingTotals
+  range: MarketingRange
+  // Etiqueta del periodo elegido arriba, o `null` con "Máximo". Solo se
+  // usa para explicar por qué la sección salió vacía.
+  periodLabel: string | null
 }
 
 const currency = (n?: number) =>
@@ -25,13 +29,28 @@ const columns: DataTableColumn<MarketingRow>[] = [
   { key: 'ctr', header: 'CTR', align: 'right', render: (row) => (typeof row.ctr === 'number' ? `${row.ctr}%` : '—') },
 ]
 
-export default function KpiMarketingSection({ marketing, totals }: KpiMarketingSectionProps) {
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', timeZone: 'UTC' })
+
+export default function KpiMarketingSection({ marketing, totals, range, periodLabel }: KpiMarketingSectionProps) {
   return (
     <section>
       <SectionHeading>Marketing</SectionHeading>
+      {/* El periodo de esta sección NO es el que eligió el usuario arriba:
+          los Marketing Reports son semanales y se muestran en semanas
+          completas y ya cerradas (ver la ruta de KPIs). Por eso el rango
+          va escrito a la vista: sin él, un "30 días" arriba y 4 semanas de
+          gasto abajo se leerían como el mismo rango cuando no lo son. */}
+      <p className="-ft-3 text-neutral-400 -mt-2 mb-3">
+        {range
+          ? `Semanas completas del ${shortDate(range.start)} al ${shortDate(range.end)}`
+          : 'Semanas completas y ya cerradas'}
+      </p>
       {marketing.length === 0 ? (
-        <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-4">
-          Aún no hay reportes de marketing capturados para este tenant.
+        <p className="text-sm text-neutral-400 bg-neutral-900 rounded-xl border border-neutral-800 p-4">
+          {periodLabel
+            ? `No hay ninguna semana completa de ads dentro de "${periodLabel}".`
+            : 'Aún no hay reportes de marketing capturados para este tenant.'}
         </p>
       ) : (
         <>
