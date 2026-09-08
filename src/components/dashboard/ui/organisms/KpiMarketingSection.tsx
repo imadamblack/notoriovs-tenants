@@ -46,24 +46,26 @@ export default function KpiMarketingSection({ marketing, totals, range, periodLa
           ? `Semanas completas del ${shortDate(range.start)} al ${shortDate(range.end)}`
           : 'Semanas completas y ya cerradas'}
       </p>
+      {/* Los totales se pintan siempre, en cero si no hubo ads en el rango:
+          mismo criterio que en el resto del reporte. Lo que desaparece
+          cuando no hay reportes es la tabla, que sin filas no tiene nada
+          que enseñar; el aviso ocupa su lugar y explica el porqué. */}
+      <div className="flex flex-wrap gap-3 mb-3">
+        <StatTile label="Gasto total" value={currency(totals.spend)} />
+        <StatTile label="Leads (ads)" value={String(totals.leads)} />
+        <StatTile label="Costo por lead prom." value={currency(totals.avgCostPerLead)} />
+        <StatTile label="Impresiones" value={totals.impressions.toLocaleString('es-MX')} />
+      </div>
       {marketing.length === 0 ? (
-        <p className="text-sm text-neutral-400 bg-neutral-900 rounded-xl border border-neutral-800 p-4">
+        <p className="-ft-3 text-neutral-400 bg-neutral-900 rounded-xl border border-neutral-800 p-4">
           {periodLabel
             ? `No hay ninguna semana completa de ads dentro de "${periodLabel}".`
             : 'Aún no hay reportes de marketing capturados para este tenant.'}
         </p>
       ) : (
-        <>
-          <div className="flex flex-wrap gap-3 mb-3">
-            <StatTile label="Gasto total" value={currency(totals.spend)} />
-            <StatTile label="Leads (ads)" value={String(totals.leads)} />
-            <StatTile label="Costo por lead prom." value={currency(totals.avgCostPerLead)} />
-            <StatTile label="Impresiones" value={totals.impressions.toLocaleString('es-MX')} />
-          </div>
-          <div className="bg-neutral-900 rounded-xl border border-neutral-800 overflow-x-auto px-3">
-            <DataTable columns={columns} rows={marketing} rowKey={(row) => row.id} />
-          </div>
-        </>
+        <div className="bg-neutral-900 rounded-xl border border-neutral-800 overflow-x-auto px-3">
+          <DataTable columns={columns} rows={marketing} rowKey={(row) => row.id} />
+        </div>
       )}
     </section>
   )

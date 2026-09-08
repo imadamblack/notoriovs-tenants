@@ -79,29 +79,6 @@ export default function KpiReport({ data, pipeline, refreshing, sinceKey, onSinc
     // DashboardApp).
     if (!data) return <EmptyState variant="loading" />
 
-    if (data.total === 0) {
-      return (
-        <>
-          <EmptyState
-            variant="empty"
-            message={
-              sinceKey === 'all'
-                ? 'Todavía no hay leads capturados para este tenant.'
-                : `Sin leads en el periodo seleccionado (${SINCE_LABELS[sinceKey]}). Prueba con un rango más amplio.`
-            }
-          />
-          {/* Marketing sí se muestra con cero leads: son semanas completas
-              de ads, que existen aunque ninguna haya traído un lead. */}
-          <KpiMarketingSection
-            marketing={data.marketing}
-            totals={data.marketingTotals}
-            range={data.marketingRange}
-            periodLabel={periodLabel}
-          />
-        </>
-      )
-    }
-
     return (
       <>
         <KpiSummarySection
