@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { getTenantBySubdomain } from '@/utils/getTenant'
+import { getTenantBySubdomain, tenantHasDashboard } from '@/utils/getTenant'
 import { verifyDashboardToken, DASHBOARD_COOKIE_NAME } from '@/utils/dashboardAuth'
 import DashboardLogin from '@/components/dashboard/DashboardLogin'
 import DashboardApp from '@/components/dashboard/DashboardApp'
@@ -14,11 +14,17 @@ export const metadata = { title: 'Dashboard de leads' }
 
 export default async function TenantDashboardPage({ params }: DashboardPageProps) {
   const { subdomain } = await params
-  const tenant = await getTenantBySubdomain(subdomain, 'dashboard')
+  const [tenant, hasDashboard] = await Promise.all([
+    getTenantBySubdomain(subdomain, 'dashboard'),
+    tenantHasDashboard(subdomain),
+  ])
 
   if (!tenant) notFound()
 
-  if (!tenant.dashboardPassword) {
+  // La contraseña en sí no se carga aquí: esta página se renderiza sin
+  // sesión (es la que muestra el login), así que solo pregunta si hay
+  // dashboard configurado. Ver `tenantHasDashboard`.
+  if (!hasDashboard) {
     return <DashboardUnavailable />
   }
 

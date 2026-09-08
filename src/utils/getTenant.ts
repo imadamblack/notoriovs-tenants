@@ -77,10 +77,24 @@ type Present<T> = Exclude<T, null | undefined>
 
 // Un campo se pide entero (`true`) o, si es un grupo, subcampo por subcampo.
 // Lo segundo es lo que permite que una página pública se lleve el Meta Pixel
-// sin llevarse el token de la Conversions API que vive en el mismo grupo.
+// sin llevarse el token de la Conversions API, que vive en el mismo grupo.
 type FieldSelect<V> = true | { [K in keyof Present<V>]?: true }
 
-type TenantSelect = { [K in keyof Omit<TenantDoc, 'id'>]?: FieldSelect<TenantDoc[K]> }
+type TenantSelect = { id?: true } & { [K in keyof Omit<TenantDoc, 'id'>]?: FieldSelect<TenantDoc[K]> }
+
+type TenantProjection = {
+  // `depth: 1` solo donde la página realmente pinta una Media (logo, imagen
+  // del quiz): con `depth: 0` esos campos llegan como id y la imagen queda
+  // en blanco. Ver la regla de `depth` en .claude/skills/payload/reference/
+  // local-api.md — cada nivel es un join más.
+  depth: 0 | 1
+  select: TenantSelect
+}
+
+// Bloques que se repiten entre proyecciones. Nombrarlos evita que la tabla
+// se lea como una lista de campos sueltos.
+const IDENTITY = { name: true, generalInfo: true } as const
+const PIPELINE = { leadPipeline: true, leadStuckAfterDays: true } as const
 
 /**
  * Qué campos del Tenant pide cada consumidor. Nadie resuelve un Tenant sin
@@ -95,75 +109,77 @@ export const TENANT_PROJECTIONS = {
   // Layout compartido por TODAS las páginas del tenant: título/OG de la
   // metadata y los scripts de analytics. Nada de landing, quiz ni pipeline.
   chrome: {
-    name: true,
-    generalInfo: true,
-    landingHero: { subtitle: true },
-    quizIntro: { description: true },
-    tracking: { metaPixelId: true, googleTagId: true },
+    depth: 1, // generalInfo.logo va en la imagen de OpenGraph
+    select: {
+      ...IDENTITY,
+      landingHero: { subtitle: true },
+      quizIntro: { description: true },
+      tracking: { metaPixelId: true, googleTagId: true },
+    },
   },
   landing: {
-    landingHero: true,
-    landingBlocks: true,
+    // El renderer de bloques todavía no pinta `landingHero.image` ni las
+    // imágenes de los bloques, pero son campos de imagen: poblarlos es lo
+    // que hace que agregarlos al render sea solo tocar el JSX.
+    depth: 1,
+    select: { landingHero: true, landingBlocks: true },
   },
   quiz: {
-    name: true,
-    generalInfo: true,
-    quizIntro: true,
-    quizSteps: true,
+    depth: 1, // logo + quizIntro.image se pintan en el formulario
+    select: { ...IDENTITY, quizIntro: true, quizSteps: true },
   },
   thankYou: {
-    name: true,
-    generalInfo: true,
-    thankYouPage: true,
+    depth: 1, // logo
+    select: { ...IDENTITY, thankYouPage: true },
   },
   notEligible: {
-    name: true,
-    generalInfo: true,
-    notEligiblePage: true,
+    depth: 1, // logo
+    select: { ...IDENTITY, notEligiblePage: true },
   },
   privacyNotice: {
-    name: true,
-    generalInfo: true,
+    depth: 0, // solo texto: razón social, domicilio, teléfono, email
+    select: IDENTITY,
   },
-  // Dashboard de Cliente. `dashboardPassword` entra solo para saber si el
-  // tenant tiene dashboard configurado; no viaja al cliente.
+  // Dashboard de Cliente. La contraseña NO entra: si el tenant tiene o no
+  // dashboard configurado lo responde `tenantHasDashboard`, sin traerse el
+  // secreto a una página que cualquiera puede abrir.
   dashboard: {
-    name: true,
-    generalInfo: true,
-    dashboardPassword: true,
-    leadPipeline: true,
-    leadStuckAfterDays: true,
+    depth: 0,
+    select: { ...IDENTITY, ...PIPELINE },
   },
   // Rutas /api/tenant-dashboard/* (leads, counts, kpis): autorizan con la
   // contraseña y filtran con el pipeline.
   dashboardApi: {
-    dashboardPassword: true,
-    leadPipeline: true,
-    leadStuckAfterDays: true,
+    depth: 0,
+    select: { dashboardPassword: true, ...PIPELINE },
   },
   dashboardLogin: {
-    dashboardPassword: true,
+    depth: 0,
+    select: { dashboardPassword: true },
   },
   // Único consumidor del token de la Conversions API: la ruta server-side
   // que reenvía el evento a Meta.
   conversionsApi: {
-    tracking: { metaPixelId: true, metaCapiToken: true },
+    depth: 0,
+    select: { tracking: { metaPixelId: true, metaCapiToken: true } },
   },
   quizSubmit: {
-    name: true,
-    leadPipeline: true,
-    quizWebhook: true,
+    depth: 0,
+    select: { name: true, leadPipeline: true, quizWebhook: true },
   },
+  // Resolver el subdominio a un id de tenant, nada más: es todo lo que
+  // necesita el ingest de marketing reports para scopear lo que escribe.
   identity: {
-    name: true,
-    subdomain: true,
+    depth: 0,
+    select: { id: true },
   },
-} as const satisfies Record<string, TenantSelect>
+} as const satisfies Record<string, TenantProjection>
 
 export type TenantProjectionName = keyof typeof TENANT_PROJECTIONS
 
 /**
- * Proyecciones que puede pedir una página servida a cualquier visitante. El
+ * Proyecciones que puede pedir una página servida a cualquier visitante —
+ * el dashboard incluido: su pantalla de login se renderiza sin sesión. El
  * test de tenantProjections verifica contra esta lista que ninguna arrastre
  * un secreto del tenant.
  */
@@ -174,6 +190,7 @@ export const PUBLIC_TENANT_PROJECTIONS = [
   'thankYou',
   'notEligible',
   'privacyNotice',
+  'dashboard',
 ] as const satisfies readonly TenantProjectionName[]
 
 type ProjectField<V, S> = S extends true
@@ -185,7 +202,9 @@ type Projected<S> = Pick<TenantDoc, 'id'> & {
 }
 
 /** El Tenant tal como lo ve el consumidor que pidió la proyección `K`. */
-export type TenantView<K extends TenantProjectionName> = Projected<(typeof TENANT_PROJECTIONS)[K]>
+export type TenantView<K extends TenantProjectionName> = Projected<
+  (typeof TENANT_PROJECTIONS)[K]['select']
+>
 
 /**
  * La consulta que resuelve un tenant activo por subdominio con una
@@ -193,6 +212,8 @@ export type TenantView<K extends TenantProjectionName> = Projected<(typeof TENAN
  * sin base de datos.
  */
 export function buildTenantQuery(subdomain: string, projection: TenantProjectionName) {
+  const { depth, select } = TENANT_PROJECTIONS[projection]
+
   return {
     collection: 'tenants' as const,
     where: {
@@ -200,8 +221,8 @@ export function buildTenantQuery(subdomain: string, projection: TenantProjection
       active: { equals: true },
     },
     limit: 1,
-    depth: 1,
-    select: TENANT_PROJECTIONS[projection] as SelectType,
+    depth,
+    select: select as SelectType,
   }
 }
 
@@ -209,10 +230,13 @@ export function buildTenantQuery(subdomain: string, projection: TenantProjection
 // misma proyección en el mismo render comparten una sola query, y uno que
 // pide otra proyección paga la suya (que es justo el punto).
 const findTenant = cache(
-  async (subdomain: string, projection: TenantProjectionName): Promise<unknown> => {
+  async (
+    subdomain: string,
+    projection: TenantProjectionName,
+  ): Promise<Partial<TenantDoc> | null> => {
     const payload = await getPayload({ config })
     const { docs } = await payload.find(buildTenantQuery(subdomain, projection))
-    return docs[0] ?? null
+    return (docs[0] as Partial<TenantDoc>) ?? null
   },
 )
 
@@ -229,3 +253,31 @@ export async function getTenantBySubdomain<K extends TenantProjectionName>(
 
   return (await findTenant(subdomain, projection)) as TenantView<K> | null
 }
+
+/**
+ * ¿Este tenant tiene dashboard configurado? Se responde con un `where` en
+ * vez de leyendo `dashboardPassword`, para que la página del dashboard —que
+ * cualquiera puede abrir— nunca cargue el secreto en memoria solo para
+ * decidir si muestra el login o el aviso de "no disponible".
+ *
+ * `exists` descarta el NULL y `not_equals: ''` la cadena vacía, que es como
+ * el admin apaga el acceso (ver la descripción del campo en Tenants.ts).
+ */
+export const tenantHasDashboard = cache(async (subdomain: string): Promise<boolean> => {
+  if (!subdomain) return false
+
+  const payload = await getPayload({ config })
+  const { totalDocs } = await payload.count({
+    collection: 'tenants',
+    where: {
+      and: [
+        { subdomain: { equals: subdomain.toLowerCase() } },
+        { active: { equals: true } },
+        { dashboardPassword: { exists: true } },
+        { dashboardPassword: { not_equals: '' } },
+      ],
+    },
+  })
+
+  return totalDocs > 0
+})
