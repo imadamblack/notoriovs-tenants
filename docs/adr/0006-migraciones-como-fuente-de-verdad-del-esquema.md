@@ -35,6 +35,12 @@ esperando una respuesta. Comprobado — con la marca puesta y sin una persona
 delante, el comando se cuelga indefinidamente y no aplica nada. Un despliegue
 automático se quedaría colgado ahí.
 
+Mientras se preparaba ese sellado, el push volvió a adelantarse: bastó reiniciar
+el `next dev` de la máquina de desarrollo —que apunta al `.env`, o sea a
+producción— para que las tablas de la migración siguiente aparecieran solas en
+la base. Es la demostración más clara de por qué hacía falta esta decisión, y
+deja una tarea aparte: **la base de desarrollo tiene que ser otra**.
+
 ## Consecuencias
 
 - `payload migrate` es el único camino a producción. Un despliegue que cambie
@@ -46,3 +52,8 @@ automático se quedaría colgado ahí.
   el SQL antes de commitearlo, no solo confiar en `migrate:create`.
 - `payload_migrations` pasa a ser un registro con valor: si alguien vuelve a
   escribir ahí a mano, se pierde la única bitácora que queda.
+- Comparar dos esquemas entre servidores de versiones distintas exige cuidado:
+  las versiones nuevas de Postgres catalogan las restricciones `NOT NULL` en
+  `pg_constraint` y las viejas no, así que una comparación ingenua inventa
+  cientos de diferencias que no existen. La nulabilidad real se lee en las
+  columnas. Ver `docs/runbooks/describir-esquema.sql`.

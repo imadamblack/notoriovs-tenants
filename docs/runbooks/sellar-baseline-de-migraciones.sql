@@ -48,7 +48,8 @@ BEGIN;
 
 DO $$
 DECLARE
-  baseline CONSTANT text := '20260902_010237';
+  baseline         CONSTANT text := '20260902_010237';
+  tenant_users_mig CONSTANT text := '20260908_233634_tenant_users';
   filas int;
 BEGIN
   -- 1. ¿Es la base que creemos? Si no aparecen las tablas del esquema base,
@@ -73,15 +74,9 @@ BEGIN
   --    migraciones de verdad, y entonces no hay nada que sellar.
   SELECT count(*) INTO filas
   FROM payload_migrations
-  WHERE name <> baseline AND NOT (batch = -1 AND name = 'dev');
+  WHERE name NOT IN (baseline, tenant_users_mig) AND NOT (batch = -1 AND name = 'dev');
   IF filas > 0 THEN
     RAISE EXCEPTION 'La bitácora tiene % renglón(es) que no son ni el baseline ni la marca del push de dev. Esta base ya se gobierna por migraciones; revisa a mano antes de seguir.', filas;
-  END IF;
-
-  -- 3. Si "tenant_users" ya existe, el push adelantó la migración siguiente y
-  --    sellar solo el baseline dejaría la bitácora mintiendo.
-  IF to_regclass('public.tenant_users') IS NOT NULL THEN
-    RAISE EXCEPTION 'La tabla "tenant_users" ya existe: el push ya adelantó la migración 20260908. Este guion no cubre ese caso.';
   END IF;
 
   -- Fuera la marca del push: a partir de aquí la bitácora dice la verdad por
@@ -99,7 +94,29 @@ BEGIN
   SELECT baseline, 1, now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM payload_migrations WHERE name = baseline);
 
-  RAISE NOTICE 'Baseline sellado: % queda marcada como aplicada. Ahora corre: npm run migrate', baseline;
+  RAISE NOTICE 'Sellada como aplicada: %', baseline;
+
+  -- El push de dev puede haberse adelantado a migraciones posteriores: basta
+  -- con arrancar `next dev` contra esta base después de agregar una colección
+  -- para que las tablas aparezcan sin que ninguna migración las haya creado.
+  -- Cuando eso pasó, esa migración también hay que sellarla: correrla
+  -- intentaría crear tablas que ya están.
+  --
+  -- El detector es la tabla que la migración crea. NO basta con esto para
+  -- afirmar que el esquema es correcto: antes de sellar hay que comparar el
+  -- esquema de esta base contra el que producen las migraciones desde cero
+  -- (ver la nota de arriba). El guion sella lo que encuentra; comprobar que lo
+  -- que encontró está bien es trabajo de esa comparación.
+  IF to_regclass('public.tenant_users') IS NOT NULL THEN
+    INSERT INTO payload_migrations (name, batch, created_at, updated_at)
+    SELECT tenant_users_mig, 2, now(), now()
+    WHERE NOT EXISTS (SELECT 1 FROM payload_migrations WHERE name = tenant_users_mig);
+
+    RAISE NOTICE 'La tabla "tenant_users" ya existe (la creó el push), así que también se sella: %', tenant_users_mig;
+    RAISE NOTICE 'No queda nada pendiente: NO hace falta correr `npm run migrate`.';
+  ELSE
+    RAISE NOTICE 'Falta crear las tablas de Tenant Users. Ahora corre: npm run migrate';
+  END IF;
 END $$;
 
 COMMIT;
