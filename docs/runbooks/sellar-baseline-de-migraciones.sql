@@ -22,11 +22,17 @@
 --
 -- Después, y solo después:
 --
---   npx payload migrate
+--   npm run migrate
 --
--- Ojo: `npm run migrate` corre lo mismo pero a través de cross-env, que se
--- traga la salida del CLI — no verías ni el resultado ni un error. Para
--- migraciones, llama a `npx payload` directo.
+-- Ojo con el CLI de Payload: la PRIMERA llamada después de un rato sin usar la
+-- base suele volver sin imprimir nada. Neon suspende las bases ociosas y ese
+-- primer comando se va mientras la base despierta. Vuelve a correrlo y sale.
+--
+-- Por eso, para saber qué pasó de verdad, no te fíes de la salida del CLI:
+-- pregúntale a la bitácora, que es la fuente:
+--
+--   psql "$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2-)" \
+--     -c "select name, batch, created_at from payload_migrations order by name;"
 
 BEGIN;
 
@@ -38,7 +44,7 @@ BEGIN
   -- 1. ¿Es la base que creemos? Si no aparecen las tablas del esquema base,
   --    esto no es producción y no hay nada que sellar.
   IF to_regclass('public.tenants') IS NULL OR to_regclass('public.leads') IS NULL THEN
-    RAISE EXCEPTION 'Esta base no tiene el esquema base (faltan "tenants" o "leads"). Si es una base nueva y vacía, NO la selles: corre "npx payload migrate" y listo.';
+    RAISE EXCEPTION 'Esta base no tiene el esquema base (faltan "tenants" o "leads"). Si es una base nueva y vacía, NO la selles: corre "npm run migrate" y listo.';
   END IF;
 
   IF to_regclass('public.payload_migrations') IS NULL THEN
@@ -70,7 +76,7 @@ BEGIN
   SELECT baseline, 1, now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM payload_migrations WHERE name = baseline);
 
-  RAISE NOTICE 'Baseline sellado: % queda marcada como aplicada. Ahora corre: npx payload migrate', baseline;
+  RAISE NOTICE 'Baseline sellado: % queda marcada como aplicada. Ahora corre: npm run migrate', baseline;
 END $$;
 
 COMMIT;
