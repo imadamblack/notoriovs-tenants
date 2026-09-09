@@ -24,6 +24,9 @@ export async function login({ page, user }: LoginOptions): Promise<void> {
 
   await page.waitForURL('**/admin')
 
-  const dashboardArtifact = page.locator('span[title="Dashboard"]')
-  await expect(dashboardArtifact).toBeVisible()
+  // Prueba de que hay sesión, y no de que el CSS ya cargó: el enlace de salir
+  // es texto. Lo que había aquí era un icono absolutamente posicionado, que
+  // mide 0x0 —o sea "invisible" para Playwright— hasta que el dev server
+  // termina de compilar la hoja de estilos del admin.
+  await expect(page.locator('a[href="/admin/logout"]')).toBeVisible()
 }

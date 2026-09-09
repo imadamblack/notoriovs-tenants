@@ -14,6 +14,14 @@ export const baseURL = `http://localhost:${PORT}`
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Compila el admin antes de que arranque el primer test; si no, esa espera
+  // cae dentro del `beforeAll` que hace login y lo tumba por timeout.
+  globalSetup: './tests/warmupServer.ts',
+  // Aun precalentado, el dev server compila al vuelo lo que cada ruta nueva
+  // necesita; con los valores por omisión (5s por aserción) el admin falla por
+  // lento, no por roto.
+  timeout: 90_000,
+  expect: { timeout: 20_000 },
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
@@ -39,11 +47,14 @@ export default defineConfig({
     // Nunca reutilizar un servidor ajeno: el que esté corriendo casi seguro
     // apunta a la base de desarrollo, y estos tests borran usuarios.
     reuseExistingServer: false,
+    // Arrancar el dev server y compilar el admin la primera vez tarda.
+    timeout: 180_000,
     // Estas variables ganan sobre el `.env` que carga Next: @next/env solo
     // rellena las que no vienen ya en el entorno.
     env: {
       DATABASE_URL: databaseUrl,
       PAYLOAD_SECRET: process.env.PAYLOAD_SECRET ?? '',
+      PAYLOAD_SCHEMA_PUSH: process.env.PAYLOAD_SCHEMA_PUSH ?? 'false',
       PORT: String(PORT),
     },
   },

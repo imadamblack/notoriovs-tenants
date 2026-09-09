@@ -54,6 +54,12 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
     },
+    // El push automático del modo desarrollo es comodidad local y nada más
+    // (ADR 0006). En pruebas se apaga: ahí el esquema lo ponen las migraciones
+    // (`npm run db:reset`), y además el servidor de e2e y el proceso de tests
+    // levantan cada uno su Payload contra la misma base — dos empujones
+    // simultáneos se bloquean entre sí y el login se queda colgado.
+    push: process.env.PAYLOAD_SCHEMA_PUSH !== 'false',
   }),
   sharp,
   plugins: [
