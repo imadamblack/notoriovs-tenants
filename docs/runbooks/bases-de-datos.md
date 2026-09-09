@@ -55,6 +55,30 @@ Lo que nunca se hace: copiar el `DATABASE_URL` de producción al `.env`. Ahí
 empezó todo esto — bastó reiniciar el dev server para que Payload empujara
 tablas nuevas a la base de los clientes (ADR 0006).
 
+## Traerte un tenant de producción para trabajar
+
+Tu base de desarrollo arranca vacía. Para tener con qué trabajar:
+
+```bash
+npm run copiar-tenant -- ntrs            # la ficha del tenant y su landing/quiz
+npm run copiar-tenant -- ntrs --leads 50 # además, sus 50 leads más recientes
+```
+
+Copia el tenant y todo lo que cuelga de él —bloques de la landing, pasos y
+opciones del quiz, etapas del pipeline— más las imágenes de media a las que
+apunta. De producción solo lee; el destino es el `DATABASE_URL` de tu `.env`, y
+aborta si ese no es local. Si el tenant ya está en tu base, se niega en vez de
+duplicarlo.
+
+Dos cosas que conviene saber:
+
+- **Los leads son datos personales de gente real.** Trae una muestra para probar
+  el dashboard, no la base entera, y recuerda que quedan en tu máquina.
+- **Nunca copies con `select *`.** Producción se construyó con el push del dev
+  server y tu base local con las migraciones: tienen las mismas columnas en
+  distinto orden. Un `COPY` con `select *` mete la fecha de creación en una
+  columna de id. El guion nombra cada columna por eso.
+
 ## Media
 
 Sin `BLOB_READ_WRITE_TOKEN`, el plugin de Vercel Blob no se monta y los uploads

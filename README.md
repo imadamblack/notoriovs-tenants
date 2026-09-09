@@ -18,6 +18,9 @@ npm run dev               # http://localhost:3000/admin
 La primera vez, el admin te pide crear tu usuario. No necesitas credenciales de
 nadie: la base de desarrollo es local.
 
+Arranca vacía. Para trabajar con datos de verdad, `npm run copiar-tenant -- <subdominio> --leads 50`
+te trae un tenant de producción (solo lectura allá) a tu base local.
+
 ## Pruebas
 
 ```bash
