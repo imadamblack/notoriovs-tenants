@@ -1,20 +1,12 @@
 import type { Tab } from 'payload'
 
-// Dashboard del cliente: acceso por contraseña, etapas del Kanban de leads y
-// el corte de inactividad que marca un lead como estancado.
+// Dashboard del cliente: etapas del Kanban de leads y el corte de inactividad
+// que marca un lead como estancado. Quién entra se administra en Tenant Users,
+// no aquí: un tenant sin usuarios no tiene dashboard.
 
 export const pipelineTab: Tab = {
   label: 'Dashboard Cliente',
   fields: [
-    {
-      name: 'dashboardPassword',
-      type: 'text',
-      label: 'Contraseña del dashboard',
-      admin: {
-        description:
-          'Contraseña única y compartida que usa el cliente para entrar a su dashboard de leads (/tenant-site/{subdomain}/dashboard). Se captura a mano, igual que el Meta Pixel o el CAPI Token. Déjala vacía para desactivar el acceso al dashboard.',
-      },
-    },
     {
       name: 'leadPipeline',
       type: 'array',

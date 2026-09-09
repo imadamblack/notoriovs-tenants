@@ -30,8 +30,8 @@ export const Users: CollectionConfig = {
     // `depth: 0` por la misma razón que en TenantUsers, y desde que este issue
     // empezó a llenar el campo `tenants`: con el depth por omisión (2), Payload
     // resuelve `user.tenants[].tenant` como el documento COMPLETO del Tenant en
-    // cada petición autenticada —`dashboardPassword` y `tracking.metaCapiToken`
-    // incluidos— y eso viaja en `GET /api/users/me` y en el HTML que el panel
+    // cada petición autenticada —`tracking.metaCapiToken` incluido— y eso
+    // viaja en `GET /api/users/me` y en el HTML que el panel
     // serializa. Con 0 son ids, que es lo único que necesitan el plugin
     // multi-tenant y el control de acceso (ver `assignedTenantIds`).
     depth: 0,

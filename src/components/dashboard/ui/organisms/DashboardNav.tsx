@@ -9,8 +9,8 @@ import IconLogout from "@/components/dashboard/ui/atoms/icons/IconLogout";
 
 type DashboardNavProps = {
   companyName?: string | null
-  /** Email del Tenant User, o `null` si la sesión es la contraseña compartida. */
-  accountEmail?: string | null
+  /** Email del Tenant User con el que está firmada la sesión. */
+  accountEmail: string
   tab: DashboardTab
   onTabChange: (tab: DashboardTab) => void
   onLogout: () => void
@@ -90,7 +90,7 @@ export default function DashboardNav({companyName, accountEmail, tab, onTabChang
               className="absolute right-0 top-full mt-2 z-50 min-w-[16rem] rounded-xl border border-neutral-600 bg-neutral-800 p-2 shadow-xl"
             >
               <p className="px-3 py-2 -ft-4 text-neutral-400 break-all text-left">
-                {accountEmail || 'Sesión compartida de la empresa'}
+                {accountEmail}
               </p>
               <Button
                 variant="ghost"

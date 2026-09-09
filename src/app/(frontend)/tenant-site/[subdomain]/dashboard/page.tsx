@@ -1,7 +1,6 @@
-import { cookies, headers } from 'next/headers'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getTenantBySubdomain, tenantHasDashboard } from '@/utils/getTenant'
-import { DASHBOARD_COOKIE_NAME } from '@/utils/dashboardAuth'
 import { resolveDashboardAuth, sessionPermissions } from '@/utils/requireDashboardAuth'
 import DashboardLogin from '@/components/dashboard/DashboardLogin'
 import DashboardApp from '@/components/dashboard/DashboardApp'
@@ -13,9 +12,9 @@ type DashboardPageProps = {
 
 export const metadata = { title: 'Dashboard de leads' }
 
-// El dashboard NO se cachea. `cookies()` ya lo volvería dinámico por sí solo,
-// pero eso es una consecuencia de cómo está escrito hoy, no una decisión: si
-// mañana alguien mueve la lectura de la sesión a otro lado, una página con
+// El dashboard NO se cachea. Leer la sesión ya lo volvería dinámico por sí
+// solo, pero eso es una consecuencia de cómo está escrito hoy, no una
+// decisión: si mañana alguien mueve esa lectura a otro lado, una página con
 // leads de un cliente no puede terminar servida desde el CDN por accidente.
 export const dynamic = 'force-dynamic'
 
@@ -25,13 +24,12 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
 
   if (!tenant) notFound()
 
-  // Ni la contraseña compartida ni ningún dato del Tenant User se cargan aquí:
-  // esta página se renderiza sin sesión (es la que muestra el login), así que
-  // solo pregunta si queda alguna puerta abierta. Ver `tenantHasDashboard`.
-  const [hasDashboard, requestHeaders, cookieStore] = await Promise.all([
-    tenantHasDashboard(subdomain, tenant.id),
+  // Ningún dato del Tenant User se carga aquí: esta página se renderiza sin
+  // sesión (es la que muestra el login), así que solo pregunta si el tenant
+  // tiene a alguien que pueda entrar. Ver `tenantHasDashboard`.
+  const [hasDashboard, requestHeaders] = await Promise.all([
+    tenantHasDashboard(tenant.id),
     headers(),
-    cookies(),
   ])
 
   if (!hasDashboard) {
@@ -39,11 +37,7 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
   }
 
   const companyName = tenant.generalInfo?.companyName || tenant.name
-  const auth = await resolveDashboardAuth(
-    requestHeaders,
-    cookieStore.get(DASHBOARD_COOKIE_NAME)?.value,
-    subdomain,
-  )
+  const auth = await resolveDashboardAuth(requestHeaders, subdomain)
 
   if (!auth) {
     return <DashboardLogin subdomain={subdomain} companyName={companyName} />
@@ -53,10 +47,8 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
     <DashboardApp
       subdomain={subdomain}
       companyName={companyName}
-      // Con quién está firmada la sesión. En una de Tenant User es su email;
-      // con la contraseña compartida no hay nadie a quién nombrar, y el menú
-      // de cuenta lo dice tal cual en vez de inventarse un usuario.
-      accountEmail={auth.session.kind === 'tenant-user' ? auth.session.email : null}
+      // Con quién está firmada la sesión, para el menú de cuenta.
+      accountEmail={auth.session.email}
       // Qué puede hacer este rol, ya resuelto en el servidor. La interfaz lo
       // usa para no ofrecer botones que la API va a rechazar; quien decide de
       // verdad es cada ruta, que vuelve a preguntar por su cuenta.

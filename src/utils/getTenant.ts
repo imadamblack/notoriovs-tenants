@@ -58,7 +58,6 @@ export type TenantDoc = {
   optInWebhook?: string | null
   quizWebhook?: string | null
   tracking?: TenantTracking | null
-  dashboardPassword?: string | null
   leadPipeline?: TenantLeadStage[] | null
   leadStuckAfterDays?: number | null
   thankYouPage?: {
@@ -100,8 +99,7 @@ const PIPELINE = { leadPipeline: true, leadStuckAfterDays: true } as const
  * Qué campos del Tenant pide cada consumidor. Nadie resuelve un Tenant sin
  * nombrar una de estas proyecciones, así que el conjunto de campos que una
  * página carga en memoria se lee de un solo lugar — y se puede afirmar en un
- * test que ninguna página pública toca `tracking.metaCapiToken` ni
- * `dashboardPassword`.
+ * test que ninguna página pública toca `tracking.metaCapiToken`.
  *
  * `id` siempre viene de vuelta (Payload lo incluye en todo `select`).
  */
@@ -140,27 +138,20 @@ export const TENANT_PROJECTIONS = {
     depth: 0, // solo texto: razón social, domicilio, teléfono, email
     select: IDENTITY,
   },
-  // Dashboard de Cliente. La contraseña NO entra: si el tenant tiene o no
-  // dashboard configurado lo responde `tenantHasDashboard`, sin traerse el
-  // secreto a una página que cualquiera puede abrir.
+  // Dashboard de Cliente. Si el tenant tiene o no dashboard disponible lo
+  // responde `tenantHasDashboard`, que cuenta usuarios en vez de leer nada
+  // del Tenant.
   dashboard: {
     depth: 0,
     select: { ...IDENTITY, ...PIPELINE },
   },
   // Rutas /api/tenant-dashboard/* (leads, counts, kpis) y la autorización de
   // la página del dashboard: el `id` para scopear la query a `leads` y el
-  // pipeline para filtrarla. La contraseña ya NO entra: quién autoriza es
-  // `resolveDashboardAuth`, que para la puerta compartida pregunta con un
-  // `count` (`tenantHasSharedPassword`) en vez de traerse el secreto — la
-  // misma proyección la usa la página del dashboard, que se renderiza sin
-  // sesión para mostrar el login.
+  // pipeline para filtrarla. Quién autoriza es `resolveDashboardAuth`, contra
+  // la colección `tenant-users`; del Tenant no sale ninguna credencial.
   dashboardApi: {
     depth: 0,
     select: { ...PIPELINE },
-  },
-  dashboardLogin: {
-    depth: 0,
-    select: { dashboardPassword: true },
   },
   // Único consumidor del token de la Conversions API: la ruta server-side
   // que reenvía el evento a Meta.
@@ -260,34 +251,6 @@ export async function getTenantBySubdomain<K extends TenantProjectionName>(
   return (await findTenant(subdomain, projection)) as TenantView<K> | null
 }
 
-/**
- * ¿Este tenant todavía tiene contraseña compartida? Se responde con un `where`
- * en vez de leyendo `dashboardPassword`, para que ni la página del dashboard
- * —que cualquiera puede abrir— ni la autorización de las rutas de API carguen
- * el secreto en memoria solo para decidir si esa puerta sigue abierta.
- *
- * `exists` descarta el NULL y `not_equals: ''` la cadena vacía, que es como
- * el admin apaga esa puerta (ver la descripción del campo en pipeline.ts).
- */
-export const tenantHasSharedPassword = cache(async (subdomain: string): Promise<boolean> => {
-  if (!subdomain) return false
-
-  const payload = await getPayload({ config })
-  const { totalDocs } = await payload.count({
-    collection: 'tenants',
-    where: {
-      and: [
-        { subdomain: { equals: subdomain.toLowerCase() } },
-        { active: { equals: true } },
-        { dashboardPassword: { exists: true } },
-        { dashboardPassword: { not_equals: '' } },
-      ],
-    },
-  })
-
-  return totalDocs > 0
-})
-
 /** ¿Este tenant tiene al menos un Tenant User que pueda entrar con su email? */
 export const tenantHasUsers = cache(async (tenantId: string | number): Promise<boolean> => {
   const payload = await getPayload({ config })
@@ -301,20 +264,10 @@ export const tenantHasUsers = cache(async (tenantId: string | number): Promise<b
 })
 
 /**
- * ¿Hay alguna forma de entrar al dashboard de este tenant? Cualquiera de las
- * dos puertas basta: la contraseña compartida o un Tenant User. Un tenant al
- * que ya se le migraron los usuarios y se le vació la contraseña sigue
- * teniendo dashboard; uno sin ninguna de las dos ve el aviso de "no
+ * ¿Hay alguna forma de entrar al dashboard de este tenant? Solo hay una:
+ * tener al menos un Tenant User. Un tenant sin usuarios ve el aviso de "no
  * disponible" en vez de un login que nadie podría pasar.
  */
-export async function tenantHasDashboard(
-  subdomain: string,
-  tenantId: string | number,
-): Promise<boolean> {
-  const [shared, users] = await Promise.all([
-    tenantHasSharedPassword(subdomain),
-    tenantHasUsers(tenantId),
-  ])
-
-  return shared || users
+export async function tenantHasDashboard(tenantId: string | number): Promise<boolean> {
+  return tenantHasUsers(tenantId)
 }

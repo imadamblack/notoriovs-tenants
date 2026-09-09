@@ -19,5 +19,5 @@ El host, en cambio, no lo puede falsificar el navegador.
 - Payload sirve un catch-all en `/api/[...slug]`; `/api/v1/*` gana por ser
   segmento estático, pero hay que confirmarlo en el build.
 - Las API Keys se guardan **hasheadas**. El esquema anterior guardaba la
-  contraseña del dashboard en texto plano en `tenants.dashboardPassword`;
-  eso no se repite.
+  contraseña del dashboard en texto plano en `tenants.dashboardPassword`
+  (campo ya retirado); eso no se repite.

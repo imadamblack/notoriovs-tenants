@@ -6,7 +6,6 @@ import { TenantUsers } from '@/collections/TenantUsers'
 import { Leads } from '@/collections/Leads'
 import { MarketingReports } from '@/collections/MarketingReports'
 import { Tenants } from '@/collections/Tenants'
-import { createDashboardToken } from '@/utils/dashboardAuth'
 import { normalizeTenantUserRole, roleCan } from '@/access/tenantUserPermissions'
 
 // Este archivo prueba la capa de autorización del Dashboard de Cliente sin
@@ -16,19 +15,17 @@ import { normalizeTenantUserRole, roleCan } from '@/access/tenantUserPermissions
 // sino la regla — y la regla es la única barrera entre los leads de un
 // cliente y los de otro.
 const getTenantBySubdomain = vi.fn()
-const tenantHasSharedPassword = vi.fn()
 const getTenantUserSession = vi.fn()
 
 vi.mock('@/utils/getTenant', () => ({
   getTenantBySubdomain: (...args: unknown[]) => getTenantBySubdomain(...args),
-  tenantHasSharedPassword: (...args: unknown[]) => tenantHasSharedPassword(...args),
 }))
 
 vi.mock('@/utils/tenantUserAuth', () => ({
   getTenantUserSession: (...args: unknown[]) => getTenantUserSession(...args),
 }))
 
-const { resolveDashboardAuth, sessionCan, sessionRole } = await import('@/utils/requireDashboardAuth')
+const { resolveDashboardAuth, sessionCan } = await import('@/utils/requireDashboardAuth')
 
 const ACME = { id: 1, leadPipeline: [], leadStuckAfterDays: 21 }
 
@@ -43,7 +40,6 @@ const tenantUser = (tenantId: string | number, role: 'owner' | 'member' = 'owner
 beforeEach(() => {
   vi.resetAllMocks()
   getTenantBySubdomain.mockResolvedValue(ACME)
-  tenantHasSharedPassword.mockResolvedValue(true)
   getTenantUserSession.mockResolvedValue(null)
 })
 
@@ -70,15 +66,10 @@ describe('autorización del dashboard', () => {
   it('un Tenant User de este tenant entra, y la sesión lo nombra', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1))
 
-    const auth = await resolveDashboardAuth(noHeaders, undefined, 'acme')
+    const auth = await resolveDashboardAuth(noHeaders, 'acme')
 
     expect(auth?.tenant).toBe(ACME)
-    expect(auth?.session).toEqual({
-      kind: 'tenant-user',
-      userId: 7,
-      email: 'cliente@acme.com',
-      role: 'owner',
-    })
+    expect(auth?.session).toEqual({ userId: 7, email: 'cliente@acme.com', role: 'owner' })
   })
 
   // El caso que justifica toda esta capa: la sesión es legítima, pero es de
@@ -86,57 +77,31 @@ describe('autorización del dashboard', () => {
   it('un Tenant User de otro tenant no entra aunque cambie el subdominio', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(2))
 
-    expect(await resolveDashboardAuth(noHeaders, undefined, 'acme')).toBeNull()
+    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
   })
 
   it('un Tenant User sin tenant asignado no entra a ninguno', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(null as unknown as number))
 
-    expect(await resolveDashboardAuth(noHeaders, undefined, 'acme')).toBeNull()
-  })
-
-  it('la contraseña compartida sigue abriendo el dashboard', async () => {
-    const token = createDashboardToken('acme')
-
-    const auth = await resolveDashboardAuth(noHeaders, token, 'acme')
-
-    expect(auth?.tenant).toBe(ACME)
-    expect(auth?.session).toEqual({ kind: 'shared-password' })
-  })
-
-  it('una cookie compartida firmada para otro subdominio no sirve aquí', async () => {
-    const token = createDashboardToken('otro')
-
-    expect(await resolveDashboardAuth(noHeaders, token, 'acme')).toBeNull()
-  })
-
-  it('vaciar la contraseña en el admin cierra esa puerta sin tocar a los Tenant Users', async () => {
-    tenantHasSharedPassword.mockResolvedValue(false)
-    const token = createDashboardToken('acme')
-
-    expect(await resolveDashboardAuth(noHeaders, token, 'acme')).toBeNull()
-
-    getTenantUserSession.mockResolvedValue(tenantUser(1))
-    expect(await resolveDashboardAuth(noHeaders, token, 'acme')).not.toBeNull()
-  })
-
-  // Una cookie inventada no debe costar una consulta: es el caso que un
-  // atacante puede repetir gratis.
-  it('una cookie compartida con firma inválida se descarta sin consultar la base', async () => {
-    expect(await resolveDashboardAuth(noHeaders, 'basura.basura', 'acme')).toBeNull()
-    expect(tenantHasSharedPassword).not.toHaveBeenCalled()
+    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
   })
 
   it('sin subdominio no hay tenant que resolver', async () => {
-    expect(await resolveDashboardAuth(noHeaders, undefined, null)).toBeNull()
+    expect(await resolveDashboardAuth(noHeaders, null)).toBeNull()
     expect(getTenantBySubdomain).not.toHaveBeenCalled()
+  })
+
+  // Sin sesión de Tenant User no queda ninguna otra puerta: la contraseña
+  // compartida por Tenant se retiró con su campo.
+  it('sin sesión de Tenant User no entra nadie', async () => {
+    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
   })
 
   it('un tenant inexistente o inactivo no autoriza ni con sesión válida', async () => {
     getTenantBySubdomain.mockResolvedValue(null)
     getTenantUserSession.mockResolvedValue(tenantUser(1))
 
-    expect(await resolveDashboardAuth(noHeaders, createDashboardToken('acme'), 'acme')).toBeNull()
+    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
   })
 })
 
@@ -195,8 +160,8 @@ describe('la colección de Tenant Users', () => {
 
   // Con el `auth.depth` por omisión (2), Payload devuelve `user.tenant` como
   // el Tenant COMPLETO en cada petición autenticada, y el panel serializa el
-  // usuario dentro de la página: `dashboardPassword` y `tracking.metaCapiToken`
-  // terminaban en el HTML que recibe el navegador de un Tenant User que abre
+  // usuario dentro de la página: `tracking.metaCapiToken` terminaba en el
+  // HTML que recibe el navegador de un Tenant User que abre
   // /admin en el host de su tenant. Verificado contra un build de producción
   // antes y después del arreglo.
   it('resuelve la sesión sin poblar el Tenant, para no arrastrar sus secretos', () => {
@@ -228,8 +193,8 @@ describe('la API de Payload no le abre nada a un Tenant User', () => {
   const collections = [
     ['leads', Leads],
     ['marketing-reports', MarketingReports],
-    // El documento del Tenant trae `dashboardPassword` y el token de la CAPI:
-    // su lectura por REST era pública, y ahora es interna.
+    // El documento del Tenant trae el token de la CAPI: su lectura por REST
+    // era pública, y ahora es interna.
     ['tenants', Tenants],
   ] as const
 
@@ -315,18 +280,9 @@ describe('qué puede hacer cada rol dentro del dashboard', () => {
   it('la sesión del dashboard lleva el rol del usuario', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1, 'member'))
 
-    const auth = await resolveDashboardAuth(noHeaders, undefined, 'acme')
+    const auth = await resolveDashboardAuth(noHeaders, 'acme')
 
-    expect(auth && sessionRole(auth.session)).toBe('member')
+    expect(auth?.session.role).toBe('member')
     expect(auth && sessionCan(auth.session, 'leads:delete')).toBe(false)
-  })
-
-  // La contraseña compartida es una sola credencial que hoy abre todo. Se
-  // retira vaciándola, no recortándole capacidades a quien no ha migrado.
-  it('la contraseña compartida sigue valiendo como owner', async () => {
-    const auth = await resolveDashboardAuth(noHeaders, createDashboardToken('acme'), 'acme')
-
-    expect(auth && sessionRole(auth.session)).toBe('owner')
-    expect(auth && sessionCan(auth.session, 'leads:delete')).toBe(true)
   })
 })

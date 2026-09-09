@@ -42,8 +42,8 @@ export type DashboardTab = 'kanban' | 'kpis'
 type DashboardAppProps = {
   subdomain: string
   companyName?: string | null
-  /** Email del Tenant User de la sesión, o `null` si entró con la contraseña compartida. */
-  accountEmail?: string | null
+  /** Email del Tenant User con el que está firmada la sesión. */
+  accountEmail: string
   /** Lo que el rol de esta sesión permite. Resuelto en el servidor, ver `sessionPermissions`. */
   permissions: DashboardPermissions
   pipeline: PipelineStage[]

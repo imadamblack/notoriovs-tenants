@@ -2,19 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getTenantBySubdomain } from '@/utils/getTenant'
-import { createDashboardToken, DASHBOARD_COOKIE_NAME, DASHBOARD_COOKIE_MAX_AGE } from '@/utils/dashboardAuth'
 import { loginTenantUser, tenantUserCookieMaxAge, TENANT_USER_COOKIE_NAME } from '@/utils/tenantUserAuth'
 
-// Dos puertas al mismo dashboard mientras dura la migración de autenticación:
+// Una sola puerta al dashboard: email + contraseña propios contra la colección
+// `tenant-users`. La contraseña compartida por Tenant vivió aquí en paralelo
+// mientras duró la migración y ya no existe.
 //
-//  1. Tenant User: email + contraseña propios contra la colección
-//     `tenant-users`. Es la definitiva.
-//  2. Contraseña compartida del tenant (Tenants → Dashboard Cliente →
-//     `dashboardPassword`): la de siempre, sin usuario ni email.
-//
-// Cuál se intenta lo decide si vino un email, no un modo que mande el cliente.
-// Las dos dejan una cookie httpOnly host-only en el subdominio del tenant, así
-// que la sesión de un cliente nunca viaja al host de otro.
+// La cookie es httpOnly y host-only en el subdominio del tenant, así que la
+// sesión de un cliente nunca viaja al host de otro.
 
 /** Mismo mensaje para credenciales malas, usuario inexistente y cuenta bloqueada. */
 const BAD_CREDENTIALS = 'Email o contraseña incorrectos'
@@ -32,16 +27,10 @@ export async function POST(req: NextRequest) {
   const password = typeof body?.password === 'string' ? body.password : ''
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
 
-  if (!subdomain || !password) {
-    return NextResponse.json({ error: 'Falta subdomain o password' }, { status: 400 })
+  if (!subdomain || !email || !password) {
+    return NextResponse.json({ error: 'Falta subdomain, email o password' }, { status: 400 })
   }
 
-  return email
-    ? await loginAsTenantUser(subdomain, email, password)
-    : await loginWithSharedPassword(subdomain, password)
-}
-
-async function loginAsTenantUser(subdomain: string, email: string, password: string) {
   // El tenant sale del host, nunca del usuario: quien se autentica bien pero
   // pertenece a otro cliente recibe exactamente la misma respuesta que quien
   // erró la contraseña, para no delatar en qué subdominio existe una cuenta.
@@ -63,35 +52,6 @@ async function loginAsTenantUser(subdomain: string, email: string, password: str
     sameSite: 'lax',
     path: '/',
     maxAge: tenantUserCookieMaxAge(payload),
-  })
-  return res
-}
-
-async function loginWithSharedPassword(subdomain: string, password: string) {
-  const tenant = await getTenantBySubdomain(subdomain, 'dashboardLogin')
-  if (!tenant) {
-    return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
-  }
-
-  if (!tenant.dashboardPassword) {
-    return NextResponse.json(
-      { error: 'Este tenant ya no usa contraseña compartida. Entra con tu email y contraseña.' },
-      { status: 403 },
-    )
-  }
-
-  if (password !== tenant.dashboardPassword) {
-    return NextResponse.json({ error: 'Contraseña incorrecta' }, { status: 401 })
-  }
-
-  const token = createDashboardToken(subdomain)
-  const res = NextResponse.json({ ok: true })
-  res.cookies.set(DASHBOARD_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: DASHBOARD_COOKIE_MAX_AGE,
   })
   return res
 }

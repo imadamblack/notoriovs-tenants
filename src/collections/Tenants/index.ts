@@ -29,10 +29,10 @@ export const Tenants: CollectionConfig = {
     // sirviéndose igual a cualquier visitante.
     //
     // Lo que cierra es `GET /api/tenants`: ese endpoint devolvía el documento
-    // COMPLETO —`dashboardPassword` y `tracking.metaCapiToken` incluidos— de
-    // todos los clientes. Con los Tenant Users teniendo ya sesión de Payload,
-    // eso además les habría dado la contraseña compartida de cualquier otro
-    // tenant con una sola petición.
+    // COMPLETO de todos los clientes —incluido `tracking.metaCapiToken`, y en
+    // su momento la contraseña compartida del dashboard, ya retirada—. Con los
+    // Tenant Users teniendo ya sesión de Payload, eso les habría entregado los
+    // secretos de cualquier otro tenant con una sola petición.
     read: isInternalUser,
     // Crear y borrar clientes es del superadmin (issue 09). Editar no: eso es
     // el trabajo diario de un account manager sobre los clientes que tiene

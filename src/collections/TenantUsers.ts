@@ -44,18 +44,18 @@ export const TenantUsers: CollectionConfig = {
       'Personas del lado del cliente que entran al Dashboard de Cliente de su tenant. No tienen acceso a este panel.',
   },
   auth: {
-    // La sesión dura lo mismo que duraba la cookie de la contraseña
-    // compartida (30 días): migrar de contraseña compartida a usuario propio
-    // no debe hacer que a un cliente se le cierre la sesión más seguido.
+    // 30 días, lo mismo que duraba la cookie de la contraseña compartida a
+    // la que reemplazó: pasar a usuario propio no debía hacer que a un
+    // cliente se le cerrara la sesión más seguido.
     tokenExpiration: 60 * 60 * 24 * 30,
     // `depth: 0` NO es una micro-optimización: es lo que impide que el
     // documento del Tenant viaje dentro del usuario autenticado.
     //
     // Payload resuelve el usuario de cada petición con `auth.depth`, que por
     // omisión es 2. Con eso, `user.tenant` deja de ser un id y pasa a ser el
-    // Tenant COMPLETO —`dashboardPassword` y `tracking.metaCapiToken`
-    // incluidos— en cada request autenticada. Y como el panel de Payload
-    // serializa el usuario dentro de la página, esos secretos terminaban en
+    // Tenant COMPLETO —`tracking.metaCapiToken` incluido— en cada request
+    // autenticada. Y como el panel de Payload serializa el usuario dentro de
+    // la página, ese secreto terminaba en
     // el HTML que recibe el navegador de un Tenant User que abra /admin en
     // el host de su tenant (el panel se sirve en todos los hosts; ver el
     // middleware). Con 0, `user.tenant` es el id y nada más, que es lo único

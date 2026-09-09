@@ -9,11 +9,10 @@ import {
 import config from '@payload-config'
 import { normalizeTenantUserRole, type TenantUserRole } from '@/access/tenantUserPermissions'
 
-// Sesión de Tenant User: la auth de verdad del Dashboard de Cliente, con su
-// propia colección (`tenant-users`) y el JWT firmado de Payload. Convive con
-// la contraseña compartida por tenant (src/utils/dashboardAuth.ts) mientras
-// dura la migración; quien decide cuál de las dos vale en cada petición es
-// `requireDashboardTenant`.
+// Sesión de Tenant User: la única auth del Dashboard de Cliente, con su
+// propia colección (`tenant-users`) y el JWT firmado de Payload. La
+// contraseña compartida por tenant convivió con esta durante la migración y
+// ya no existe; quien la valida en cada petición es `requireDashboardTenant`.
 //
 // El token ES el JWT de Payload —así la sesión pasa por la maquinaria que ya
 // trae la colección: se verifica contra el documento del usuario en cada

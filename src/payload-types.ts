@@ -482,10 +482,6 @@ export interface Tenant {
     googleTagId?: string | null;
   };
   /**
-   * Contraseña única y compartida que usa el cliente para entrar a su dashboard de leads (/tenant-site/{subdomain}/dashboard). Se captura a mano, igual que el Meta Pixel o el CAPI Token. Déjala vacía para desactivar el acceso al dashboard.
-   */
-  dashboardPassword?: string | null;
-  /**
    * Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. Cada lead guarda en Lead.stage el "id" interno (autogenerado por Payload) de la etapa en la que está, no el nombre, así que puedes renombrar una etapa o reordenarlas libremente sin romper nada. Ese id solo se pierde si BORRAS la etapa y creas una "igual" en su lugar: los leads que estaban ahí quedan huérfanos y caen en la columna "Otro" del Kanban hasta que se reasignan a mano.
    */
   leadPipeline?:
@@ -1048,7 +1044,6 @@ export interface TenantsSelect<T extends boolean = true> {
         metaCapiToken?: T;
         googleTagId?: T;
       };
-  dashboardPassword?: T;
   leadPipeline?:
     | T
     | {

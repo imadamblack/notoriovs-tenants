@@ -38,11 +38,6 @@ export default function LoginForm({
         </div>
       </div>
 
-      {/* El email es opcional a propósito mientras dura la migración: quien ya
-          tiene usuario propio lo llena, y quien todavía usa la contraseña
-          compartida de su empresa lo deja vacío. Cuando ya no quede ningún
-          tenant con contraseña compartida, este campo pasa a `required` y la
-          nota de abajo se va. */}
       <Input
         label="Email"
         type="email"
@@ -50,6 +45,7 @@ export default function LoginForm({
         autoComplete="username"
         value={email}
         onChange={(e) => onEmailChange(e.target.value)}
+        required
         autoFocus
       />
 
@@ -62,10 +58,6 @@ export default function LoginForm({
         onChange={(e) => onPasswordChange(e.target.value)}
         required
       />
-
-      <p className="-ft-4 text-neutral-400">
-        Si tu empresa todavía entra con una contraseña compartida, deja el email vacío.
-      </p>
 
       {error && <p className="-ft-3 text-red-400">{error}</p>}
 
