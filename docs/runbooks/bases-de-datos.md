@@ -5,7 +5,7 @@ Hay tres bases y ninguna se alcanza por accidente.
 | Base | Dónde vive | Quién la usa | Archivo |
 | --- | --- | --- | --- |
 | Desarrollo | Postgres local (`docker-compose.yml`), base `notoriovs_dev` | `npm run dev`, `npm run migrate` | `.env` |
-| Pruebas | el mismo Postgres local, base `notoriovs_test` | `npm run test:int`, `npm run test:e2e` | `.env.test` (commiteado) |
+| Pruebas | el mismo Postgres local, base `notoriovs_test` | `npm test` | `.env.test` (commiteado) |
 | Producción | Neon | el despliegue de Vercel, y en local **solo** `npm run prod -- …` | `.env.prod` (nunca se commitea) |
 
 ## Levantar tu entorno desde cero
@@ -33,11 +33,11 @@ lo de `.env.prod` y el CLI de Payload ya no puede leer otra cosa.
 carga solo. Si se llamara `.env.production`, un `next build` local lo cargaría
 sin que nadie lo pidiera.
 
-Los tests son el caso aparte: `vitest.setup.ts` y `playwright.config.ts` no usan
-`@next/env` sino `dotenv`, así que cargan `.env.test` de forma explícita
-(`tests/loadTestEnv.ts`) y **abortan si el `DATABASE_URL` no es local**. Los
-tests e2e borran y crean usuarios: equivocarse de base ahí no es un test rojo,
-es borrar cuentas de gente.
+Los tests son el caso aparte: `vitest.setup.ts` no usa `@next/env` sino
+`dotenv`, así que carga `.env.test` de forma explícita (`tests/loadTestEnv.ts`)
+y **aborta si el `DATABASE_URL` no es local**. El test que habla con Postgres
+crea y borra usuarios: equivocarse de base ahí no es un test rojo, es borrar
+cuentas de gente.
 
 ## Tocar producción
 

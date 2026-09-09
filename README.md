@@ -24,9 +24,11 @@ te trae un tenant de producción (solo lectura allá) a tu base local.
 ## Pruebas
 
 ```bash
-npm run test:int          # vitest
-npm run test:e2e          # playwright (levanta su propio servidor en el 3001)
+npm test                  # vitest
 ```
+
+La suite es corta a propósito: cubre autorización del dashboard, aislamiento
+entre tenants y el ruteo por subdominio. Lo demás se verifica usando la app.
 
 Corren contra `notoriovs_test`, nunca contra tu base de desarrollo ni contra
 producción; si el `DATABASE_URL` no es local, se niegan a correr. `npm run
