@@ -27,7 +27,6 @@ export function loadTestEnv(): { databaseUrl: string } {
   const { error } = dotenv.config({
     path: path.join(repoRoot, '.env.test'),
     override: true,
-    quiet: true,
   })
 
   if (error) {
