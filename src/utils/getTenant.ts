@@ -163,6 +163,14 @@ export const TENANT_PROJECTIONS = {
     depth: 0,
     select: { name: true, leadPipeline: true, quizWebhook: true },
   },
+  // Quién firma un correo transaccional: el id para acotar la búsqueda del
+  // usuario al Tenant, y el nombre de la empresa para el remitente visible y
+  // el cuerpo del correo. Lo piden rutas sin sesión (recuperar contraseña),
+  // así que no puede traer nada más.
+  tenantMail: {
+    depth: 0,
+    select: { name: true, generalInfo: { companyName: true } },
+  },
   // Resolver el subdominio a un id de tenant, nada más: es todo lo que
   // necesita el ingest de marketing reports para scopear lo que escribe.
   identity: {
@@ -188,6 +196,7 @@ export const PUBLIC_TENANT_PROJECTIONS = [
   'privacyNotice',
   'dashboard',
   'dashboardApi',
+  'tenantMail',
 ] as const satisfies readonly TenantProjectionName[]
 
 type ProjectField<V, S> = S extends true

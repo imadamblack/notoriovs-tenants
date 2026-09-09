@@ -1,8 +1,7 @@
 import type { FormEvent } from 'react'
 import Input from '@/components/dashboard/ui/atoms/Input'
 import Button from '@/components/dashboard/ui/atoms/Button'
-import AdminLogo from "@/components/AdminLogo";
-import IconCross from "@/components/dashboard/ui/atoms/icons/IconCross";
+import BrandHeading from '@/components/dashboard/ui/molecules/BrandHeading'
 
 type LoginFormProps = {
   companyName?: string | null
@@ -13,6 +12,8 @@ type LoginFormProps = {
   error: string | null
   loading: boolean
   onSubmit: (e: FormEvent) => void
+  /** Cambia a la pantalla que pide el enlace de recuperación. */
+  onForgotPassword: () => void
 }
 
 export default function LoginForm({
@@ -24,19 +25,11 @@ export default function LoginForm({
   error,
   loading,
   onSubmit,
+  onForgotPassword,
 }: LoginFormProps) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <div className="flex items-baseline relative">
-        <h1 className="ft-4 font-bold text-neutral-100">{companyName}</h1>
-        <span className="ft-4 inline-block w-[0.8em] h-[0.8em] mx-1 text-neutral-100">
-          <IconCross />
-        </span>
-        <p className="ft-4 font-bold text-neutral-100">CRM</p>
-        <div className="ml-2 w-12 h-12 self-center flex items-center">
-          <AdminLogo color="--dashboard-color-text"/>
-        </div>
-      </div>
+      <BrandHeading companyName={companyName} />
 
       <Input
         label="Email"
@@ -64,6 +57,16 @@ export default function LoginForm({
       <Button type="submit" variant="primary" disabled={loading} className="mt-2">
         {loading ? 'Entrando…' : 'Entrar'}
       </Button>
+
+      {/* `type="button"` a propósito: dentro de un <form>, un botón sin tipo
+          envía el formulario. */}
+      <button
+        type="button"
+        onClick={onForgotPassword}
+        className="bg-transparent -ft-4 text-neutral-400 underline self-start"
+      >
+        ¿Olvidaste tu contraseña?
+      </button>
     </form>
   )
 }

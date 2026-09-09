@@ -6,6 +6,7 @@ import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import LeadDetailPanel from '@/components/dashboard/LeadDetailPanel'
 import KpiReport from '@/components/dashboard/KpiReport'
 import DashboardNav from '@/components/dashboard/ui/organisms/DashboardNav'
+import TeamPanel from '@/components/dashboard/TeamPanel'
 import { DEFAULT_SINCE_KEY, type SinceKey } from '@/utils/dashboardPeriod'
 import type { DashboardPermissions } from '@/access/tenantUserPermissions'
 
@@ -65,6 +66,7 @@ export default function DashboardApp({
   // puedan verificar contra la otra sin volver a elegir el rango.
   const [sinceKey, setSinceKey] = useState<SinceKey>(DEFAULT_SINCE_KEY)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [teamOpen, setTeamOpen] = useState(false)
   const [updateEvent, setUpdateEvent] = useState<LeadUpdateEvent | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [kpis, setKpis] = useState<any>(null)
@@ -156,6 +158,7 @@ export default function DashboardApp({
         tab={tab}
         onTabChange={setTab}
         onLogout={handleLogout}
+        onManageUsers={permissions.canManageUsers ? () => setTeamOpen(true) : undefined}
       />
 
       <main className="flex-1 overflow-auto min-h-0">
@@ -180,6 +183,10 @@ export default function DashboardApp({
           />
         )}
       </main>
+
+      {teamOpen && (
+        <TeamPanel subdomain={subdomain} accountEmail={accountEmail} onClose={() => setTeamOpen(false)} />
+      )}
 
       {selectedLead && (
         <LeadDetailPanel
