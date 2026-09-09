@@ -1,14 +1,17 @@
 import { defineConfig, devices } from '@playwright/test'
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-import 'dotenv/config'
+// Fija la base de PRUEBAS antes de nada. `dotenv/config` (lo que había aquí)
+// resuelve al `.env`, así que los tests e2e —que borran y crean usuarios—
+// corrían contra la base de desarrollo, y antes contra la de producción.
+import { loadTestEnv } from './tests/loadTestEnv'
 
-/**
- * See https://playwright.dev/docs/test-configuration.
- */
+const { databaseUrl } = loadTestEnv()
+
+// Puerto propio: el servidor de los tests usa la base de pruebas, y no debe
+// confundirse con el `npm run dev` que quizá tengas abierto en el 3000.
+const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3001)
+export const baseURL = `http://localhost:${PORT}`
+
 export default defineConfig({
   testDir: './tests/e2e',
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -19,11 +22,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://localhost:3000',
-
+    baseURL,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
@@ -34,8 +34,17 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
-    reuseExistingServer: true,
-    url: 'http://localhost:3000',
+    command: 'npm run dev',
+    url: baseURL,
+    // Nunca reutilizar un servidor ajeno: el que esté corriendo casi seguro
+    // apunta a la base de desarrollo, y estos tests borran usuarios.
+    reuseExistingServer: false,
+    // Estas variables ganan sobre el `.env` que carga Next: @next/env solo
+    // rellena las que no vienen ya en el entorno.
+    env: {
+      DATABASE_URL: databaseUrl,
+      PAYLOAD_SECRET: process.env.PAYLOAD_SECRET ?? '',
+      PORT: String(PORT),
+    },
   },
 })

@@ -13,12 +13,14 @@
 -- Es idempotente y transaccional: si alguna condición no se cumple, aborta sin
 -- dejar nada a medias. Correrlo dos veces no hace daño.
 --
--- Uso (desde la raíz del repo). `DATABASE_URL` vive en .env y NO está exportada
--- en el shell, así que hay que leerla del archivo; con `psql "$DATABASE_URL"` a
--- secas te intenta conectar a un Postgres local y falla:
+-- Uso (desde la raíz del repo). El `DATABASE_URL` de producción vive en
+-- `.env.prod` —que no carga nada de forma automática, a propósito— y NO está
+-- exportada en el shell, así que hay que leerla del archivo; con
+-- `psql "$DATABASE_URL"` a secas te conectas al Postgres LOCAL de desarrollo,
+-- que no es lo que quieres sellar:
 --
 --   PGSSLROOTCERT=system \
---   psql "$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2-)" \
+--   psql "$(grep -m1 '^DATABASE_URL=' .env.prod | cut -d= -f2-)" \
 --     -v ON_ERROR_STOP=1 -f docs/runbooks/sellar-baseline-de-migraciones.sql
 --
 -- `PGSSLROOTCERT=system` no es opcional: la URL de Neon trae
@@ -29,9 +31,10 @@
 -- Node trae su propio almacén de certificados; por eso `npm run migrate`
 -- conecta sin ayuda y psql no.)
 --
--- Después, y solo después:
+-- Después, y solo después (`npm run prod` es lo que apunta el CLI de Payload a
+-- producción; sin él, `npm run migrate` corre contra tu base local):
 --
---   npm run migrate
+--   npm run prod -- npm run migrate
 --
 -- Ojo con el CLI de Payload: la PRIMERA llamada después de un rato sin usar la
 -- base suele volver sin imprimir nada. Neon suspende las bases ociosas y ese
@@ -41,7 +44,7 @@
 -- pregúntale a la bitácora, que es la fuente:
 --
 --   PGSSLROOTCERT=system \
---   psql "$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2-)" \
+--   psql "$(grep -m1 '^DATABASE_URL=' .env.prod | cut -d= -f2-)" \
 --     -c "select name, batch, created_at from payload_migrations order by name;"
 
 BEGIN;

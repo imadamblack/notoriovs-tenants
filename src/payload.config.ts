@@ -65,15 +65,24 @@ export default buildConfig({
     // pagado móvil. El media de este proyecto es público de todas formas
     // (`Media.access.read` es `() => true`), así que no se pierde ningún
     // control de acceso al saltarse esa capa.
-    vercelBlobStorage({
-      collections: {
-        media: {
-          disablePayloadAccessControl: true,
-        },
-      },
-      addRandomSuffix: true,
-      token: process.env.BLOB_READ_WRITE_TOKEN || '',
-    }),
+    //
+    // El plugin se monta solo si hay token. Sin él, Payload guarda los uploads
+    // en la carpeta local `media/`: así, subir una imagen en desarrollo deja de
+    // escribir en el blob de producción — el mismo agujero que tenía la base de
+    // datos, y se cierra igual, no configurando lo de producción en local.
+    ...(process.env.BLOB_READ_WRITE_TOKEN
+      ? [
+          vercelBlobStorage({
+            collections: {
+              media: {
+                disablePayloadAccessControl: true,
+              },
+            },
+            addRandomSuffix: true,
+            token: process.env.BLOB_READ_WRITE_TOKEN,
+          }),
+        ]
+      : []),
     // Agrega el selector de tenant en el admin de Payload y filtra
     // automáticamente las listas de `leads` y `marketing-reports` por el
     // tenant seleccionado, en vez de mostrar los de los 50+ tenants
