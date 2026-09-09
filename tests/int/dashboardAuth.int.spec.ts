@@ -6,7 +6,11 @@ import { TenantUsers } from '@/collections/TenantUsers'
 import { Leads } from '@/collections/Leads'
 import { MarketingReports } from '@/collections/MarketingReports'
 import { Tenants } from '@/collections/Tenants'
-import { normalizeTenantUserRole, roleCan } from '@/access/tenantUserPermissions'
+import {
+  normalizeTenantUserRole,
+  roleCan,
+  TENANT_USER_MANAGEMENT_ENABLED,
+} from '@/access/tenantUserPermissions'
 
 // Este archivo prueba la capa de autorización del Dashboard de Cliente sin
 // base de datos: qué sesión abre qué tenant. Lo que se resuelve contra
@@ -267,7 +271,17 @@ describe('qué puede hacer cada rol dentro del dashboard', () => {
   it('un member no gestiona usuarios ni la suscripción', () => {
     expect(roleCan('member', 'users:manage')).toBe(false)
     expect(roleCan('member', 'billing:manage')).toBe(false)
-    expect(roleCan('owner', 'users:manage')).toBe(true)
+  })
+
+  // La administración de usuarios está construida pero apagada a pedido (ver
+  // `TENANT_USER_MANAGEMENT_ENABLED`). Lo que se afirma es que el interruptor
+  // MANDA: mientras esté en falso ni el `owner` la alcanza —o sea que las
+  // rutas de /api/tenant-dashboard/users responden 403 aunque alguien las
+  // llame a mano—, y al encenderlo la gana él y solo él. Así este test no hay
+  // que reescribirlo el día que se entregue.
+  it('solo el owner gestiona usuarios, y solo si la función está encendida', () => {
+    expect(roleCan('owner', 'users:manage')).toBe(TENANT_USER_MANAGEMENT_ENABLED)
+    expect(roleCan('member', 'users:manage')).toBe(false)
   })
 
   // Un documento sin rol (una fila vieja, un seed a mano) cae del lado que no
