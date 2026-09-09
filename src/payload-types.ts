@@ -151,11 +151,17 @@ export interface TenantUserAuthOperations {
   };
 }
 /**
+ * El equipo de Notoriovs. Quien entra a este panel.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
   id: number;
+  /**
+   * Un Superadmin ve y administra todos los clientes. Un Account Manager solo ve los clientes que tenga asignados abajo. Solo un Superadmin puede cambiar esto.
+   */
+  role: 'superadmin' | 'account-manager';
   tenants?:
     | {
         tenant: number | Tenant;
@@ -555,6 +561,10 @@ export interface FolderInterface {
 export interface TenantUser {
   id: number;
   /**
+   * Un Propietario gestiona los usuarios y la facturación de su empresa y puede borrar leads. Un Miembro trabaja los leads y ve los KPIs completos, gasto en anuncios incluido, pero no borra leads ni administra usuarios.
+   */
+  role: 'owner' | 'member';
+  /**
    * El único tenant al que este usuario puede entrar. La autorización del dashboard compara esto contra el tenant del host de la petición, así que cambiar el subdominio en la URL no le da acceso a otro cliente.
    */
   tenant: number | Tenant;
@@ -774,6 +784,7 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  role?: T;
   tenants?:
     | T
     | {
@@ -802,6 +813,7 @@ export interface UsersSelect<T extends boolean = true> {
  * via the `definition` "tenant-users_select".
  */
 export interface TenantUsersSelect<T extends boolean = true> {
+  role?: T;
   tenant?: T;
   updatedAt?: T;
   createdAt?: T;

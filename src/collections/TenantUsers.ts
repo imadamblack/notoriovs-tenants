@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload'
-import { isInternalUser } from '@/access/isInternalUser'
+import { Forbidden } from 'payload'
+import { assignedTenantIds, internalScopedToAssignedTenants, isSuperadminUser } from '@/access/internalRoles'
+import { tenantUserRoleField } from '@/access/tenantUserPermissions'
 
 // Población de auth del lado del cliente: quien entra al Dashboard de Cliente
 // de SU tenant. Es una colección aparte de `users` (el equipo de Notoriovs),
@@ -18,9 +20,16 @@ import { isInternalUser } from '@/access/isInternalUser'
 // URL que hay que saberse de memoria. Esconderla nunca fue lo que cerraba el
 // panel; `access.admin` sí.
 
-// Solo el equipo interno administra Tenant Users. Un Tenant User autenticado
-// nunca cumple `isInternalUser`, ni siquiera contra los usuarios de su propio
-// tenant: gestionar usuarios llega con el rol `owner`, en el issue 09.
+// Solo el equipo interno administra Tenant Users desde el panel. Un Tenant
+// User autenticado nunca pasa este control de acceso, ni siquiera contra los
+// usuarios de su propio tenant: que un `owner` gestione a los suyos es cosa
+// del Dashboard de Cliente (permiso `users:manage`), no de esta colección.
+//
+// Y dentro del equipo interno, un account manager solo alcanza a los usuarios
+// de los Tenants que tiene asignados. Esta colección no pasa por
+// `multiTenantPlugin` —el plugin inyectaría su propio campo `tenant` encima
+// del que ya está declarado aquí—, así que el filtro se escribe a mano con el
+// mismo criterio.
 
 export const TenantUsers: CollectionConfig = {
   slug: 'tenant-users',
@@ -61,12 +70,34 @@ export const TenantUsers: CollectionConfig = {
     // Puerta del panel de Payload: cerrada por construcción para toda esta
     // colección. No la vuelvas condicional.
     admin: () => false,
-    read: isInternalUser,
-    create: isInternalUser,
-    update: isInternalUser,
-    delete: isInternalUser,
+    read: internalScopedToAssignedTenants(),
+    create: internalScopedToAssignedTenants(),
+    update: internalScopedToAssignedTenants(),
+    delete: internalScopedToAssignedTenants(),
+  },
+  hooks: {
+    // El filtro por Tenant del control de acceso solo muerde en las
+    // operaciones que consultan documentos existentes. En un `create` no hay
+    // nada contra qué filtrar: Payload solo mira si la regla dio algo
+    // verdadero, y un `where` lo es. Sin esta comprobación, un account manager
+    // podía crearse un usuario en el tenant de un cliente que no le toca y
+    // entrar a su dashboard con él.
+    beforeValidate: [
+      ({ data, operation, req }) => {
+        if (operation !== 'create' || !req.user || isSuperadminUser(req.user)) return data
+
+        const target = data?.tenant
+        const allowed = assignedTenantIds(req.user).map(String)
+        if (target === undefined || target === null || !allowed.includes(String(target))) {
+          throw new Forbidden(req.t)
+        }
+
+        return data
+      },
+    ],
   },
   fields: [
+    tenantUserRoleField,
     {
       name: 'tenant',
       type: 'relationship',

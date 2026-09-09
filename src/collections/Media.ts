@@ -1,10 +1,20 @@
 import type { CollectionConfig } from 'payload'
 import { del } from '@vercel/blob'
+import { isInternalUser } from '@/access/isInternalUser'
 
 export const Media: CollectionConfig = {
   slug: 'media',
   access: {
+    // La lectura es pública a propósito: son las imágenes de las landings y
+    // los quizzes, que se sirven a cualquier visitante.
     read: () => true,
+    // Subir y borrar, no. Sin estas tres líneas Payload deja escribir a
+    // cualquiera con sesión, y desde el issue 08 eso incluye a los Tenant
+    // Users: la cookie del dashboard de un cliente servía para subir archivos
+    // al blob de Notoriovs o borrar las imágenes de otro cliente.
+    create: isInternalUser,
+    update: isInternalUser,
+    delete: isInternalUser,
   },
   folders: true,
   fields: [

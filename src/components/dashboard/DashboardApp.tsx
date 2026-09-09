@@ -7,6 +7,7 @@ import LeadDetailPanel from '@/components/dashboard/LeadDetailPanel'
 import KpiReport from '@/components/dashboard/KpiReport'
 import DashboardNav from '@/components/dashboard/ui/organisms/DashboardNav'
 import { DEFAULT_SINCE_KEY, type SinceKey } from '@/utils/dashboardPeriod'
+import type { DashboardPermissions } from '@/access/tenantUserPermissions'
 
 export type PipelineStage = { id: string; label: string; isWon?: boolean | null; isLost?: boolean | null }
 
@@ -34,7 +35,7 @@ export type Lead = {
 // cambio: sin ella, una columna no sabría de dónde quitar la tarjeta cuando
 // el lead se movió de etapa desde el panel de detalle (en vez de
 // arrastrado, donde el propio drag ya conoce su origen).
-export type LeadUpdateEvent = { lead: Lead; previousStage: string }
+export type LeadUpdateEvent = { lead: Lead; previousStage: string; deleted?: boolean }
 
 export type DashboardTab = 'kanban' | 'kpis'
 
@@ -43,11 +44,20 @@ type DashboardAppProps = {
   companyName?: string | null
   /** Email del Tenant User de la sesión, o `null` si entró con la contraseña compartida. */
   accountEmail?: string | null
+  /** Lo que el rol de esta sesión permite. Resuelto en el servidor, ver `sessionPermissions`. */
+  permissions: DashboardPermissions
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
 }
 
-export default function DashboardApp({ subdomain, companyName, accountEmail, pipeline, stuckAfterDays }: DashboardAppProps) {
+export default function DashboardApp({
+  subdomain,
+  companyName,
+  accountEmail,
+  permissions,
+  pipeline,
+  stuckAfterDays,
+}: DashboardAppProps) {
   const router = useRouter()
   const [tab, setTab] = useState<DashboardTab>('kanban')
   // El periodo es del dashboard entero, no de una pestaña: el listado de
@@ -113,6 +123,26 @@ export default function DashboardApp({ subdomain, companyName, accountEmail, pip
     [subdomain, loadKpis],
   )
 
+  // Borrar de verdad, no descalificar: el lead desaparece de la base. Solo
+  // llega aquí quien tiene el permiso `leads:delete` (la ruta lo vuelve a
+  // comprobar); un `member` no ve el botón.
+  const deleteLead = useCallback(
+    async (lead: Lead): Promise<boolean> => {
+      const params = new URLSearchParams({ subdomain, id: String(lead.id) })
+      const res = await fetch(`/api/tenant-dashboard/leads?${params.toString()}`, { method: 'DELETE' })
+      if (!res.ok) return false
+
+      setSelectedLead(null)
+      // El mismo evento que usa una edición: cada vista reconcilia su copia
+      // local. `deleted` es lo que le dice a la columna que quite la tarjeta
+      // en vez de moverla.
+      setUpdateEvent({ lead, previousStage: lead.stage, deleted: true })
+      loadKpis()
+      return true
+    },
+    [subdomain, loadKpis],
+  )
+
   const handleLogout = async () => {
     await fetch('/api/tenant-dashboard/logout', { method: 'POST' })
     router.refresh()
@@ -158,6 +188,7 @@ export default function DashboardApp({ subdomain, companyName, accountEmail, pip
           stuckAfterDays={stuckAfterDays}
           onClose={() => setSelectedLead(null)}
           onSave={async (patch) => Boolean(await updateLead(selectedLead, patch))}
+          onDelete={permissions.canDeleteLeads ? () => deleteLead(selectedLead) : undefined}
         />
       )}
     </div>

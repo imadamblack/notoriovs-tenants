@@ -232,6 +232,31 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
     const {lead, previousStage} = updateEvent
     const targetKey = pipelineIds.has(lead.stage) ? lead.stage : '__other__'
 
+    // Un lead borrado no se mueve de columna: se va. Es el mismo trabajo de
+    // reconciliación, pero quitando en vez de reubicando.
+    if (updateEvent.deleted) {
+      setColumnData((cols) => {
+        const state = cols[targetKey]
+        if (!state) return cols
+        const leads = state.leads.filter((l) => String(l.id) !== String(lead.id))
+        return {
+          ...cols,
+          [targetKey]: {
+            ...state,
+            leads,
+            totalDocs: Math.max(0, state.totalDocs - (leads.length === state.leads.length ? 0 : 1)),
+          },
+        }
+      })
+      setStageCounts((counts) =>
+        lead.stage in counts ? {...counts, [lead.stage]: Math.max(0, counts[lead.stage] - 1)} : counts,
+      )
+      if (targetKey === '__other__') setOtherCount((c) => Math.max(0, c - 1))
+      setListLeads((leads) => leads.filter((l) => String(l.id) !== String(lead.id)))
+      setListTotalDocs((total) => Math.max(0, total - 1))
+      return
+    }
+
     setColumnData((cols) => {
       const next = {...cols}
       const fromKey = pipelineIds.has(previousStage) ? previousStage : '__other__'

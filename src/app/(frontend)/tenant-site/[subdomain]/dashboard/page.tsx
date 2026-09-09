@@ -2,7 +2,7 @@ import { cookies, headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { getTenantBySubdomain, tenantHasDashboard } from '@/utils/getTenant'
 import { DASHBOARD_COOKIE_NAME } from '@/utils/dashboardAuth'
-import { resolveDashboardAuth } from '@/utils/requireDashboardAuth'
+import { resolveDashboardAuth, sessionPermissions } from '@/utils/requireDashboardAuth'
 import DashboardLogin from '@/components/dashboard/DashboardLogin'
 import DashboardApp from '@/components/dashboard/DashboardApp'
 import DashboardUnavailable from '@/components/dashboard/DashboardUnavailable'
@@ -57,6 +57,10 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
       // con la contraseña compartida no hay nadie a quién nombrar, y el menú
       // de cuenta lo dice tal cual en vez de inventarse un usuario.
       accountEmail={auth.session.kind === 'tenant-user' ? auth.session.email : null}
+      // Qué puede hacer este rol, ya resuelto en el servidor. La interfaz lo
+      // usa para no ofrecer botones que la API va a rechazar; quien decide de
+      // verdad es cada ruta, que vuelve a preguntar por su cuenta.
+      permissions={sessionPermissions(auth.session)}
       // Filtra por si acaso una fila del array llegara sin id (Payload lo
       // tipa como opcional); en la práctica siempre lo tiene una vez que el
       // tenant se guardó, así que esto nunca debería quitar etapas reales.

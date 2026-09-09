@@ -7,6 +7,7 @@ import { Leads } from '@/collections/Leads'
 import { MarketingReports } from '@/collections/MarketingReports'
 import { Tenants } from '@/collections/Tenants'
 import { createDashboardToken } from '@/utils/dashboardAuth'
+import { normalizeTenantUserRole, roleCan } from '@/access/tenantUserPermissions'
 
 // Este archivo prueba la capa de autorización del Dashboard de Cliente sin
 // base de datos: qué sesión abre qué tenant. Lo que se resuelve contra
@@ -27,15 +28,16 @@ vi.mock('@/utils/tenantUserAuth', () => ({
   getTenantUserSession: (...args: unknown[]) => getTenantUserSession(...args),
 }))
 
-const { resolveDashboardAuth } = await import('@/utils/requireDashboardAuth')
+const { resolveDashboardAuth, sessionCan, sessionRole } = await import('@/utils/requireDashboardAuth')
 
 const ACME = { id: 1, leadPipeline: [], leadStuckAfterDays: 21 }
 
 /** Un Tenant User de `tenantId`, tal como lo devuelve `getTenantUserSession`. */
-const tenantUser = (tenantId: string | number) => ({
+const tenantUser = (tenantId: string | number, role: 'owner' | 'member' = 'owner') => ({
   id: 7,
   email: 'cliente@acme.com',
   tenantId,
+  role,
 })
 
 beforeEach(() => {
@@ -47,6 +49,23 @@ beforeEach(() => {
 
 const noHeaders = new Headers()
 
+/** Un Internal User que ve a todos los clientes. */
+const asSuperadmin = () =>
+  ({ req: { user: { id: 1, collection: 'users', role: 'superadmin' } } }) as unknown as Parameters<Access>[0]
+
+/** Un Internal User acotado a los Tenants que tiene asignados. */
+const asAccountManager = (tenantIds: number[]) =>
+  ({
+    req: {
+      user: {
+        id: 2,
+        collection: 'users',
+        role: 'account-manager',
+        tenants: tenantIds.map((tenant) => ({ tenant })),
+      },
+    },
+  }) as unknown as Parameters<Access>[0]
+
 describe('autorización del dashboard', () => {
   it('un Tenant User de este tenant entra, y la sesión lo nombra', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1))
@@ -54,7 +73,12 @@ describe('autorización del dashboard', () => {
     const auth = await resolveDashboardAuth(noHeaders, undefined, 'acme')
 
     expect(auth?.tenant).toBe(ACME)
-    expect(auth?.session).toEqual({ kind: 'tenant-user', userId: 7, email: 'cliente@acme.com' })
+    expect(auth?.session).toEqual({
+      kind: 'tenant-user',
+      userId: 7,
+      email: 'cliente@acme.com',
+      role: 'owner',
+    })
   })
 
   // El caso que justifica toda esta capa: la sesión es legítima, pero es de
@@ -132,10 +156,41 @@ describe('la colección de Tenant Users', () => {
   it('solo el equipo interno administra Tenant Users', () => {
     for (const operation of ['read', 'create', 'update', 'delete'] as const) {
       const access = TenantUsers.access?.[operation] as Access
-      expect(access(asUser('users')), `${operation} para un Internal User`).toBe(true)
+      expect(access(asSuperadmin()), `${operation} para un superadmin`).toBe(true)
       expect(access(asUser('tenant-users')), `${operation} para un Tenant User`).toBe(false)
       expect(access(asUser(null)), `${operation} sin sesión`).toBe(false)
     }
+  })
+
+  // Un usuario de cliente es una llave para entrar a ese cliente: quien no
+  // administra el Tenant tampoco reparte sus llaves.
+  it('un account manager solo alcanza a los usuarios de sus clientes', () => {
+    for (const operation of ['read', 'update', 'delete'] as const) {
+      const access = TenantUsers.access?.[operation] as Access
+      expect(access(asAccountManager([7])), operation).toEqual({ tenant: { in: [7] } })
+      expect(access(asAccountManager([])), `${operation} sin clientes asignados`).toBe(false)
+    }
+  })
+
+  // El `where` del control de acceso no filtra nada en un alta: no hay
+  // documento contra el cual comparar, y Payload solo mira si la regla dio
+  // algo verdadero. Por eso el alta la revisa además un hook.
+  it('un account manager no puede crear un usuario en un cliente que no le toca', () => {
+    const hook = TenantUsers.hooks?.beforeValidate?.[0]
+    const run = (user: unknown, tenant: unknown) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      hook!({ data: { tenant }, operation: 'create', req: { user } } as any)
+
+    expect(() => run(asAccountManager([7]).req.user, 9)).toThrow()
+    expect(() => run(asAccountManager([7]).req.user, undefined)).toThrow()
+    expect(run(asAccountManager([7]).req.user, 7)).toEqual({ tenant: 7 })
+    expect(run(asSuperadmin().req.user, 9)).toEqual({ tenant: 9 })
+  })
+
+  it('cada Tenant User tiene un rol, y el que se asume es el de menos alcance', () => {
+    const role = TenantUsers.fields.find((field) => 'name' in field && field.name === 'role')
+
+    expect(role).toMatchObject({ type: 'select', required: true, defaultValue: 'member' })
   })
 
   // Con el `auth.depth` por omisión (2), Payload devuelve `user.tenant` como
@@ -227,5 +282,51 @@ describe('borrar un Tenant', () => {
     await Tenants.hooks!.beforeDelete![0]!({ id: 7, req: { payload: { delete: del } } } as any)
 
     expect(del.mock.calls.map((c) => c[0].collection)).not.toContain('leads')
+  })
+})
+
+
+// Los roles del lado del cliente. Un `member` trabaja los leads todos los días;
+// lo que no hace es lo que no se puede deshacer ni lo administrativo.
+describe('qué puede hacer cada rol dentro del dashboard', () => {
+  it('un member marca leads como descalificados, pero no los borra', () => {
+    expect(roleCan('member', 'leads:update')).toBe(true)
+    expect(roleCan('member', 'leads:delete')).toBe(false)
+    expect(roleCan('owner', 'leads:delete')).toBe(true)
+  })
+
+  it('un member ve los KPIs completos, con el gasto en anuncios', () => {
+    expect(roleCan('member', 'kpis:read')).toBe(true)
+  })
+
+  it('un member no gestiona usuarios ni la suscripción', () => {
+    expect(roleCan('member', 'users:manage')).toBe(false)
+    expect(roleCan('member', 'billing:manage')).toBe(false)
+    expect(roleCan('owner', 'users:manage')).toBe(true)
+  })
+
+  // Un documento sin rol (una fila vieja, un seed a mano) cae del lado que no
+  // borra nada.
+  it('un rol que no se reconoce vale como member', () => {
+    expect(normalizeTenantUserRole(undefined)).toBe('member')
+    expect(normalizeTenantUserRole('propietario')).toBe('member')
+  })
+
+  it('la sesión del dashboard lleva el rol del usuario', async () => {
+    getTenantUserSession.mockResolvedValue(tenantUser(1, 'member'))
+
+    const auth = await resolveDashboardAuth(noHeaders, undefined, 'acme')
+
+    expect(auth && sessionRole(auth.session)).toBe('member')
+    expect(auth && sessionCan(auth.session, 'leads:delete')).toBe(false)
+  })
+
+  // La contraseña compartida es una sola credencial que hoy abre todo. Se
+  // retira vaciándola, no recortándole capacidades a quien no ha migrado.
+  it('la contraseña compartida sigue valiendo como owner', async () => {
+    const auth = await resolveDashboardAuth(noHeaders, createDashboardToken('acme'), 'acme')
+
+    expect(auth && sessionRole(auth.session)).toBe('owner')
+    expect(auth && sessionCan(auth.session, 'leads:delete')).toBe(true)
   })
 })

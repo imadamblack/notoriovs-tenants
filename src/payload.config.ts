@@ -17,6 +17,7 @@ import { MarketingReports } from './collections/MarketingReports'
 // para darle tipado fuerte al plugin (multiTenantPlugin<Config>(...)); no
 // crea un ciclo real porque solo se usa a nivel de tipos, nunca en runtime.
 import type { Config } from './payload-types'
+import { isSuperadminUser, superadminFieldAccess } from './access/internalRoles'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -99,12 +100,22 @@ export default buildConfig({
     // de ingesta, las rutas de /api/tenant-dashboard) sigue funcionando sin
     // cambios.
     //
-    // `userHasAccessToAllTenants: () => true` porque hoy todo el equipo
-    // interno de Notoriovs administra todos los clientes: nadie debe
-    // quedar restringido a un subconjunto de tenants. El campo `tenants`
-    // que el plugin agrega a Users (para restringir accesos por tenant) no
-    // hace falta usarlo mientras esto siga así; si algún día contratan a
-    // alguien que solo debe ver ciertos clientes, ahí sí se vuelve útil.
+    // Quién ve todos los clientes y quién solo los suyos (issue 09). Hasta
+    // aquí esto era `() => true`: todo Internal User tenía acceso irrestricto
+    // a los 50+ tenants. Ahora un superadmin sigue viéndolo todo y un account
+    // manager queda acotado a los Tenants de su campo `tenants` (el que agrega
+    // este mismo plugin).
+    //
+    // El plugin es quien aplica el recorte, y lo hace en el único lugar que
+    // sirve: le agrega en AND un `tenant in [asignados]` a TODAS las reglas de
+    // acceso de las colecciones enlistadas arriba, más un `id in [asignados]`
+    // a la colección `tenants` y a los usuarios internos. No es un filtro de
+    // la vista de lista: vale igual para la API REST.
+    //
+    // Escribir `tenants` y `role` en el propio usuario está cerrado a
+    // superadmin a nivel de campo (ver `superadminFieldAccess`). Sin eso, un
+    // account manager podía editar su propio documento —Payload siempre lo
+    // permite— y asignarse los clientes que quisiera.
     //
     // El control de acceso que ya tenía cada colección (`Boolean(req.user)`
     // en Leads/MarketingReports) NO se reemplaza: el plugin lo combina con
@@ -114,7 +125,18 @@ export default buildConfig({
         leads: {},
         'marketing-reports': {},
       },
-      userHasAccessToAllTenants: () => true,
+      userHasAccessToAllTenants: (user) => isSuperadminUser(user),
+      tenantsArrayField: {
+        includeDefaultField: true,
+        arrayFieldAccess: {
+          create: superadminFieldAccess,
+          update: superadminFieldAccess,
+        },
+        tenantFieldAccess: {
+          create: superadminFieldAccess,
+          update: superadminFieldAccess,
+        },
+      },
     }),
   ],
 })

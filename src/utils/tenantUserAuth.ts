@@ -7,6 +7,7 @@ import {
   type Payload,
 } from 'payload'
 import config from '@payload-config'
+import { normalizeTenantUserRole, type TenantUserRole } from '@/access/tenantUserPermissions'
 
 // Sesión de Tenant User: la auth de verdad del Dashboard de Cliente, con su
 // propia colección (`tenant-users`) y el JWT firmado de Payload. Convive con
@@ -43,6 +44,8 @@ export type TenantUserSession = {
   email: string
   /** Id del tenant al que pertenece, ya normalizado a valor plano. */
   tenantId: string | number | null
+  /** Qué puede hacer dentro del dashboard de ese tenant. Ver `roleCan`. */
+  role: TenantUserRole
 }
 
 /** `tenant` llega como id o como documento poblado según el `depth` de la colección. */
@@ -99,6 +102,7 @@ export async function getTenantUserSession(headers: Headers): Promise<TenantUser
     id: user.id,
     email: String((user as { email?: unknown }).email ?? ''),
     tenantId: toTenantId((user as { tenant?: unknown }).tenant),
+    role: normalizeTenantUserRole((user as { role?: unknown }).role),
   }
 }
 
@@ -130,6 +134,7 @@ export async function loginTenantUser(email: string, password: string): Promise<
         id: user.id,
         email: String((user as { email?: unknown }).email ?? ''),
         tenantId: toTenantId((user as { tenant?: unknown }).tenant),
+        role: normalizeTenantUserRole((user as { role?: unknown }).role),
       },
     }
   } catch {

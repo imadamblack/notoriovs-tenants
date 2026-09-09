@@ -2,6 +2,13 @@ import type { NextRequest } from 'next/server'
 import { getTenantBySubdomain, tenantHasSharedPassword, type TenantView } from '@/utils/getTenant'
 import { verifyDashboardToken, DASHBOARD_COOKIE_NAME } from '@/utils/dashboardAuth'
 import { getTenantUserSession } from '@/utils/tenantUserAuth'
+import {
+  permissionsForRole,
+  roleCan,
+  type DashboardPermission,
+  type DashboardPermissions,
+  type TenantUserRole,
+} from '@/access/tenantUserPermissions'
 
 /**
  * Cómo entró quien está viendo el dashboard. Hoy hay dos puertas abiertas a la
@@ -11,7 +18,7 @@ import { getTenantUserSession } from '@/utils/tenantUserAuth'
  * único que cambia es de quién sabemos el nombre.
  */
 export type DashboardSession =
-  | { kind: 'tenant-user'; userId: string | number; email: string }
+  | { kind: 'tenant-user'; userId: string | number; email: string; role: TenantUserRole }
   | { kind: 'shared-password' }
 
 export type DashboardAuth = {
@@ -43,7 +50,15 @@ export async function resolveDashboardAuth(
 
   const tenantUser = await getTenantUserSession(headers)
   if (tenantUser && tenantUser.tenantId !== null && String(tenantUser.tenantId) === String(tenant.id)) {
-    return { tenant, session: { kind: 'tenant-user', userId: tenantUser.id, email: tenantUser.email } }
+    return {
+      tenant,
+      session: {
+        kind: 'tenant-user',
+        userId: tenantUser.id,
+        email: tenantUser.email,
+        role: tenantUser.role,
+      },
+    }
   }
 
   // La contraseña compartida solo sigue valiendo mientras el tenant tenga una
@@ -67,11 +82,41 @@ export async function requireDashboardTenant(
   req: NextRequest,
   subdomain: string | null | undefined,
 ): Promise<TenantView<'dashboardApi'> | null> {
-  const auth = await resolveDashboardAuth(
-    req.headers,
-    req.cookies.get(DASHBOARD_COOKIE_NAME)?.value,
-    subdomain,
-  )
+  const auth = await requireDashboardAuth(req, subdomain)
 
   return auth?.tenant ?? null
+}
+
+/**
+ * Rol con el que actúa una sesión.
+ *
+ * La contraseña compartida del tenant (la puerta vieja, en retirada) cuenta
+ * como `owner`: es una sola credencial que hoy abre todo el dashboard, y
+ * recortarla al introducir los roles les quitaría capacidades a los clientes
+ * que todavía no migran. Esa puerta se cierra vaciando la contraseña, no
+ * degradándola en silencio.
+ */
+export function sessionRole(session: DashboardSession): TenantUserRole {
+  return session.kind === 'tenant-user' ? session.role : 'owner'
+}
+
+/** Único lugar donde una ruta del dashboard pregunta "¿esta sesión puede X?". */
+export function sessionCan(session: DashboardSession, permission: DashboardPermission): boolean {
+  return roleCan(sessionRole(session), permission)
+}
+
+/** Los permisos ya resueltos, para que la UI no pinte botones que la API rechaza. */
+export function sessionPermissions(session: DashboardSession): DashboardPermissions {
+  return permissionsForRole(sessionRole(session))
+}
+
+/**
+ * La autorización completa (tenant + sesión) para las rutas que además del
+ * tenant necesitan saber QUIÉN pide y con qué rol.
+ */
+export async function requireDashboardAuth(
+  req: NextRequest,
+  subdomain: string | null | undefined,
+): Promise<DashboardAuth | null> {
+  return resolveDashboardAuth(req.headers, req.cookies.get(DASHBOARD_COOKIE_NAME)?.value, subdomain)
 }

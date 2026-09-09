@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isInternalUser } from '@/access/isInternalUser'
+import { isSuperadmin } from '@/access/internalRoles'
 import { revalidateTenantSite } from '@/utils/tenantSiteCache'
 import { identityFields, generalInfoTab } from './identity'
 import { landingTab } from './landing'
@@ -33,7 +34,24 @@ export const Tenants: CollectionConfig = {
     // eso además les habría dado la contraseña compartida de cualquier otro
     // tenant con una sola petición.
     read: isInternalUser,
-    // create/update/delete: restringir a admins internos cuando se defina el rol client-editor.
+    // Crear y borrar clientes es del superadmin (issue 09). Editar no: eso es
+    // el trabajo diario de un account manager sobre los clientes que tiene
+    // asignados, y a esos lo acota `multiTenantPlugin` (ver payload.config.ts),
+    // que le agrega `id in [sus tenants]` a todas estas reglas.
+    //
+    // `create` también, aunque el issue solo pida cerrar el borrado: un
+    // account manager que da de alta un cliente se queda sin poder verlo en
+    // cuanto lo guarda (no está en su lista de asignados), así que el alta
+    // pasa por quien además reparte las asignaciones.
+    //
+    // Que estén escritas aquí y no heredadas también cierra un agujero que no
+    // era de roles: sin `access` explícito, Payload permite la operación a
+    // cualquiera con sesión, y desde el issue 08 eso incluye a los Tenant
+    // Users. Un cliente podía borrar el Tenant de otro con una llamada a
+    // `DELETE /api/tenants/:id`.
+    create: isSuperadmin,
+    update: isInternalUser,
+    delete: isSuperadmin,
   },
   hooks: {
     // Autogenera `quizWebhook` a partir de `subdomain`. Va aquí (a nivel de

@@ -20,7 +20,10 @@ describe('API', () => {
     payload = await getPayload({ config: payloadConfig })
 
     await payload.delete({ collection: 'users', where: { email: { equals: email } } })
-    await payload.create({ collection: 'users', data: { email, password: 'test' } })
+    await payload.create({
+      collection: 'users',
+      data: { email, password: 'test', role: 'superadmin' },
+    })
   })
 
   afterAll(async () => {

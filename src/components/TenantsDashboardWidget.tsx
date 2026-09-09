@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import {getPayload} from 'payload'
+import {getPayload, type ServerProps} from 'payload'
 import config from '@payload-config'
 
 const ArrowOutward = () => (
@@ -18,21 +18,41 @@ const ArrowOutward = () => (
 
 // Server Component (RSC) para el admin de Payload. Se registra vía
 // admin.components.beforeDashboard en payload.config.ts.
-export const TenantsDashboardWidget: React.FC = async () => {
+//
+// Las dos consultas van con `overrideAccess: false` y el usuario de la
+// petición, que Payload le pasa a todo componente de servidor del panel. NO es
+// un detalle: la Local API salta el control de acceso por omisión, así que este
+// widget le enseñaba a cualquier Internal User la lista completa de clientes
+// —con el panel entero ya acotado a los suyos— justo debajo del título
+// "Tenants". Con esto, un account manager ve aquí exactamente los mismos
+// clientes que en el resto del panel, y uno sin asignaciones no ve ninguno.
+export const TenantsDashboardWidget: React.FC<ServerProps> = async ({user}) => {
   const payload = await getPayload({config})
 
   const [all, active] = await Promise.all([
-    payload.find({
-      collection: 'tenants',
-      limit: 100,
-      depth: 0,
-      sort: 'name',
-      select: {name: true, subdomain: true, active: true},
-    }),
-    payload.count({
-      collection: 'tenants',
-      where: {active: {equals: true}},
-    }),
+    emptyIfForbidden(
+      payload
+        .find({
+          collection: 'tenants',
+          limit: 100,
+          depth: 0,
+          sort: 'name',
+          select: {name: true, subdomain: true, active: true},
+          overrideAccess: false,
+          user,
+        })
+        .then(({docs, totalDocs}) => ({docs, totalDocs})),
+      {docs: [], totalDocs: 0},
+    ),
+    emptyIfForbidden(
+      payload.count({
+        collection: 'tenants',
+        where: {active: {equals: true}},
+        overrideAccess: false,
+        user,
+      }),
+      {totalDocs: 0},
+    ),
   ])
 
   const total = all.totalDocs
@@ -117,6 +137,22 @@ export const TenantsDashboardWidget: React.FC = async () => {
       )}
     </div>
   )
+}
+
+/**
+ * Cuando el control de acceso niega la consulta entera —un account manager sin
+ * clientes asignados—, Payload lanza un 403 en vez de devolver cero
+ * resultados. Aquí eso no es una falla: es un widget vacío. Cualquier otro
+ * error sí se deja subir; si la base está caída queremos verlo, no un panel
+ * que dice "Aún no hay tenants".
+ */
+async function emptyIfForbidden<T>(promise: Promise<T>, empty: T): Promise<T> {
+  try {
+    return await promise
+  } catch (err) {
+    if ((err as {status?: number})?.status === 403) return empty
+    throw err
+  }
 }
 
 const Stat: React.FC<{ label: string; value: number; accent?: string }> = ({
