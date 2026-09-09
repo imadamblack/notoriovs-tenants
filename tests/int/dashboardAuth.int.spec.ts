@@ -196,3 +196,36 @@ describe('la API de Payload no le abre nada a un Tenant User', () => {
     }
   })
 })
+
+// Borrar un Tenant se lleva a sus usuarios. Además de ser lo que uno espera,
+// sin esto el borrado ni siquiera pasa: la llave foránea de
+// `tenant_users.tenant_id` es ON DELETE SET NULL sobre una columna NOT NULL.
+describe('borrar un Tenant', () => {
+  it('borra antes a sus Tenant Users, en la misma transacción', async () => {
+    const hook = Tenants.hooks?.beforeDelete?.[0]
+    expect(hook, 'Tenants no tiene beforeDelete').toBeDefined()
+
+    const del = vi.fn().mockResolvedValue({ docs: [] })
+    const req = { payload: { delete: del } }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await hook!({ id: 7, req } as any)
+
+    expect(del).toHaveBeenCalledTimes(1)
+    const args = del.mock.calls[0][0]
+    expect(args.collection).toBe('tenant-users')
+    expect(args.where).toEqual({ tenant: { equals: 7 } })
+    expect(args.overrideAccess).toBe(true)
+    // Sin `req` el borrado de los usuarios va por su cuenta y sobrevive a un
+    // fallo posterior del borrado del Tenant.
+    expect(args.req).toBe(req)
+  })
+
+  it('no toca los Leads: son el registro histórico del negocio', async () => {
+    const del = vi.fn().mockResolvedValue({ docs: [] })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await Tenants.hooks!.beforeDelete![0]!({ id: 7, req: { payload: { delete: del } } } as any)
+
+    expect(del.mock.calls.map((c) => c[0].collection)).not.toContain('leads')
+  })
+})

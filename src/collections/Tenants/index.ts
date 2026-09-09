@@ -97,6 +97,31 @@ export const Tenants: CollectionConfig = {
       },
     ],
 
+    // Los Tenant Users de este cliente se van con él. Va en `beforeDelete` y
+    // no en `afterDelete` por una razón dura, no de estilo: la llave foránea
+    // de `tenant_users.tenant_id` es `ON DELETE SET NULL` sobre una columna
+    // `NOT NULL`, así que si el Tenant se borra primero, Postgres rechaza el
+    // borrado entero y el admin muestra un error sin explicación. Limpiando
+    // antes, el borrado pasa.
+    //
+    // Un Tenant User no significa nada sin su Tenant: no puede entrar a ningún
+    // otro (ver TenantUsers) y no hay a quién reasignarlo. Los Leads, en
+    // cambio, NO se tocan: su `tenant_id` sí admite nulo y son el registro
+    // histórico del negocio.
+    //
+    // `req` va incluido para que esto viaje en la misma transacción que el
+    // borrado del Tenant: si el borrado falla después, los usuarios vuelven.
+    beforeDelete: [
+      async ({ id, req }) => {
+        await req.payload.delete({
+          collection: 'tenant-users',
+          where: { tenant: { equals: id } },
+          req,
+          overrideAccess: true,
+        })
+      },
+    ],
+
     // Borrar el tenant también tiene que bajar su sitio: la página cacheada
     // sobreviviría al documento.
     afterDelete: [
