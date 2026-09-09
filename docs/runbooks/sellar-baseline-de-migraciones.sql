@@ -17,8 +17,17 @@
 -- en el shell, así que hay que leerla del archivo; con `psql "$DATABASE_URL"` a
 -- secas te intenta conectar a un Postgres local y falla:
 --
+--   PGSSLROOTCERT=system \
 --   psql "$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2-)" \
 --     -v ON_ERROR_STOP=1 -f docs/runbooks/sellar-baseline-de-migraciones.sql
+--
+-- `PGSSLROOTCERT=system` no es opcional: la URL de Neon trae
+-- `sslmode=verify-full` y psql, sin eso, busca la raíz de confianza en
+-- ~/.postgresql/root.crt —que no existe— y ni siquiera intenta conectarse.
+-- Con `system` usa las raíces del sistema operativo, sin bajarle un ápice a la
+-- verificación del certificado. (Payload no sufre esto porque el driver de
+-- Node trae su propio almacén de certificados; por eso `npm run migrate`
+-- conecta sin ayuda y psql no.)
 --
 -- Después, y solo después:
 --
@@ -31,6 +40,7 @@
 -- Por eso, para saber qué pasó de verdad, no te fíes de la salida del CLI:
 -- pregúntale a la bitácora, que es la fuente:
 --
+--   PGSSLROOTCERT=system \
 --   psql "$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2-)" \
 --     -c "select name, batch, created_at from payload_migrations order by name;"
 
