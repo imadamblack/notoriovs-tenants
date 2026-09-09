@@ -28,6 +28,13 @@ SQL (ver `docs/runbooks/sellar-baseline-de-migraciones.sql`) y de ahí en
 adelante todo va por `payload migrate`. Se verificó que el esquema sellado y uno
 construido desde cero solo con migraciones son byte por byte el mismo.
 
+Sellar incluye **retirar la marca del push** (`name = 'dev'`, `batch = -1`, que
+escribe `pushDevSchema`). No es cosmético: mientras esa marca esté, `payload
+migrate` abre un diálogo interactivo advirtiendo pérdida de datos y se queda
+esperando una respuesta. Comprobado — con la marca puesta y sin una persona
+delante, el comando se cuelga indefinidamente y no aplica nada. Un despliegue
+automático se quedaría colgado ahí.
+
 ## Consecuencias
 
 - `payload migrate` es el único camino a producción. Un despliegue que cambie

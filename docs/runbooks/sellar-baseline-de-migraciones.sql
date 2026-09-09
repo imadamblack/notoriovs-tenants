@@ -61,23 +61,36 @@ BEGIN
     RAISE EXCEPTION 'No existe "payload_migrations". Base inesperada: revisa a qué DATABASE_URL estás apuntando antes de seguir.';
   END IF;
 
-  -- 2. Una bitácora con renglones significa que aquí ya se corrieron
-  --    migraciones: sellar encima taparía historia real.
-  SELECT count(*) INTO filas FROM payload_migrations WHERE name <> baseline;
+  -- 2. La marca del push de dev (name = 'dev', batch = -1) es ESPERADA aquí:
+  --    es justo la huella de haber armado el esquema con `next dev`. La
+  --    escribe pushDevSchema y solo sirve para dos cosas: que el push sepa si
+  --    ya la puso, y que `payload migrate` abra un diálogo advirtiendo pérdida
+  --    de datos. Se retira más abajo — dejarla haría que cada migración futura
+  --    pidiera confirmación interactiva, que es justo lo que rompe un
+  --    despliegue automático.
+  --
+  --    Cualquier OTRO renglón sí es señal de que aquí ya se corrieron
+  --    migraciones de verdad, y entonces no hay nada que sellar.
+  SELECT count(*) INTO filas
+  FROM payload_migrations
+  WHERE name <> baseline AND NOT (batch = -1 AND name = 'dev');
   IF filas > 0 THEN
-    RAISE EXCEPTION 'La bitácora ya tiene % migración(es) registrada(s) además del baseline. Esta base ya se gobierna por migraciones; no hay nada que sellar.', filas;
+    RAISE EXCEPTION 'La bitácora tiene % renglón(es) que no son ni el baseline ni la marca del push de dev. Esta base ya se gobierna por migraciones; revisa a mano antes de seguir.', filas;
   END IF;
 
-  -- 3. `batch = -1` es la marca que deja el push de dev. Si está, `payload
-  --    migrate` abre un diálogo interactivo advirtiendo pérdida de datos.
-  IF EXISTS (SELECT 1 FROM payload_migrations WHERE batch = -1) THEN
-    RAISE EXCEPTION 'La bitácora trae la marca del push de dev (batch = -1). Párate aquí y revisa a mano antes de sellar.';
-  END IF;
-
-  -- 4. Si "tenant_users" ya existe, el push adelantó la migración siguiente y
+  -- 3. Si "tenant_users" ya existe, el push adelantó la migración siguiente y
   --    sellar solo el baseline dejaría la bitácora mintiendo.
   IF to_regclass('public.tenant_users') IS NOT NULL THEN
     RAISE EXCEPTION 'La tabla "tenant_users" ya existe: el push ya adelantó la migración 20260908. Este guion no cubre ese caso.';
+  END IF;
+
+  -- Fuera la marca del push: a partir de aquí la bitácora dice la verdad por
+  -- sí sola. Si algún día se vuelve a correr `next dev` contra esta base, el
+  -- push la escribe de nuevo sin problema.
+  DELETE FROM payload_migrations WHERE batch = -1 AND name = 'dev';
+  GET DIAGNOSTICS filas = ROW_COUNT;
+  IF filas > 0 THEN
+    RAISE NOTICE 'Retirada la marca del push de dev (% renglón).', filas;
   END IF;
 
   -- Sellado. `batch = 1` a propósito, nunca -1: el siguiente `payload migrate`
