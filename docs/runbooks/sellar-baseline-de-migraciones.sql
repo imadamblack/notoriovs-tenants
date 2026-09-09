@@ -13,10 +13,20 @@
 -- Es idempotente y transaccional: si alguna condición no se cumple, aborta sin
 -- dejar nada a medias. Correrlo dos veces no hace daño.
 --
--- Uso:
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/runbooks/sellar-baseline-de-migraciones.sql
+-- Uso (desde la raíz del repo). `DATABASE_URL` vive en .env y NO está exportada
+-- en el shell, así que hay que leerla del archivo; con `psql "$DATABASE_URL"` a
+-- secas te intenta conectar a un Postgres local y falla:
 --
--- Después, y solo después:  npm run migrate
+--   psql "$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2-)" \
+--     -v ON_ERROR_STOP=1 -f docs/runbooks/sellar-baseline-de-migraciones.sql
+--
+-- Después, y solo después:
+--
+--   npx payload migrate
+--
+-- Ojo: `npm run migrate` corre lo mismo pero a través de cross-env, que se
+-- traga la salida del CLI — no verías ni el resultado ni un error. Para
+-- migraciones, llama a `npx payload` directo.
 
 BEGIN;
 
@@ -28,7 +38,7 @@ BEGIN
   -- 1. ¿Es la base que creemos? Si no aparecen las tablas del esquema base,
   --    esto no es producción y no hay nada que sellar.
   IF to_regclass('public.tenants') IS NULL OR to_regclass('public.leads') IS NULL THEN
-    RAISE EXCEPTION 'Esta base no tiene el esquema base (faltan "tenants" o "leads"). Si es una base nueva y vacía, NO la selles: corre "npm run migrate" y listo.';
+    RAISE EXCEPTION 'Esta base no tiene el esquema base (faltan "tenants" o "leads"). Si es una base nueva y vacía, NO la selles: corre "npx payload migrate" y listo.';
   END IF;
 
   IF to_regclass('public.payload_migrations') IS NULL THEN
@@ -60,7 +70,7 @@ BEGIN
   SELECT baseline, 1, now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM payload_migrations WHERE name = baseline);
 
-  RAISE NOTICE 'Baseline sellado: % queda marcada como aplicada. Ahora corre: npm run migrate', baseline;
+  RAISE NOTICE 'Baseline sellado: % queda marcada como aplicada. Ahora corre: npx payload migrate', baseline;
 END $$;
 
 COMMIT;
