@@ -6,6 +6,8 @@ import IconCross from "@/components/dashboard/ui/atoms/icons/IconCross";
 
 type LoginFormProps = {
   companyName?: string | null
+  email: string
+  onEmailChange: (value: string) => void
   password: string
   onPasswordChange: (value: string) => void
   error: string | null
@@ -15,6 +17,8 @@ type LoginFormProps = {
 
 export default function LoginForm({
   companyName,
+  email,
+  onEmailChange,
   password,
   onPasswordChange,
   error,
@@ -35,13 +39,23 @@ export default function LoginForm({
       </div>
 
       <Input
+        label="Email"
+        type="email"
+        name="email"
+        autoComplete="username"
+        value={email}
+        onChange={(e) => onEmailChange(e.target.value)}
+        required
+        autoFocus
+      />
+
+      <Input
         label="Contraseña"
         type="password"
         name="password"
         autoComplete="current-password"
         value={password}
         onChange={(e) => onPasswordChange(e.target.value)}
-        autoFocus
         required
       />
 

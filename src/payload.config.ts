@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
 import { Users } from './collections/Users'
+import { TenantUsers } from './collections/TenantUsers'
 import { Media } from './collections/Media'
 import { Tenants } from './collections/Tenants'
 import { Leads } from './collections/Leads'
@@ -16,6 +17,7 @@ import { MarketingReports } from './collections/MarketingReports'
 // para darle tipado fuerte al plugin (multiTenantPlugin<Config>(...)); no
 // crea un ciclo real porque solo se usa a nivel de tipos, nunca en runtime.
 import type { Config } from './payload-types'
+import { isSuperadminUser, superadminFieldAccess } from './access/internalRoles'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -43,7 +45,7 @@ export default buildConfig({
       beforeDashboard: ['/components/TenantsDashboardWidget#TenantsDashboardWidget'],
     },
   },
-  collections: [Users, Media, Tenants, Leads, MarketingReports],
+  collections: [Users, TenantUsers, Media, Tenants, Leads, MarketingReports],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
@@ -53,6 +55,12 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
     },
+    // El push automático del modo desarrollo es comodidad local y nada más
+    // (ADR 0006). En pruebas se apaga: ahí el esquema lo ponen las migraciones
+    // (`npm run db:reset`), y además el servidor de e2e y el proceso de tests
+    // levantan cada uno su Payload contra la misma base — dos empujones
+    // simultáneos se bloquean entre sí y el login se queda colgado.
+    push: process.env.PAYLOAD_SCHEMA_PUSH !== 'false',
   }),
   sharp,
   plugins: [
@@ -64,15 +72,24 @@ export default buildConfig({
     // pagado móvil. El media de este proyecto es público de todas formas
     // (`Media.access.read` es `() => true`), así que no se pierde ningún
     // control de acceso al saltarse esa capa.
-    vercelBlobStorage({
-      collections: {
-        media: {
-          disablePayloadAccessControl: true,
-        },
-      },
-      addRandomSuffix: true,
-      token: process.env.BLOB_READ_WRITE_TOKEN || '',
-    }),
+    //
+    // El plugin se monta solo si hay token. Sin él, Payload guarda los uploads
+    // en la carpeta local `media/`: así, subir una imagen en desarrollo deja de
+    // escribir en el blob de producción — el mismo agujero que tenía la base de
+    // datos, y se cierra igual, no configurando lo de producción en local.
+    ...(process.env.BLOB_READ_WRITE_TOKEN
+      ? [
+          vercelBlobStorage({
+            collections: {
+              media: {
+                disablePayloadAccessControl: true,
+              },
+            },
+            addRandomSuffix: true,
+            token: process.env.BLOB_READ_WRITE_TOKEN,
+          }),
+        ]
+      : []),
     // Agrega el selector de tenant en el admin de Payload y filtra
     // automáticamente las listas de `leads` y `marketing-reports` por el
     // tenant seleccionado, en vez de mostrar los de los 50+ tenants
@@ -83,12 +100,22 @@ export default buildConfig({
     // de ingesta, las rutas de /api/tenant-dashboard) sigue funcionando sin
     // cambios.
     //
-    // `userHasAccessToAllTenants: () => true` porque hoy todo el equipo
-    // interno de Notoriovs administra todos los clientes: nadie debe
-    // quedar restringido a un subconjunto de tenants. El campo `tenants`
-    // que el plugin agrega a Users (para restringir accesos por tenant) no
-    // hace falta usarlo mientras esto siga así; si algún día contratan a
-    // alguien que solo debe ver ciertos clientes, ahí sí se vuelve útil.
+    // Quién ve todos los clientes y quién solo los suyos (issue 09). Hasta
+    // aquí esto era `() => true`: todo Internal User tenía acceso irrestricto
+    // a los 50+ tenants. Ahora un superadmin sigue viéndolo todo y un account
+    // manager queda acotado a los Tenants de su campo `tenants` (el que agrega
+    // este mismo plugin).
+    //
+    // El plugin es quien aplica el recorte, y lo hace en el único lugar que
+    // sirve: le agrega en AND un `tenant in [asignados]` a TODAS las reglas de
+    // acceso de las colecciones enlistadas arriba, más un `id in [asignados]`
+    // a la colección `tenants` y a los usuarios internos. No es un filtro de
+    // la vista de lista: vale igual para la API REST.
+    //
+    // Escribir `tenants` y `role` en el propio usuario está cerrado a
+    // superadmin a nivel de campo (ver `superadminFieldAccess`). Sin eso, un
+    // account manager podía editar su propio documento —Payload siempre lo
+    // permite— y asignarse los clientes que quisiera.
     //
     // El control de acceso que ya tenía cada colección (`Boolean(req.user)`
     // en Leads/MarketingReports) NO se reemplaza: el plugin lo combina con
@@ -98,7 +125,18 @@ export default buildConfig({
         leads: {},
         'marketing-reports': {},
       },
-      userHasAccessToAllTenants: () => true,
+      userHasAccessToAllTenants: (user) => isSuperadminUser(user),
+      tenantsArrayField: {
+        includeDefaultField: true,
+        arrayFieldAccess: {
+          create: superadminFieldAccess,
+          update: superadminFieldAccess,
+        },
+        tenantFieldAccess: {
+          create: superadminFieldAccess,
+          update: superadminFieldAccess,
+        },
+      },
     }),
   ],
 })

@@ -1,6 +1,7 @@
 import type { Where } from 'payload'
 import type { TenantDoc } from '@/utils/getTenant'
 import { DEFAULT_LEAD_STUCK_AFTER_DAYS } from '@/components/dashboard/leadPresentation'
+import { sinceCutoffISO } from '@/utils/dashboardPeriod'
 
 // Filtros compartidos entre GET /api/tenant-dashboard/leads (trae los
 // documentos, paginado) y GET /api/tenant-dashboard/leads/counts (solo
@@ -16,14 +17,11 @@ export const SEARCH_FIELDS = ['name', 'phone', 'whatsapp', 'email'] as const
 
 export const ALLOWED_STATUSES_FILTER = new Set(['open', 'won', 'lost', 'disqualified'])
 
-// Filtro de tiempo del dashboard ("Hoy/7 días/30 días/3 meses/Máximo"),
-// sobre `createdAt` (cuándo llegó el lead, no cuándo se tocó por última
-// vez: es la misma fecha que ya usa el Sort). Son ventanas rodantes desde
-// "ahora" (24h/7d/30d/90d), no días de calendario: el tenant no tiene zona
-// horaria guardada en ningún lado, así que "Hoy" como "desde medianoche"
-// no se puede calcular de forma confiable. Cualquier valor no reconocido
-// (incluyendo `all`/"Máximo") no filtra nada.
-export const SINCE_DAYS: Record<string, number> = { today: 1, '7d': 7, '30d': 30, '3m': 90 }
+// El filtro de tiempo ("Hoy/7 días/30 días/3 meses/Máximo") vive en
+// utils/dashboardPeriod.ts: lo comparten estas rutas, la de KPIs y el
+// selector del toolbar. Aquí solo se aplica sobre `createdAt` (cuándo
+// llegó el lead, no cuándo se tocó por última vez: es la misma fecha que
+// ya usa el Sort).
 
 export function stuckCutoffISO(tenant: Pick<TenantDoc, 'leadStuckAfterDays'>): string {
   const days =
@@ -31,11 +29,6 @@ export function stuckCutoffISO(tenant: Pick<TenantDoc, 'leadStuckAfterDays'>): s
       ? tenant.leadStuckAfterDays
       : DEFAULT_LEAD_STUCK_AFTER_DAYS
   return new Date(Date.now() - days * 86400000).toISOString()
-}
-
-function sinceCutoffISO(sinceKey: string | undefined): string | undefined {
-  if (!sinceKey || !SINCE_DAYS[sinceKey]) return undefined
-  return new Date(Date.now() - SINCE_DAYS[sinceKey] * 86400000).toISOString()
 }
 
 // Agrega a `and` las cláusulas de status/tiempo. `status=stuck` es un

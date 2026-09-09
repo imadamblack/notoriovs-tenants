@@ -55,6 +55,22 @@ describe('middleware', () => {
     expect(destination(res)).toBeNull()
   })
 
+  it('los archivos estáticos de /public no se reescriben por tenant', () => {
+    // El apple-touch-icon del dashboard vive en /public. Reescrito a
+    // /tenant-site/{sub}/apple-touch-icon-dashboard.png da 404, y entonces
+    // iOS guarda una captura de la página como icono de home screen.
+    const res = middleware(request('acme.notoriovs.com', '/apple-touch-icon-dashboard.png'))
+
+    expect(destination(res)).toBeNull()
+    expect(res.status).toBe(200)
+  })
+
+  it('una ruta de tenant con punto en el slug sí se reescribe', () => {
+    const res = middleware(request('acme.notoriovs.com', '/oferta-2.0'))
+
+    expect(destination(res)).toBe('https://acme.notoriovs.com/tenant-site/acme/oferta-2.0')
+  })
+
   it('el dominio raíz sirve el sitio default sin reescritura', () => {
     const res = middleware(request('notoriovs.com', '/'))
 

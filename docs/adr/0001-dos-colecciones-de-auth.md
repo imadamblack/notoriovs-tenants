@@ -3,8 +3,9 @@
 Los clientes (Tenant Users) y el equipo de Notoriovs (Internal Users) se
 autentican contra **dos colecciones auth distintas**, no contra una sola
 colección `users` con un campo `role`. La colección de Tenant Users tiene el
-panel de Payload cerrado por construcción (`admin.hidden` + `access.admin`
-en falso), no por un condicional de rol.
+panel de Payload cerrado por construcción (`access.admin: () => false`), no por
+un condicional de rol: `canAccessAdmin` llama esa función en cuanto el token
+viene de esa colección, así que es la única puerta y está clavada en falso.
 
 La alternativa de una sola colección era más barata (un solo flujo de
 recuperación, un solo modelo mental), pero deja el acceso al panel de Payload
@@ -16,10 +17,25 @@ estructural.
 
 ## Consecuencias
 
+- La colección de Tenant Users **sí** es visible en el nav del admin, aunque
+  la redacción original de este ADR hablara también de `admin.hidden`: un
+  Internal User tiene que poder dar de alta a los usuarios de un cliente desde
+  el panel, y esconder la colección solo la habría movido a una URL que hay
+  que saberse de memoria. Esconderla nunca fue lo que cerraba el panel.
 - El flujo de recuperación de contraseña se implementa dos veces (en Payload
   son pocas líneas por colección).
 - Cada colección puede tener su propia política de sesión, rate limiting y,
   a futuro, 2FA, sin negociar una con la otra.
-- `userHasAccessToAllTenants: () => true` en el plugin multi-tenant deja de
-  ser válido en el momento en que exista el rol `account-manager` con scope
-  de tenants.
+- `userHasAccessToAllTenants: () => true` en el plugin multi-tenant dejó de ser
+  válido al llegar el rol `account-manager` (issue 09). Hoy es
+  `isSuperadminUser`: un superadmin ve todos los clientes y un account manager
+  solo los de su campo `tenants`.
+- Cada colección tiene su propio juego de roles, y no se hablan: `superadmin` /
+  `account-manager` del lado interno, `owner` / `member` del lado del cliente.
+  Un `owner` no es un usuario interno con menos permisos, y un account manager
+  no entra al Dashboard de Cliente de nadie.
+- Separar las poblaciones no exime de escribir el control de acceso de cada
+  colección. Payload permite por omisión cualquier operación a cualquiera con
+  sesión, y desde que los Tenant Users tienen la suya, "cualquiera" los
+  incluye: `tenants`, `users` y `media` tenían create/update/delete abiertos a
+  la cookie de un cliente hasta que el issue 09 los cerró.

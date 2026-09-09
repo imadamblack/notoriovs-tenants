@@ -21,7 +21,13 @@ Recomendaciones creativas ni reportes.
 ## Internal User
 
 Persona del equipo de Notoriovs. Se autentica contra el panel de Payload
-(`/admin`) y puede operar sobre varios Tenants.
+(`/admin`) y puede operar sobre varios Tenants. Tiene uno de dos roles:
+
+- **Superadmin** — todos los Tenants. Es quien da de alta y de baja clientes, y
+  quien reparte roles y asignaciones.
+- **Account Manager** — solo los Tenants que tiene **asignados**. Ve y edita
+  esos clientes, sus Leads, sus Marketing Reports y sus Tenant Users, y nada
+  más. No borra Tenants.
 
 ## Tenant User
 
@@ -29,9 +35,16 @@ Persona del lado del cliente que entra al **Dashboard de Cliente** de su
 Tenant. **Nunca** tiene acceso al panel de Payload. Es una población distinta
 de los Internal Users, no un Internal User con menos permisos.
 
-Cuando alguien dice "admin" hay que preguntar cuál: un Internal User con rol
-elevado, o un Tenant User con rol elevado dentro de su propio Tenant. Son
-cosas distintas.
+Tiene uno de dos roles, que valen **solo dentro de su Tenant**:
+
+- **Owner** — todo lo de su empresa: además de los Leads y los KPIs, gestiona a
+  los usuarios de su Tenant y su facturación, y puede borrar Leads.
+- **Member** — trabaja los Leads (incluido marcarlos como descalificados) y ve
+  los KPIs completos, gasto en anuncios y costo por Lead incluidos. No borra
+  Leads ni gestiona usuarios.
+
+Cuando alguien dice "admin" hay que preguntar cuál: un Superadmin del equipo, o
+el Owner de un Tenant. Son cosas distintas.
 
 ## Lead
 

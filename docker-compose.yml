@@ -1,43 +1,36 @@
-version: '3'
+# Postgres local para desarrollo y pruebas.
+#
+# Existe para que ni `npm run dev` ni los tests tengan que apuntar a una base
+# remota: producción se alcanza solo a propósito (ver docs/runbooks/bases-de-datos.md).
+# Levanta dos bases sobre el mismo servidor —`notoriovs_dev` y `notoriovs_test`—
+# porque los tests borran y crean registros, y no deben pisar lo que traes a
+# medias en el admin local.
+#
+#   npm run db:up      # levanta el servidor
+#   npm run db:reset   # tira las dos bases y las reconstruye con las migraciones
+#
+# Las credenciales son deliberadamente triviales: este servidor solo escucha en
+# tu máquina y no contiene datos de nadie.
 
 services:
-  payload:
-    image: node:20-alpine
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
     ports:
-      - '3000:3000'
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: notoriovs
+      POSTGRES_PASSWORD: notoriovs
+      POSTGRES_DB: notoriovs_dev
     volumes:
-      - .:/home/node/app
-      - node_modules:/home/node/app/node_modules
-    working_dir: /home/node/app/
-    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm dev"
-    depends_on:
-      - mongo
-      # - postgres
-    env_file:
-      - .env
-
-  # Ensure your DATABASE_URL uses 'mongo' as the hostname ie. mongodb://mongo/my-db-name
-  mongo:
-    image: mongo:latest
-    ports:
-      - '27017:27017'
-    command:
-      - --storageEngine=wiredTiger
-    volumes:
-      - data:/data/db
-    logging:
-      driver: none
-
-  # Uncomment the following to use postgres
-  # postgres:
-  #   restart: always
-  #   image: postgres:latest
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
+      - pgdata:/var/lib/postgresql/data
+      # Solo corre la primera vez, cuando el volumen está vacío.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U notoriovs -d notoriovs_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  data:
-  # pgdata:
-  node_modules:
+  pgdata:

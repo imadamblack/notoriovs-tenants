@@ -8,20 +8,17 @@ import {
   type TenantProjectionName,
 } from '@/utils/getTenant'
 
-// Campos del Tenant que nunca deben viajar a una página pública. El token de
-// la Conversions API permite escribir eventos en el Pixel del cliente; la
-// contraseña del dashboard abre el Kanban de sus leads.
-const SECRET_FIELDS = ['dashboardPassword'] as const
+// Lo único del Tenant que nunca debe viajar a una página pública: el token de
+// la Conversions API, que permite escribir eventos en el Pixel del cliente.
+// Vive dentro de `tracking`, junto a datos que sí son públicos, así que la
+// regla es sobre el subcampo. (`dashboardPassword` estuvo aquí hasta que se
+// retiró la contraseña compartida.)
 const SECRET_SUBFIELDS = { tracking: ['metaCapiToken'] } as const
 
 describe('proyecciones del tenant', () => {
-  it('ninguna proyección pública incluye el token de CAPI ni la contraseña del dashboard', () => {
+  it('ninguna proyección pública incluye el token de CAPI', () => {
     for (const name of PUBLIC_TENANT_PROJECTIONS) {
       const select: Record<string, unknown> = TENANT_PROJECTIONS[name].select
-
-      for (const field of SECRET_FIELDS) {
-        expect(select, `la proyección pública "${name}"`).not.toHaveProperty(field)
-      }
 
       for (const [group, subfields] of Object.entries(SECRET_SUBFIELDS)) {
         const selected = select[group]
@@ -67,7 +64,7 @@ describe('proyecciones del tenant', () => {
   it('solo pobla relaciones (depth 1) la proyección que pinta una Media', () => {
     // `depth: 1` es un join más por consulta; las proyecciones de las rutas
     // de API no pintan nada, así que no lo pagan.
-    for (const name of ['dashboardApi', 'dashboardLogin', 'conversionsApi', 'quizSubmit', 'identity'] as const) {
+    for (const name of ['dashboardApi', 'conversionsApi', 'quizSubmit', 'identity'] as const) {
       expect(TENANT_PROJECTIONS[name].depth, name).toBe(0)
     }
     for (const name of ['chrome', 'quiz', 'thankYou', 'notEligible'] as const) {

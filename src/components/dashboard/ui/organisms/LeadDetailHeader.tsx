@@ -38,7 +38,7 @@ export default function LeadDetailHeader({ name, badge, mode, onBack, onEdit }: 
       </div>
       {mode === 'read' && (
         <div className="flex gap-4">
-          <h2 className="flex flex-grow ft-2 font-bold text-neutral-200 truncate">{name}</h2>
+          <h2 className="flex flex-grow ft-3 font-bold text-neutral-100 truncate">{name}</h2>
           {badge && <Badge label={badge.label} tone={badge.tone} size="lg" />}
         </div>
       )}

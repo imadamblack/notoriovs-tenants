@@ -5,7 +5,7 @@ import type { TenantQuizStep } from '@/utils/tenantQuiz'
 
 // Tipos locales (ver nota en tenantQuiz.ts: no se pudo correr
 // `payload generate:types` en este entorno). Deben mantenerse en sync con
-// src/collections/Tenants.ts.
+// src/collections/Tenants/.
 export type TenantLeadStage = {
   // Id autogenerado por Payload para esta fila del array; es lo único que
   // referencia `Lead.stage` (ver comentario en Leads.ts). Puede venir null
@@ -58,7 +58,6 @@ export type TenantDoc = {
   optInWebhook?: string | null
   quizWebhook?: string | null
   tracking?: TenantTracking | null
-  dashboardPassword?: string | null
   leadPipeline?: TenantLeadStage[] | null
   leadStuckAfterDays?: number | null
   thankYouPage?: {
@@ -100,8 +99,7 @@ const PIPELINE = { leadPipeline: true, leadStuckAfterDays: true } as const
  * Qué campos del Tenant pide cada consumidor. Nadie resuelve un Tenant sin
  * nombrar una de estas proyecciones, así que el conjunto de campos que una
  * página carga en memoria se lee de un solo lugar — y se puede afirmar en un
- * test que ninguna página pública toca `tracking.metaCapiToken` ni
- * `dashboardPassword`.
+ * test que ninguna página pública toca `tracking.metaCapiToken`.
  *
  * `id` siempre viene de vuelta (Payload lo incluye en todo `select`).
  */
@@ -140,22 +138,20 @@ export const TENANT_PROJECTIONS = {
     depth: 0, // solo texto: razón social, domicilio, teléfono, email
     select: IDENTITY,
   },
-  // Dashboard de Cliente. La contraseña NO entra: si el tenant tiene o no
-  // dashboard configurado lo responde `tenantHasDashboard`, sin traerse el
-  // secreto a una página que cualquiera puede abrir.
+  // Dashboard de Cliente. Si el tenant tiene o no dashboard disponible lo
+  // responde `tenantHasDashboard`, que cuenta usuarios en vez de leer nada
+  // del Tenant.
   dashboard: {
     depth: 0,
     select: { ...IDENTITY, ...PIPELINE },
   },
-  // Rutas /api/tenant-dashboard/* (leads, counts, kpis): autorizan con la
-  // contraseña y filtran con el pipeline.
+  // Rutas /api/tenant-dashboard/* (leads, counts, kpis) y la autorización de
+  // la página del dashboard: el `id` para scopear la query a `leads` y el
+  // pipeline para filtrarla. Quién autoriza es `resolveDashboardAuth`, contra
+  // la colección `tenant-users`; del Tenant no sale ninguna credencial.
   dashboardApi: {
     depth: 0,
-    select: { dashboardPassword: true, ...PIPELINE },
-  },
-  dashboardLogin: {
-    depth: 0,
-    select: { dashboardPassword: true },
+    select: { ...PIPELINE },
   },
   // Único consumidor del token de la Conversions API: la ruta server-side
   // que reenvía el evento a Meta.
@@ -191,6 +187,7 @@ export const PUBLIC_TENANT_PROJECTIONS = [
   'notEligible',
   'privacyNotice',
   'dashboard',
+  'dashboardApi',
 ] as const satisfies readonly TenantProjectionName[]
 
 type ProjectField<V, S> = S extends true
@@ -254,30 +251,23 @@ export async function getTenantBySubdomain<K extends TenantProjectionName>(
   return (await findTenant(subdomain, projection)) as TenantView<K> | null
 }
 
-/**
- * ¿Este tenant tiene dashboard configurado? Se responde con un `where` en
- * vez de leyendo `dashboardPassword`, para que la página del dashboard —que
- * cualquiera puede abrir— nunca cargue el secreto en memoria solo para
- * decidir si muestra el login o el aviso de "no disponible".
- *
- * `exists` descarta el NULL y `not_equals: ''` la cadena vacía, que es como
- * el admin apaga el acceso (ver la descripción del campo en Tenants.ts).
- */
-export const tenantHasDashboard = cache(async (subdomain: string): Promise<boolean> => {
-  if (!subdomain) return false
-
+/** ¿Este tenant tiene al menos un Tenant User que pueda entrar con su email? */
+export const tenantHasUsers = cache(async (tenantId: string | number): Promise<boolean> => {
   const payload = await getPayload({ config })
   const { totalDocs } = await payload.count({
-    collection: 'tenants',
-    where: {
-      and: [
-        { subdomain: { equals: subdomain.toLowerCase() } },
-        { active: { equals: true } },
-        { dashboardPassword: { exists: true } },
-        { dashboardPassword: { not_equals: '' } },
-      ],
-    },
+    collection: 'tenant-users',
+    where: { tenant: { equals: tenantId } },
+    overrideAccess: true,
   })
 
   return totalDocs > 0
 })
+
+/**
+ * ¿Hay alguna forma de entrar al dashboard de este tenant? Solo hay una:
+ * tener al menos un Tenant User. Un tenant sin usuarios ve el aviso de "no
+ * disponible" en vez de un login que nadie podría pasar.
+ */
+export async function tenantHasDashboard(tenantId: string | number): Promise<boolean> {
+  return tenantHasUsers(tenantId)
+}

@@ -64,10 +64,12 @@ export type SupportedTimezones =
 export interface Config {
   auth: {
     users: UserAuthOperations;
+    'tenant-users': TenantUserAuthOperations;
   };
   blocks: {};
   collections: {
     users: User;
+    'tenant-users': TenantUser;
     media: Media;
     tenants: Tenant;
     leads: Lead;
@@ -85,6 +87,7 @@ export interface Config {
   };
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
+    'tenant-users': TenantUsersSelect<false> | TenantUsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
@@ -105,7 +108,7 @@ export interface Config {
   widgets: {
     collections: CollectionsWidget;
   };
-  user: User;
+  user: User | TenantUser;
   jobs: {
     tasks: unknown;
     workflows: unknown;
@@ -129,12 +132,36 @@ export interface UserAuthOperations {
     password: string;
   };
 }
+export interface TenantUserAuthOperations {
+  forgotPassword: {
+    email: string;
+    password: string;
+  };
+  login: {
+    email: string;
+    password: string;
+  };
+  registerFirstUser: {
+    email: string;
+    password: string;
+  };
+  unlock: {
+    email: string;
+    password: string;
+  };
+}
 /**
+ * El equipo de Notoriovs. Quien entra a este panel.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
   id: number;
+  /**
+   * Un Superadmin ve y administra todos los clientes. Un Account Manager solo ve los clientes que tenga asignados abajo. Solo un Superadmin puede cambiar esto.
+   */
+  role: 'superadmin' | 'account-manager';
   tenants?:
     | {
         tenant: number | Tenant;
@@ -455,10 +482,6 @@ export interface Tenant {
     googleTagId?: string | null;
   };
   /**
-   * Contraseña única y compartida que usa el cliente para entrar a su dashboard de leads (/tenant-site/{subdomain}/dashboard). Se captura a mano, igual que el Meta Pixel o el CAPI Token. Déjala vacía para desactivar el acceso al dashboard.
-   */
-  dashboardPassword?: string | null;
-  /**
    * Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. Cada lead guarda en Lead.stage el "id" interno (autogenerado por Payload) de la etapa en la que está, no el nombre, así que puedes renombrar una etapa o reordenarlas libremente sin romper nada. Ese id solo se pierde si BORRAS la etapa y creas una "igual" en su lugar: los leads que estaban ahí quedan huérfanos y caen en la columna "Otro" del Kanban hasta que se reasignan a mano.
    */
   leadPipeline?:
@@ -524,6 +547,41 @@ export interface FolderInterface {
   folderType?: 'media'[] | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * Personas del lado del cliente que entran al Dashboard de Cliente de su tenant. No tienen acceso a este panel.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenant-users".
+ */
+export interface TenantUser {
+  id: number;
+  /**
+   * Un Propietario gestiona los usuarios y la facturación de su empresa y puede borrar leads. Un Miembro trabaja los leads y ve los KPIs completos, gasto en anuncios incluido, pero no borra leads ni administra usuarios.
+   */
+  role: 'owner' | 'member';
+  /**
+   * El único tenant al que este usuario puede entrar. La autorización del dashboard compara esto contra el tenant del host de la petición, así que cambiar el subdominio en la URL no le da acceso a otro cliente.
+   */
+  tenant: number | Tenant;
+  updatedAt: string;
+  createdAt: string;
+  email: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiration?: string | null;
+  salt?: string | null;
+  hash?: string | null;
+  loginAttempts?: number | null;
+  lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
+  password?: string | null;
+  collection: 'tenant-users';
 }
 /**
  * Leads capturados por el quiz de cada tenant.
@@ -642,6 +700,10 @@ export interface PayloadLockedDocument {
         value: number | User;
       } | null)
     | ({
+        relationTo: 'tenant-users';
+        value: number | TenantUser;
+      } | null)
+    | ({
         relationTo: 'media';
         value: number | Media;
       } | null)
@@ -662,10 +724,15 @@ export interface PayloadLockedDocument {
         value: number | FolderInterface;
       } | null);
   globalSlug?: string | null;
-  user: {
-    relationTo: 'users';
-    value: number | User;
-  };
+  user:
+    | {
+        relationTo: 'users';
+        value: number | User;
+      }
+    | {
+        relationTo: 'tenant-users';
+        value: number | TenantUser;
+      };
   updatedAt: string;
   createdAt: string;
 }
@@ -675,10 +742,15 @@ export interface PayloadLockedDocument {
  */
 export interface PayloadPreference {
   id: number;
-  user: {
-    relationTo: 'users';
-    value: number | User;
-  };
+  user:
+    | {
+        relationTo: 'users';
+        value: number | User;
+      }
+    | {
+        relationTo: 'tenant-users';
+        value: number | TenantUser;
+      };
   key?: string | null;
   value?:
     | {
@@ -708,12 +780,37 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  role?: T;
   tenants?:
     | T
     | {
         tenant?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  email?: T;
+  resetPasswordToken?: T;
+  resetPasswordExpiration?: T;
+  salt?: T;
+  hash?: T;
+  loginAttempts?: T;
+  lockUntil?: T;
+  sessions?:
+    | T
+    | {
+        id?: T;
+        createdAt?: T;
+        expiresAt?: T;
+      };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenant-users_select".
+ */
+export interface TenantUsersSelect<T extends boolean = true> {
+  role?: T;
+  tenant?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -947,7 +1044,6 @@ export interface TenantsSelect<T extends boolean = true> {
         metaCapiToken?: T;
         googleTagId?: T;
       };
-  dashboardPassword?: T;
   leadPipeline?:
     | T
     | {

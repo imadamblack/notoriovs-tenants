@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import type { Where } from 'payload'
 import config from '@payload-config'
-import { requireDashboardTenant } from '@/utils/requireDashboardAuth'
+import { requireDashboardAuth, requireDashboardTenant, sessionCan } from '@/utils/requireDashboardAuth'
 import { applyStatusAndSinceFilters, SEARCH_FIELDS } from '@/utils/leadDashboardFilters'
 
 // Todas las rutas bajo /api/tenant-dashboard/* usan la Local API de Payload
@@ -96,6 +96,29 @@ export async function GET(req: NextRequest) {
   })
 }
 
+/**
+ * El lead de `id`, pero solo si es de este tenant. Sin esta comprobación
+ * cualquier sesión válida de un tenant podría tocar leads de otro con solo
+ * adivinar o enumerar ids: el id viene del cliente, la pertenencia no.
+ */
+async function findLeadOfTenant(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  id: string | number,
+  tenantId: string | number,
+) {
+  const lead = await payload.findByID({
+    collection: 'leads',
+    id,
+    depth: 0,
+    overrideAccess: true,
+    disableErrors: true,
+  })
+
+  const leadTenantId = typeof lead?.tenant === 'object' ? (lead.tenant as { id?: unknown })?.id : lead?.tenant
+
+  return lead && String(leadTenantId) === String(tenantId) ? lead : null
+}
+
 export async function PATCH(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any
@@ -112,18 +135,7 @@ export async function PATCH(req: NextRequest) {
 
   const payload = await getPayload({ config })
 
-  // Confirma que el lead pertenece a este tenant antes de tocarlo. Sin este
-  // check, cualquier sesión válida de un tenant podría editar leads de otro
-  // con solo adivinar/enumerar ids.
-  const existing = await payload.findByID({
-    collection: 'leads',
-    id,
-    depth: 0,
-    overrideAccess: true,
-  })
-  const existingTenantId =
-    typeof existing?.tenant === 'object' ? (existing.tenant as { id?: unknown })?.id : existing?.tenant
-  if (!existing || String(existingTenantId) !== String(tenant.id)) {
+  if (!(await findLeadOfTenant(payload, id, tenant.id))) {
     return NextResponse.json({ error: 'Lead no encontrado' }, { status: 404 })
   }
 
@@ -168,4 +180,39 @@ export async function PATCH(req: NextRequest) {
   })
 
   return NextResponse.json({ lead: updated })
+}
+
+// Borrar un lead es la única acción del dashboard que no se puede deshacer, y
+// por eso es de las dos que distinguen a un `owner` de un `member` (la otra es
+// gestionar usuarios, que llega con el issue 10). Un `member` sí puede sacar
+// un lead de en medio: lo marca como descalificado con el PATCH de arriba, que
+// lo quita de los números de conversión sin perder el registro.
+export async function DELETE(req: NextRequest) {
+  const params = req.nextUrl.searchParams
+  const subdomain = params.get('subdomain')
+  const id = params.get('id')
+
+  const auth = await requireDashboardAuth(req, subdomain)
+  if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
+
+  // 403 y no 404: la sesión es válida y el lead es suyo; lo que falta es el
+  // rol. Decirlo tal cual es lo que permite que la interfaz explique por qué
+  // no está el botón en vez de fingir que el lead no existe.
+  if (!sessionCan(auth.session, 'leads:delete')) {
+    return NextResponse.json(
+      { error: 'Tu rol no permite borrar leads. Puedes marcarlo como descalificado.' },
+      { status: 403 },
+    )
+  }
+
+  const payload = await getPayload({ config })
+
+  if (!(await findLeadOfTenant(payload, id, auth.tenant.id))) {
+    return NextResponse.json({ error: 'Lead no encontrado' }, { status: 404 })
+  }
+
+  await payload.delete({ collection: 'leads', id, overrideAccess: true })
+
+  return NextResponse.json({ ok: true })
 }

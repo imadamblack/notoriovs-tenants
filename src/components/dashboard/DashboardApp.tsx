@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import LeadDetailPanel from '@/components/dashboard/LeadDetailPanel'
 import KpiReport from '@/components/dashboard/KpiReport'
 import DashboardNav from '@/components/dashboard/ui/organisms/DashboardNav'
+import { DEFAULT_SINCE_KEY, type SinceKey } from '@/utils/dashboardPeriod'
+import type { DashboardPermissions } from '@/access/tenantUserPermissions'
 
 export type PipelineStage = { id: string; label: string; isWon?: boolean | null; isLost?: boolean | null }
 
@@ -33,34 +35,68 @@ export type Lead = {
 // cambio: sin ella, una columna no sabría de dónde quitar la tarjeta cuando
 // el lead se movió de etapa desde el panel de detalle (en vez de
 // arrastrado, donde el propio drag ya conoce su origen).
-export type LeadUpdateEvent = { lead: Lead; previousStage: string }
+export type LeadUpdateEvent = { lead: Lead; previousStage: string; deleted?: boolean }
 
 export type DashboardTab = 'kanban' | 'kpis'
 
 type DashboardAppProps = {
   subdomain: string
   companyName?: string | null
+  /** Email del Tenant User con el que está firmada la sesión. */
+  accountEmail: string
+  /** Lo que el rol de esta sesión permite. Resuelto en el servidor, ver `sessionPermissions`. */
+  permissions: DashboardPermissions
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
 }
 
-export default function DashboardApp({ subdomain, companyName, pipeline, stuckAfterDays }: DashboardAppProps) {
+export default function DashboardApp({
+  subdomain,
+  companyName,
+  accountEmail,
+  permissions,
+  pipeline,
+  stuckAfterDays,
+}: DashboardAppProps) {
   const router = useRouter()
   const [tab, setTab] = useState<DashboardTab>('kanban')
+  // El periodo es del dashboard entero, no de una pestaña: el listado de
+  // Leads y los KPIs lo comparten para que los números de una vista se
+  // puedan verificar contra la otra sin volver a elegir el rango.
+  const [sinceKey, setSinceKey] = useState<SinceKey>(DEFAULT_SINCE_KEY)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [updateEvent, setUpdateEvent] = useState<LeadUpdateEvent | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [kpis, setKpis] = useState<any>(null)
-  const [loadingKpis, setLoadingKpis] = useState(true)
+  // `refreshing` NO desmonta el reporte: al cambiar de periodo (o al
+  // guardar un lead) se dejan en pantalla los números anteriores hasta que
+  // llegan los nuevos, y solo cambian los valores. Antes esto era un
+  // `loading` que sustituía todo el body por "Cargando…", así que cada
+  // recarga repintaba la pantalla entera y se veía como un parpadeo.
+  const [refreshing, setRefreshing] = useState(true)
+
+  // Descarta respuestas que llegan fuera de orden: cambiar de periodo dos
+  // veces seguidas dispara dos fetches y el primero puede contestar al
+  // final, dejando en pantalla los números del rango que ya no está
+  // seleccionado.
+  const kpiRequestRef = useRef(0)
 
   const loadKpis = useCallback(async () => {
-    const res = await fetch(`/api/tenant-dashboard/kpis?subdomain=${encodeURIComponent(subdomain)}`)
-    if (res.ok) setKpis(await res.json())
-  }, [subdomain])
+    const requestId = ++kpiRequestRef.current
+    setRefreshing(true)
+    try {
+      const params = new URLSearchParams({ subdomain })
+      if (sinceKey !== 'all') params.set('since', sinceKey)
+      const res = await fetch(`/api/tenant-dashboard/kpis?${params.toString()}`)
+      if (requestId !== kpiRequestRef.current) return
+      if (res.ok) setKpis(await res.json())
+    } finally {
+      if (requestId === kpiRequestRef.current) setRefreshing(false)
+    }
+  }, [subdomain, sinceKey])
 
   useEffect(() => {
-    setLoadingKpis(true)
-    loadKpis().finally(() => setLoadingKpis(false))
+    loadKpis()
   }, [loadKpis])
 
   // Único punto que hace el PATCH real contra la API. El Kanban (drag&drop)
@@ -87,6 +123,26 @@ export default function DashboardApp({ subdomain, companyName, pipeline, stuckAf
     [subdomain, loadKpis],
   )
 
+  // Borrar de verdad, no descalificar: el lead desaparece de la base. Solo
+  // llega aquí quien tiene el permiso `leads:delete` (la ruta lo vuelve a
+  // comprobar); un `member` no ve el botón.
+  const deleteLead = useCallback(
+    async (lead: Lead): Promise<boolean> => {
+      const params = new URLSearchParams({ subdomain, id: String(lead.id) })
+      const res = await fetch(`/api/tenant-dashboard/leads?${params.toString()}`, { method: 'DELETE' })
+      if (!res.ok) return false
+
+      setSelectedLead(null)
+      // El mismo evento que usa una edición: cada vista reconcilia su copia
+      // local. `deleted` es lo que le dice a la columna que quite la tarjeta
+      // en vez de moverla.
+      setUpdateEvent({ lead, previousStage: lead.stage, deleted: true })
+      loadKpis()
+      return true
+    },
+    [subdomain, loadKpis],
+  )
+
   const handleLogout = async () => {
     await fetch('/api/tenant-dashboard/logout', { method: 'POST' })
     router.refresh()
@@ -94,7 +150,13 @@ export default function DashboardApp({ subdomain, companyName, pipeline, stuckAf
 
   return (
     <div className="fixed inset-0 bg-neutral-800 flex flex-col">
-      <DashboardNav companyName={companyName} tab={tab} onTabChange={setTab} onLogout={handleLogout} />
+      <DashboardNav
+        companyName={companyName}
+        accountEmail={accountEmail}
+        tab={tab}
+        onTabChange={setTab}
+        onLogout={handleLogout}
+      />
 
       <main className="flex-1 overflow-auto min-h-0">
         {tab === 'kanban' ? (
@@ -105,11 +167,17 @@ export default function DashboardApp({ subdomain, companyName, pipeline, stuckAf
             onCardClick={setSelectedLead}
             onStageChange={(lead, stage) => updateLead(lead, { stage })}
             updateEvent={updateEvent}
+            sinceKey={sinceKey}
+            onSinceChange={setSinceKey}
           />
-        ) : loadingKpis ? (
-          <p className="text-neutral-800 text-sm">Cargando…</p>
         ) : (
-          <KpiReport data={kpis} pipeline={pipeline} />
+          <KpiReport
+            data={kpis}
+            pipeline={pipeline}
+            refreshing={refreshing}
+            sinceKey={sinceKey}
+            onSinceChange={setSinceKey}
+          />
         )}
       </main>
 
@@ -120,6 +188,7 @@ export default function DashboardApp({ subdomain, companyName, pipeline, stuckAf
           stuckAfterDays={stuckAfterDays}
           onClose={() => setSelectedLead(null)}
           onSave={async (patch) => Boolean(await updateLead(selectedLead, patch))}
+          onDelete={permissions.canDeleteLeads ? () => deleteLead(selectedLead) : undefined}
         />
       )}
     </div>

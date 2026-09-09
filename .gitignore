@@ -11,11 +11,12 @@ tsconfig.tsbuildinfo
 dist/
 build/
 
-# Env vars (contienen credenciales, nunca deben subirse)
-.env
-.env.local
-.env.*.local
-test.env
+# Env vars (contienen credenciales, nunca deben subirse).
+# .env.example y .env.test sí viajan: no tienen secretos y son lo que permite
+# que quien clone el repo levante su base sin pedirle credenciales a nadie.
+.env*
+!.env.example
+!.env.test
 
 # Payload local media (uploads locales de desarrollo)
 media/
