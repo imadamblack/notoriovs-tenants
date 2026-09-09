@@ -25,10 +25,47 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1091
-source .env.prod
-set +a
+# `.env.prod` se LEE, no se ejecuta. `source` lo trataba como un guion de
+# shell, y ahí una URL de Neon se parte sola: trae
+# `?sslmode=verify-full&channel_binding=require`, y ese `&` sin comillas manda
+# la asignación a segundo plano —o sea, a otro proceso— así que DATABASE_URL
+# llegaba vacía y el comando reventaba con "Invalid URL". Lo mismo habría
+# pasado con un `$`, un backtick o un `;` dentro de una contraseña.
+#
+# Aquí se separa por el primer `=`, se le quitan las comillas opcionales que
+# admite dotenv, y nada se evalúa.
+while IFS= read -r linea || [ -n "$linea" ]; do
+  linea="${linea%$'\r'}"
+
+  case "$linea" in
+    '' | '#'*) continue ;;
+  esac
+
+  linea="${linea#export }"
+
+  nombre="${linea%%=*}"
+  valor="${linea#*=}"
+
+  # Una línea sin `=`, o con un nombre que no es un identificador, se ignora
+  # en vez de tumbar el guion entero.
+  [ "$nombre" != "$linea" ] || continue
+  case "$nombre" in
+    [A-Za-z_]*) ;;
+    *) continue ;;
+  esac
+
+  case "$valor" in
+    '"'*'"') valor="${valor#\"}" ; valor="${valor%\"}" ;;
+    "'"*"'") valor="${valor#\'}" ; valor="${valor%\'}" ;;
+  esac
+
+  export "$nombre=$valor"
+done < .env.prod
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "El .env.prod no define DATABASE_URL. Sin eso no hay a dónde ir." >&2
+  exit 1
+fi
 
 host="$(node -e 'process.stdout.write(new URL(process.env.DATABASE_URL).host)')"
 
