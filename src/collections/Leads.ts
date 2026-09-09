@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { isInternalUser } from '@/access/isInternalUser'
 
 // Leads generados por el quiz de cada tenant. Antes solo se reenviaban a un
 // webhook de n8n (ver `Tenants.quizWebhook` y /api/quiz-submit); ahora
@@ -37,16 +38,20 @@ export const Leads: CollectionConfig = {
     description: 'Leads capturados por el quiz de cada tenant.',
   },
   access: {
-    // Solo usuarios internos autenticados en Payload (admin panel / API
-    // directa) pueden leer, crear, editar o borrar leads. El dashboard de
-    // cliente (auth por contraseña simple, sin usuario Payload) llega a
-    // estos datos a través de rutas server-side que usan la Local API con
-    // `overrideAccess: true` y filtran manualmente por tenant, así que no
-    // depende de estas reglas.
-    read: ({ req }) => Boolean(req.user),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Solo usuarios internos (colección `users`) pueden leer, crear, editar o
+    // borrar leads. Ojo con la diferencia entre `isInternalUser` y el
+    // `Boolean(req.user)` que había aquí antes: desde que los Tenant Users
+    // tienen sesión de Payload propia, `req.user` también puede ser un
+    // cliente, y con la regla vieja un `GET /api/leads` con su cookie le
+    // habría devuelto los leads de todos los tenants.
+    //
+    // El Dashboard de Cliente no depende de estas reglas: llega a los leads
+    // por rutas server-side que usan la Local API con `overrideAccess: true`
+    // y filtran a mano por el tenant del host.
+    read: isInternalUser,
+    create: isInternalUser,
+    update: isInternalUser,
+    delete: isInternalUser,
   },
   fields: [
     {

@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { isInternalUser } from '@/access/isInternalUser'
 
 // Métricas semanales de las campañas de ads por tenant (hoy viven en un
 // Google Sheet por cliente, ver ejemplo compartido: date_start, date_stop,
@@ -18,10 +19,13 @@ export const MarketingReports: CollectionConfig = {
     description: 'KPIs semanales de campañas de ads por tenant (ingesta desde n8n).',
   },
   access: {
-    read: ({ req }) => Boolean(req.user),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Internos, no "cualquiera autenticado": ver la nota en `isInternalUser`.
+    // Los KPIs de gasto que ve el cliente salen por /api/tenant-dashboard/kpis,
+    // que filtra por el tenant del host.
+    read: isInternalUser,
+    create: isInternalUser,
+    update: isInternalUser,
+    delete: isInternalUser,
   },
   fields: [
     {

@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { isInternalUser } from '@/access/isInternalUser'
 import { revalidateTenantSite } from '@/utils/tenantSiteCache'
 import { identityFields, generalInfoTab } from './identity'
 import { landingTab } from './landing'
@@ -21,7 +22,17 @@ export const Tenants: CollectionConfig = {
     },
   },
   access: {
-    read: () => true,
+    // La lectura por API deja de ser pública. Todas las páginas del sitio de
+    // un tenant resuelven su documento con la Local API (`getTenantBySubdomain`),
+    // que corre con `overrideAccess: true`, así que la landing y el quiz siguen
+    // sirviéndose igual a cualquier visitante.
+    //
+    // Lo que cierra es `GET /api/tenants`: ese endpoint devolvía el documento
+    // COMPLETO —`dashboardPassword` y `tracking.metaCapiToken` incluidos— de
+    // todos los clientes. Con los Tenant Users teniendo ya sesión de Payload,
+    // eso además les habría dado la contraseña compartida de cualquier otro
+    // tenant con una sola petición.
+    read: isInternalUser,
     // create/update/delete: restringir a admins internos cuando se defina el rol client-editor.
   },
   hooks: {

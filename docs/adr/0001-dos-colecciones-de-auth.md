@@ -3,8 +3,9 @@
 Los clientes (Tenant Users) y el equipo de Notoriovs (Internal Users) se
 autentican contra **dos colecciones auth distintas**, no contra una sola
 colección `users` con un campo `role`. La colección de Tenant Users tiene el
-panel de Payload cerrado por construcción (`admin.hidden` + `access.admin`
-en falso), no por un condicional de rol.
+panel de Payload cerrado por construcción (`access.admin: () => false`), no por
+un condicional de rol: `canAccessAdmin` llama esa función en cuanto el token
+viene de esa colección, así que es la única puerta y está clavada en falso.
 
 La alternativa de una sola colección era más barata (un solo flujo de
 recuperación, un solo modelo mental), pero deja el acceso al panel de Payload
@@ -16,6 +17,11 @@ estructural.
 
 ## Consecuencias
 
+- La colección de Tenant Users **sí** es visible en el nav del admin, aunque
+  la redacción original de este ADR hablara también de `admin.hidden`: un
+  Internal User tiene que poder dar de alta a los usuarios de un cliente desde
+  el panel, y esconder la colección solo la habría movido a una URL que hay
+  que saberse de memoria. Esconderla nunca fue lo que cerraba el panel.
 - El flujo de recuperación de contraseña se implementa dos veces (en Payload
   son pocas líneas por colección).
 - Cada colección puede tener su propia política de sesión, rate limiting y,

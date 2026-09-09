@@ -11,6 +11,7 @@ type DashboardLoginProps = {
 
 export default function DashboardLogin({subdomain, companyName}: DashboardLoginProps) {
   const router = useRouter()
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -24,7 +25,7 @@ export default function DashboardLogin({subdomain, companyName}: DashboardLoginP
       const res = await fetch('/api/tenant-dashboard/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({subdomain, password}),
+        body: JSON.stringify({subdomain, email, password}),
       })
 
       if (!res.ok) {
@@ -46,6 +47,8 @@ export default function DashboardLogin({subdomain, companyName}: DashboardLoginP
       <div className="reading-container">
         <LoginForm
           companyName={companyName}
+          email={email}
+          onEmailChange={setEmail}
           password={password}
           onPasswordChange={setPassword}
           error={error}

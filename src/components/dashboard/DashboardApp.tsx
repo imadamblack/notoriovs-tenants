@@ -41,11 +41,13 @@ export type DashboardTab = 'kanban' | 'kpis'
 type DashboardAppProps = {
   subdomain: string
   companyName?: string | null
+  /** Email del Tenant User de la sesión, o `null` si entró con la contraseña compartida. */
+  accountEmail?: string | null
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
 }
 
-export default function DashboardApp({ subdomain, companyName, pipeline, stuckAfterDays }: DashboardAppProps) {
+export default function DashboardApp({ subdomain, companyName, accountEmail, pipeline, stuckAfterDays }: DashboardAppProps) {
   const router = useRouter()
   const [tab, setTab] = useState<DashboardTab>('kanban')
   // El periodo es del dashboard entero, no de una pestaña: el listado de
@@ -118,7 +120,13 @@ export default function DashboardApp({ subdomain, companyName, pipeline, stuckAf
 
   return (
     <div className="fixed inset-0 bg-neutral-800 flex flex-col">
-      <DashboardNav companyName={companyName} tab={tab} onTabChange={setTab} onLogout={handleLogout} />
+      <DashboardNav
+        companyName={companyName}
+        accountEmail={accountEmail}
+        tab={tab}
+        onTabChange={setTab}
+        onLogout={handleLogout}
+      />
 
       <main className="flex-1 overflow-auto min-h-0">
         {tab === 'kanban' ? (

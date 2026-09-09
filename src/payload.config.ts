@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
 import { Users } from './collections/Users'
+import { TenantUsers } from './collections/TenantUsers'
 import { Media } from './collections/Media'
 import { Tenants } from './collections/Tenants'
 import { Leads } from './collections/Leads'
@@ -43,7 +44,7 @@ export default buildConfig({
       beforeDashboard: ['/components/TenantsDashboardWidget#TenantsDashboardWidget'],
     },
   },
-  collections: [Users, Media, Tenants, Leads, MarketingReports],
+  collections: [Users, TenantUsers, Media, Tenants, Leads, MarketingReports],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
