@@ -14,6 +14,7 @@
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "migrate:create": "cross-env NODE_OPTIONS=--no-deprecation payload migrate:create",
     "migrate": "cross-env NODE_OPTIONS=--no-deprecation payload migrate",
+    "migrate:debug": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/migrate-debug.mts",
     "migrate:status": "cross-env NODE_OPTIONS=--no-deprecation payload migrate:status",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "db:up": "docker compose up -d postgres",

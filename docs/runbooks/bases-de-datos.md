@@ -51,6 +51,25 @@ salta. Para `psql` contra producción, ver
 `docs/runbooks/sellar-baseline-de-migraciones.sql` (necesitas
 `PGSSLROOTCERT=system` con Neon).
 
+### Si `migrate` no imprime nada
+
+El CLI de Payload **se traga los errores** en los comandos de migración: si algo
+falla al arrancar —una variable de entorno que no llegó, la base que no
+responde— no imprime una sola línea y sale con código 0. En pantalla, "falló" y
+"todavía no termina" se ven idénticos.
+
+Cuando pase, saca el CLI de en medio:
+
+```bash
+npm run prod -- npm run migrate:debug
+```
+
+Hace el mismo trabajo (`payload.db.migrate()`), pero imprime el error completo y
+sale con código 1 si truena. Sirve igual en local, sin el `npm run prod --`.
+
+Reintentar nunca es peligroso: cada migración corre dentro de su transacción, así
+que o se aplicó entera o no se aplicó.
+
 Lo que nunca se hace: copiar el `DATABASE_URL` de producción al `.env`. Ahí
 empezó todo esto — bastó reiniciar el dev server para que Payload empujara
 tablas nuevas a la base de los clientes (ADR 0006).
@@ -92,7 +111,8 @@ almacenamiento de producción.
 2. `npm run migrate:create`, y **lee el SQL** antes de commitearlo.
 3. `npm run db:reset` otra vez: si la migración se aplica sobre una base vacía,
    sirve.
-4. Ya en producción: `npm run prod -- npm run migrate`.
+4. Ya en producción: `npm run prod -- npm run migrate`, y confirma con
+   `npm run prod -- npm run migrate:status`. Si no imprime nada, ve arriba.
 
 El push automático del dev server sigue vivo en local y puede hacer que tu base
 diverja del repo sin avisar; `db:reset` es la forma de comprobar que lo que hay
