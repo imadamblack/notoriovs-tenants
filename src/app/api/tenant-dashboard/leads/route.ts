@@ -96,6 +96,123 @@ export async function GET(req: NextRequest) {
 }
 
 /**
+ * Texto ya recortado, o `undefined` si venía vacío. Un campo de contacto en
+ * blanco no se guarda como cadena vacía: eso haría que un lead "sin correo"
+ * y uno "con el correo borrado" se vieran distintos en la base sin serlo.
+ */
+function toText(value: unknown): string | undefined {
+  if (typeof value === 'number') return String(value)
+  if (typeof value !== 'string') return undefined
+  return value.trim() || undefined
+}
+
+// Alta a mano de un Lead desde el propio dashboard: el que llegó por
+// teléfono o en persona y nunca pasó por el quiz (issue 13). Queda marcado
+// con `source: 'manual'`, que es lo que lo distingue para siempre de los
+// del quiz y de los que mete n8n por /api/leads/ingest.
+//
+// No pide un permiso de rol: capturar un lead es el trabajo diario tanto de
+// un `owner` como de un `member`, igual que editarlo con el PATCH de arriba.
+// Lo único que se exige es sesión válida en ESTE tenant.
+export async function POST(req: NextRequest) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
+  }
+
+  const tenant = await requireDashboardTenant(req)
+  if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const name = toText(body?.name)
+  const phone = toText(body?.phone)
+  const whatsapp = toText(body?.whatsapp)
+  const email = toText(body?.email)
+
+  // Lo mínimo para que el lead sirva de algo: cómo se llama y por dónde
+  // buscarlo. Nada más es obligatorio — quien captura un lead en medio de
+  // una llamada no tiene por qué llenar un formulario largo.
+  if (!name) {
+    return NextResponse.json({ error: 'Escribe el nombre del lead' }, { status: 400 })
+  }
+  if (!phone && !whatsapp && !email) {
+    return NextResponse.json(
+      { error: 'Deja al menos un teléfono, un WhatsApp o un correo' },
+      { status: 400 },
+    )
+  }
+
+  // Nace en la primera etapa del pipeline del tenant, igual que los del
+  // quiz y los del ingest, salvo que quien lo captura elija otra: un lead
+  // que llega por teléfono a veces entra ya avanzado ("me habló para
+  // agendar"). Sin pipeline configurado cae al sentinel 'nuevo', que no
+  // coincide con ningún id real y lo deja en la columna "Otro".
+  const pipeline = tenant.leadPipeline || []
+  const requestedStage = toText(body?.stage)
+  if (requestedStage && pipeline.length && !pipeline.some((stage) => stage.id === requestedStage)) {
+    return NextResponse.json({ error: 'Etapa inválida para este tenant' }, { status: 400 })
+  }
+  const stage = requestedStage || pipeline[0]?.id || 'nuevo'
+
+  const payload = await getPayload({ config })
+
+  // Duplicado por teléfono: se avisa, NO se bloquea. La segunda llamada
+  // llega con `confirmDuplicate` y captura el lead de todos modos — el
+  // mismo número puede ser de dos personas (una empresa, una familia), y
+  // perder un lead por eso es peor que tener dos.
+  //
+  // La comparación es exacta contra lo que se escribió, en `phone` y en
+  // `whatsapp` (el mismo número suele quedar registrado en cualquiera de
+  // los dos). Dos formatos distintos del mismo número no se reconocen: eso
+  // pediría guardar una versión normalizada aparte, y este aviso no vale
+  // ese campo.
+  const numbers = [phone, whatsapp].filter((value): value is string => Boolean(value))
+  if (numbers.length && !body?.confirmDuplicate) {
+    const found = await payload.find({
+      collection: 'leads',
+      where: {
+        and: [
+          { tenant: { equals: tenant.id } },
+          { or: [{ phone: { in: numbers } }, { whatsapp: { in: numbers } }] },
+        ],
+      },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    const duplicate = found.docs[0]
+    if (duplicate) {
+      return NextResponse.json(
+        { error: 'Ya tienes un lead con ese teléfono', duplicate },
+        { status: 409 },
+      )
+    }
+  }
+
+  const created = await payload.create({
+    collection: 'leads',
+    data: {
+      tenant: Number(tenant.id),
+      name,
+      phone,
+      whatsapp,
+      email,
+      stage,
+      status: 'open',
+      source: 'manual',
+      notes: toText(body?.notes),
+    },
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  return NextResponse.json({ lead: created }, { status: 201 })
+}
+
+/**
  * El lead de `id`, pero solo si es de este tenant. Sin esta comprobación
  * cualquier sesión válida de un tenant podría tocar leads de otro con solo
  * adivinar o enumerar ids: el id viene del cliente, la pertenencia no.

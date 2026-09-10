@@ -5,6 +5,8 @@ import type {Lead, LeadUpdateEvent, PipelineStage} from '@/components/dashboard/
 import Select from '@/components/dashboard/ui/atoms/Select'
 import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
 import IconFilter from '@/components/dashboard/ui/atoms/icons/IconFilter'
+import IconPlus from '@/components/dashboard/ui/atoms/icons/IconPlus'
+import Button from '@/components/dashboard/ui/atoms/Button'
 import PeriodFilter from '@/components/dashboard/ui/molecules/PeriodFilter'
 import { type SinceKey } from '@/utils/dashboardPeriod'
 import SearchInput from '@/components/dashboard/ui/molecules/SearchInput'
@@ -17,6 +19,8 @@ type KanbanBoardProps = {
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
   onCardClick: (lead: Lead) => void
+  /** Abre el alta a mano de un lead (ver NewLeadPanel). */
+  onCreateLead: () => void
   onStageChange: (lead: Lead, stage: string) => Promise<Lead | null>
   updateEvent: LeadUpdateEvent | null
   // El periodo lo controla DashboardApp: es el mismo filtro que usan los
@@ -81,7 +85,7 @@ const emptyColumn: ColumnState = {
 // es lo que hace viable un tenant con miles de leads sin traer todo a la vez
 // (ver `handleColumnScroll`/`handleListScroll`: cargan la siguiente página
 // al acercarse al fondo del contenedor, sin botón).
-export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
+export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCreateLead, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
   const [view, setView] = useState<BoardView>('kanban')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -230,6 +234,31 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onSt
     if (!updateEvent) return
     const {lead, previousStage} = updateEvent
     const targetKey = pipelineIds.has(lead.stage) ? lead.stage : '__other__'
+
+    // Un lead recién capturado a mano no viene de ninguna columna: se
+    // agrega a la suya y sube los contadores. Se mete tal cual aunque haya
+    // filtros puestos (un status, una búsqueda) — verlo aparecer donde uno
+    // acaba de crearlo pesa más que la pureza del filtro, y basta recargar
+    // para que la vista vuelva a cuadrar.
+    if (updateEvent.created) {
+      setColumnData((cols) => {
+        const state = cols[targetKey]
+        if (!state) return cols
+        if (state.leads.some((l) => String(l.id) === String(lead.id))) return cols
+        return {...cols, [targetKey]: {...state, leads: [lead, ...state.leads], totalDocs: state.totalDocs + 1}}
+      })
+      if (targetKey === '__other__') {
+        setOtherCount((c) => c + 1)
+      } else {
+        setStageCounts((counts) => ({...counts, [lead.stage]: (counts[lead.stage] ?? 0) + 1}))
+      }
+      setTotalCount((c) => c + 1)
+      // La Lista solo lo agrega si ya cargó su primera página; si no, lo
+      // traerá ella sola cuando se abra esa vista.
+      setListLeads((leads) => (leads.length ? [lead, ...leads] : leads))
+      setListTotalDocs((total) => total + 1)
+      return
+    }
 
     // Un lead borrado no se mueve de columna: se va. Es el mismo trabajo de
     // reconciliación, pero quitando en vez de reubicando.
@@ -454,6 +483,21 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onSt
               onClear={() => setSearch('')}
               placeholder="Buscar leads"
             />
+
+            {/* El que llegó por teléfono o en persona se captura aquí, donde
+                ya se están viendo los demás, y no en un formulario aparte. */}
+            <Button
+              variant="primary"
+              size="icon"
+              className="rounded-full shrink-0 flex items-center justify-center"
+              onClick={onCreateLead}
+              aria-label="Nuevo lead"
+              title="Nuevo lead"
+            >
+              <span className="w-6 h-6 inline-flex items-center justify-center">
+                <IconPlus/>
+              </span>
+            </Button>
           </div>
         </div>
       </div>
