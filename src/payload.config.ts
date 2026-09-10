@@ -18,6 +18,7 @@ import { MarketingReports } from './collections/MarketingReports'
 // crea un ciclo real porque solo se usa a nivel de tipos, nunca en runtime.
 import type { Config } from './payload-types'
 import { isSuperadminUser, superadminFieldAccess } from './access/internalRoles'
+import { sendgridAdapter } from './email/sendgrid'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -46,6 +47,12 @@ export default buildConfig({
     },
   },
   collections: [Users, TenantUsers, Media, Tenants, Leads, MarketingReports],
+  // Correo transaccional (recuperación de contraseña e invitaciones). Sin
+  // `SENDGRID_API_KEY` esto queda en `undefined` y Payload usa su adaptador de
+  // consola, que imprime el correo en la terminal en vez de mandarlo: es lo
+  // que se quiere en desarrollo —el enlace se copia del log— y evita que una
+  // máquina local mande correo real a la gente de un cliente.
+  email: process.env.SENDGRID_API_KEY ? sendgridAdapter(process.env.SENDGRID_API_KEY) : undefined,
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

@@ -6,6 +6,7 @@ import IconPaid from "@/components/dashboard/ui/atoms/icons/IconPaid";
 import IconMonitoring from "@/components/dashboard/ui/atoms/icons/IconMonitoring";
 import IconAccount from "@/components/dashboard/ui/atoms/icons/IconAccount";
 import IconLogout from "@/components/dashboard/ui/atoms/icons/IconLogout";
+import IconPlus from "@/components/dashboard/ui/atoms/icons/IconPlus";
 
 type DashboardNavProps = {
   companyName?: string | null
@@ -14,6 +15,13 @@ type DashboardNavProps = {
   tab: DashboardTab
   onTabChange: (tab: DashboardTab) => void
   onLogout: () => void
+  /**
+   * Abre la administración del equipo, o `undefined` si esta sesión no tiene
+   * el permiso `users:manage` (un `member`). Sin la función no se pinta la
+   * entrada: un botón que siempre responde "no puedes" es peor que no
+   * tenerlo — el mismo criterio que el borrado de leads.
+   */
+  onManageUsers?: () => void
 }
 
 // El logout dejó de ser un botón suelto que cerraba la sesión de un clic: ahí
@@ -22,7 +30,7 @@ type DashboardNavProps = {
 // útil el menú: con dos poblaciones de usuarios y una sesión que dura 30 días,
 // "¿con qué cuenta estoy viendo esto?" es una pregunta real— y de ahí cuelga
 // "Cerrar sesión".
-export default function DashboardNav({companyName, accountEmail, tab, onTabChange, onLogout}: DashboardNavProps) {
+export default function DashboardNav({companyName, accountEmail, tab, onTabChange, onLogout, onManageUsers}: DashboardNavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const accountRef = useRef<HTMLDivElement>(null)
 
@@ -92,6 +100,23 @@ export default function DashboardNav({companyName, accountEmail, tab, onTabChang
               <p className="px-3 py-2 -ft-4 text-neutral-400 break-all text-left">
                 {accountEmail}
               </p>
+              {onManageUsers && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  role="menuitem"
+                  className="w-full !rounded-lg flex items-center gap-2 !justify-start text-left"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onManageUsers()
+                  }}
+                >
+                  <span className="w-4 h-4 inline-flex items-center">
+                    <IconPlus />
+                  </span>
+                  Usuarios
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

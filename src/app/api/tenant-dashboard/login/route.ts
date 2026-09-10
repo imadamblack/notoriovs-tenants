@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 import { getTenantBySubdomain } from '@/utils/getTenant'
-import { loginTenantUser, tenantUserCookieMaxAge, TENANT_USER_COOKIE_NAME } from '@/utils/tenantUserAuth'
+import { loginTenantUser } from '@/utils/tenantUserAuth'
+import { setTenantSessionCookie } from '@/utils/tenantSessionCookie'
 
 // Una sola puerta al dashboard: email + contraseña propios contra la colección
 // `tenant-users`. La contraseña compartida por Tenant vivió aquí en paralelo
@@ -44,14 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: BAD_CREDENTIALS }, { status: 401 })
   }
 
-  const payload = await getPayload({ config })
   const res = NextResponse.json({ ok: true })
-  res.cookies.set(TENANT_USER_COOKIE_NAME, login.token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: tenantUserCookieMaxAge(payload),
-  })
+  await setTenantSessionCookie(res, login.token)
   return res
 }

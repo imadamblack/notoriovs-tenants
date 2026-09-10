@@ -33,6 +33,23 @@ export type DashboardPermission =
   /** Ver y cambiar la suscripción del tenant. */
   | 'billing:manage'
 
+/**
+ * La administración de usuarios del propio Tenant está construida y probada
+ * (issue 10: el `owner` invita, el invitado define su contraseña y entra a su
+ * Tenant), pero apagada a pedido: se entrega después.
+ *
+ * Es UN interruptor y gobierna las dos caras, que es justo el punto de que
+ * viva en el modelo de permisos y no en la interfaz:
+ *   - el menú de cuenta no pinta la entrada "Usuarios"
+ *     (`permissionsForRole` → `canManageUsers`), y
+ *   - las rutas /api/tenant-dashboard/users responden 403
+ *     (`sessionCan` → `roleCan`), así que tampoco se alcanza a mano.
+ *
+ * Para encenderla: `true`. No hay nada más que hacer — ni migración, ni
+ * borrar código, ni tocar componentes.
+ */
+export const TENANT_USER_MANAGEMENT_ENABLED = false
+
 // La diferencia entre los dos roles es corta y deliberada: un `member` trabaja
 // los leads a diario —incluido descalificarlos— y ve los números completos del
 // gasto en anuncios, porque un dashboard que le esconde el costo por lead a
@@ -44,7 +61,7 @@ const PERMISSIONS: Record<TenantUserRole, ReadonlySet<DashboardPermission>> = {
     'leads:update',
     'leads:delete',
     'kpis:read',
-    'users:manage',
+    ...(TENANT_USER_MANAGEMENT_ENABLED ? (['users:manage'] as const) : []),
     'billing:manage',
   ]),
   member: new Set<DashboardPermission>(['leads:read', 'leads:update', 'kpis:read']),

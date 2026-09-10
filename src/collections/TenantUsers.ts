@@ -65,6 +65,12 @@ export const TenantUsers: CollectionConfig = {
     // barato para fuerza bruta; el panel interno no lo es tanto.
     maxLoginAttempts: 10,
     lockTime: 10 * 60 * 1000,
+    // NO declares aquí `forgotPassword.expiration`. El mismo token sirve para
+    // dos cosas con vidas distintas —recuperar una contraseña (2 horas) e
+    // invitar a alguien (7 días)— y cada flujo la pasa por llamada. Un valor
+    // en la colección le gana al de la llamada (ver forgotPasswordOperation),
+    // así que ponerlo aquí igualaría ambos en silencio.
+    // Ver src/utils/tenantUserAccount.ts.
   },
   access: {
     // Puerta del panel de Payload: cerrada por construcción para toda esta
