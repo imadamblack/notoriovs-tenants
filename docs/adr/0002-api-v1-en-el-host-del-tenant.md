@@ -1,5 +1,8 @@
 # El tenant de una petición se deriva del host, nunca de un parámetro
 
+> **Superada por el ADR 0007.** Esta API nunca se construyó. La regla sigue
+> valiendo para la credencial de un Tenant; para una llave de plataforma, no.
+
 Toda la API del producto vive en `{subdomain}.notoriovs.com/api/v1/*`. Esa
 ruta acepta **dos** tipos de Actor —una sesión de navegador de un Tenant User
 y una API Key de máquina— pero el `tenantId` se resuelve **siempre desde el

@@ -604,7 +604,11 @@ export interface Lead {
    * Resultado del lead, independiente de la etapa en la que esté. Se actualiza solo al mover la etapa hacia una marcada como "Ganado"/"Perdido" en el pipeline del tenant; también se puede fijar a mano (ej. "Descalificado") desde el panel de detalle del lead.
    */
   status: 'open' | 'won' | 'lost' | 'disqualified';
-  source?: ('quiz' | 'manual') | null;
+  source?: ('quiz' | 'manual' | 'meta' | 'whatsapp' | 'import') | null;
+  /**
+   * Id que trae el lead en el sistema donde nació (el id del lead en Meta, por ejemplo). Es lo único que permite que n8n reintente el mismo envío sin duplicar el lead: al reingresar, un lead con el mismo id dentro del mismo tenant se actualiza en vez de crearse otra vez. Los leads del quiz no lo llevan.
+   */
+  externalId?: string | null;
   /**
    * Notas visibles y editables desde el dashboard de cliente.
    */
@@ -1069,6 +1073,7 @@ export interface LeadsSelect<T extends boolean = true> {
   stage?: T;
   status?: T;
   source?: T;
+  externalId?: T;
   notes?: T;
   answers?: T;
   utm?: T;

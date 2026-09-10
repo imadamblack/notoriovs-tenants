@@ -48,8 +48,10 @@ el Owner de un Tenant. Son cosas distintas.
 
 ## Lead
 
-Persona que llenó el quiz de un Tenant (o que se capturó a mano). Pertenece a
-un Tenant. Tiene dos atributos independientes que suelen confundirse:
+Persona interesada en lo que vende un Tenant, venga de donde venga: el quiz, un
+alta a mano, el formulario nativo de Meta Ads, un WhatsApp o una lista que nos
+pasó el cliente. Pertenece a un Tenant. Tiene dos atributos independientes que
+suelen confundirse:
 
 - **Stage** — en qué **columna del Kanban** está el Lead ahora. Es configurable
   por Tenant (cada Tenant define su propio Pipeline), así que su valor es el id
@@ -60,6 +62,14 @@ un Tenant. Tiene dos atributos independientes que suelen confundirse:
 
 Un Lead puede estar "ganado" (Status) sentado en cualquier Stage. Mover un Lead
 de Stage puede *sugerir* un Status, pero no son el mismo dato.
+
+Un tercer atributo, **Source**, dice por cuál de esas puertas entró. Los que no
+vienen del quiz ni del alta a mano los mete n8n por
+`POST /api/leads/ingest`, y pueden traer el id que tienen en su sistema de
+origen (el del lead en Meta, por ejemplo): es lo único que permite reintentar
+un envío sin duplicar al Lead. Un reintento actualiza sus datos de contacto,
+pero nunca le devuelve el Stage ni el Status — eso es del cliente desde que
+tocó el Kanban.
 
 ## Pipeline
 
@@ -84,11 +94,19 @@ panel de Payload, aunque compartan base de datos.
 
 ## Actor
 
-Quien hace una petición a la API del Tenant. Hay exactamente dos tipos: un
-**Tenant User** con sesión de navegador, y una **API Key** (una máquina: n8n,
-un CRM externo). Ambos entran por la misma puerta y ambos quedan resueltos a
-un solo Tenant, que **siempre** se deriva del host de la petición y nunca de
-un parámetro que mande el cliente.
+Quien hace una petición a la API de un Tenant y queda resuelto a **un solo**
+Tenant. Hoy hay exactamente un tipo: un **Tenant User** con sesión de
+navegador, cuyo Tenant se deriva del host de la petición.
+
+Las integraciones máquina-a-máquina (n8n) **no** son Actores: no actúan "como"
+un Tenant sino a nivel plataforma, con una llave compartida que ya alcanza a
+todos los Tenants, y dicen en el cuerpo de la petición sobre cuál escriben.
+Que no sean Actores es lo que permite eso sin abrir una fuga: una credencial
+de Tenant combinada con un Tenant elegido por el cliente sí sería una.
+
+Una **API Key por Tenant** —para dársela a un tercero, un CRM externo— no
+existe. El día que exista será el segundo tipo de Actor, y entonces su Tenant
+tendrá que salir del host igual que el de una sesión.
 
 ## Recomendación creativa
 

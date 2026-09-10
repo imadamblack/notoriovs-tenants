@@ -177,6 +177,13 @@ export const TENANT_PROJECTIONS = {
     depth: 0,
     select: { id: true },
   },
+  // Ingest de leads (POST /api/leads/ingest, el n8n de Notoriovs). Necesita
+  // más que `identity` porque un lead nace en una etapa concreta: el
+  // pipeline es para saber cuál es la primera. El nombre, para los logs.
+  leadIngest: {
+    depth: 0,
+    select: { name: true, leadPipeline: true },
+  },
 } as const satisfies Record<string, TenantProjection>
 
 export type TenantProjectionName = keyof typeof TENANT_PROJECTIONS

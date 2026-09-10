@@ -99,10 +99,31 @@ export const Leads: CollectionConfig = {
       name: 'source',
       type: 'select',
       defaultValue: 'quiz',
+      // `quiz` y `manual` son los dos caminos que ya existían: el formulario
+      // público y el alta a mano desde el panel. Los otros tres entran por
+      // POST /api/leads/ingest, el endpoint que usa nuestro n8n para los
+      // leads que nunca pasan por el quiz. Se guardan por canal (y no como
+      // un solo valor "n8n") para que el dashboard pueda separarlos sin
+      // abrir lead por lead, y porque el canal es del negocio: seguiría
+      // significando lo mismo si mañana cambiamos de herramienta.
       options: [
         { label: 'Quiz', value: 'quiz' },
         { label: 'Manual', value: 'manual' },
+        { label: 'Meta Ads', value: 'meta' },
+        { label: 'WhatsApp', value: 'whatsapp' },
+        { label: 'Importado', value: 'import' },
       ],
+    },
+    {
+      name: 'externalId',
+      type: 'text',
+      label: 'Id en el sistema de origen',
+      index: true,
+      admin: {
+        readOnly: true,
+        description:
+          'Id que trae el lead en el sistema donde nació (el id del lead en Meta, por ejemplo). Es lo único que permite que n8n reintente el mismo envío sin duplicar el lead: al reingresar, un lead con el mismo id dentro del mismo tenant se actualiza en vez de crearse otra vez. Los leads del quiz no lo llevan.',
+      },
     },
     {
       name: 'notes',
@@ -139,6 +160,7 @@ export const Leads: CollectionConfig = {
     { fields: ['tenant', 'stage'] }, // agrupar el Kanban por etapa
     { fields: ['tenant', 'status'] }, // contar abiertos/ganados/perdidos/descalificados para KPIs
     { fields: ['tenant', 'createdAt'] }, // listado / tendencia por fecha
+    { fields: ['tenant', 'externalId'] }, // buscar el lead ya ingresado al reintentar (ver /api/leads/ingest)
   ],
   timestamps: true,
 }
