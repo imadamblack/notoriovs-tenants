@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build --webpack",
+    "build": "npm run migrate:check && cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build --webpack",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev --webpack",
     "devsafe": "rm -rf .next && cross-env NODE_OPTIONS=--no-deprecation next dev --webpack",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
@@ -15,6 +15,7 @@
     "migrate:create": "cross-env NODE_OPTIONS=--no-deprecation payload migrate:create",
     "migrate": "cross-env NODE_OPTIONS=--no-deprecation payload migrate",
     "migrate:debug": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/migrate-debug.mts",
+    "migrate:check": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/check-migrations.mts",
     "migrate:status": "cross-env NODE_OPTIONS=--no-deprecation payload migrate:status",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "db:up": "docker compose up -d postgres",

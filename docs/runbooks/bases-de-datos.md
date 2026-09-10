@@ -113,6 +113,32 @@ almacenamiento de producción.
    sirve.
 4. Ya en producción: `npm run prod -- npm run migrate`, y confirma con
    `npm run prod -- npm run migrate:status`. Si no imprime nada, ve arriba.
+5. Recién entonces, el deploy.
+
+**Migrar va antes de desplegar, no después.** Una migración que solo agrega
+tablas o columnas no le molesta a la versión vieja que sigue corriendo; al
+revés sí hay una ventana en la que el código nuevo le pide a la base algo que
+todavía no existe.
+
+El orden no depende de que te acuerdes: `npm run build` corre primero
+`npm run migrate:check`, que compara las migraciones commiteadas contra las que
+la base dice tener y **tumba el despliegue** si falta alguna, nombrándola. Solo
+lee —nunca aplica nada— y por omisión corre únicamente en el build de
+producción de Vercel (`VERCEL_ENV=production`), así que ni un build local ni uno
+de preview se caen porque tu base de desarrollo vaya por su cuenta.
+
+```bash
+CHECK_MIGRATIONS=1 npm run migrate:check   # forzarlo contra la base que tengas
+SKIP_MIGRATION_CHECK=1 npm run build       # saltárselo, si alguna vez estorba
+```
+
+Por qué el build revisa pero no aplica: `payload migrate` dentro del build
+convertiría cada push de cualquier rama en una escritura potencial a la base de
+los clientes —depende de si `DATABASE_URL` está marcada "All Environments" en el
+panel de Vercel, que no se ve desde este repo—, y un build que fallara después
+de migrar dejaría el esquema adelantado sin vuelta atrás fiable (los `down` que
+genera Payload no siempre corren). El detalle completo está en el encabezado de
+`scripts/check-migrations.mts`.
 
 El push automático del dev server sigue vivo en local y puede hacer que tu base
 diverja del repo sin avisar; `db:reset` es la forma de comprobar que lo que hay
