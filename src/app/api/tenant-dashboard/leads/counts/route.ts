@@ -13,8 +13,7 @@ import { applyStatusAndSinceFilters, SEARCH_FIELDS } from '@/utils/leadDashboard
 // así que es barato incluso con miles de leads por tenant (los índices
 // `tenant+stage` / `tenant+status` de Leads.ts ya cubren esta consulta).
 export async function GET(req: NextRequest) {
-  const subdomain = req.nextUrl.searchParams.get('subdomain')
-  const tenant = await requireDashboardTenant(req, subdomain)
+  const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const params = req.nextUrl.searchParams

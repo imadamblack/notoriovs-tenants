@@ -23,7 +23,6 @@ type TeamMember = {
 }
 
 type TeamPanelProps = {
-  subdomain: string
   /** Email de quien está viendo, para señalarse en la lista. */
   accountEmail: string
   onClose: () => void
@@ -34,7 +33,7 @@ const ROLE_LABELS: Record<TenantUserRole, string> = {
   member: 'Miembro',
 }
 
-export default function TeamPanel({ subdomain, accountEmail, onClose }: TeamPanelProps) {
+export default function TeamPanel({ accountEmail, onClose }: TeamPanelProps) {
   const [members, setMembers] = useState<TeamMember[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [email, setEmail] = useState('')
@@ -46,7 +45,7 @@ export default function TeamPanel({ subdomain, accountEmail, onClose }: TeamPane
   const load = useCallback(async () => {
     setLoadError(false)
     try {
-      const res = await fetch(`/api/tenant-dashboard/users?subdomain=${encodeURIComponent(subdomain)}`)
+      const res = await fetch('/api/tenant-dashboard/users')
       if (!res.ok) {
         setLoadError(true)
         return
@@ -56,7 +55,7 @@ export default function TeamPanel({ subdomain, accountEmail, onClose }: TeamPane
     } catch {
       setLoadError(true)
     }
-  }, [subdomain])
+  }, [])
 
   useEffect(() => {
     load()
@@ -72,7 +71,7 @@ export default function TeamPanel({ subdomain, accountEmail, onClose }: TeamPane
       const res = await fetch('/api/tenant-dashboard/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, email, role }),
+        body: JSON.stringify({ email, role }),
       })
       const data = await res.json().catch(() => ({}))
 

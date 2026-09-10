@@ -41,7 +41,6 @@ export type LeadUpdateEvent = { lead: Lead; previousStage: string; deleted?: boo
 export type DashboardTab = 'kanban' | 'kpis'
 
 type DashboardAppProps = {
-  subdomain: string
   companyName?: string | null
   /** Email del Tenant User con el que está firmada la sesión. */
   accountEmail: string
@@ -52,7 +51,6 @@ type DashboardAppProps = {
 }
 
 export default function DashboardApp({
-  subdomain,
   companyName,
   accountEmail,
   permissions,
@@ -87,7 +85,7 @@ export default function DashboardApp({
     const requestId = ++kpiRequestRef.current
     setRefreshing(true)
     try {
-      const params = new URLSearchParams({ subdomain })
+      const params = new URLSearchParams()
       if (sinceKey !== 'all') params.set('since', sinceKey)
       const res = await fetch(`/api/tenant-dashboard/kpis?${params.toString()}`)
       if (requestId !== kpiRequestRef.current) return
@@ -95,7 +93,7 @@ export default function DashboardApp({
     } finally {
       if (requestId === kpiRequestRef.current) setRefreshing(false)
     }
-  }, [subdomain, sinceKey])
+  }, [sinceKey])
 
   useEffect(() => {
     loadKpis()
@@ -111,7 +109,7 @@ export default function DashboardApp({
       const res = await fetch('/api/tenant-dashboard/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, id: lead.id, ...patch }),
+        body: JSON.stringify({ id: lead.id, ...patch }),
       })
       if (!res.ok) return null
 
@@ -122,7 +120,7 @@ export default function DashboardApp({
       loadKpis()
       return updated
     },
-    [subdomain, loadKpis],
+    [loadKpis],
   )
 
   // Borrar de verdad, no descalificar: el lead desaparece de la base. Solo
@@ -130,7 +128,7 @@ export default function DashboardApp({
   // comprobar); un `member` no ve el botón.
   const deleteLead = useCallback(
     async (lead: Lead): Promise<boolean> => {
-      const params = new URLSearchParams({ subdomain, id: String(lead.id) })
+      const params = new URLSearchParams({ id: String(lead.id) })
       const res = await fetch(`/api/tenant-dashboard/leads?${params.toString()}`, { method: 'DELETE' })
       if (!res.ok) return false
 
@@ -142,7 +140,7 @@ export default function DashboardApp({
       loadKpis()
       return true
     },
-    [subdomain, loadKpis],
+    [loadKpis],
   )
 
   const handleLogout = async () => {
@@ -164,7 +162,6 @@ export default function DashboardApp({
       <main className="flex-1 overflow-auto min-h-0">
         {tab === 'kanban' ? (
           <KanbanBoard
-            subdomain={subdomain}
             pipeline={pipeline}
             stuckAfterDays={stuckAfterDays}
             onCardClick={setSelectedLead}
@@ -185,7 +182,7 @@ export default function DashboardApp({
       </main>
 
       {teamOpen && (
-        <TeamPanel subdomain={subdomain} accountEmail={accountEmail} onClose={() => setTeamOpen(false)} />
+        <TeamPanel accountEmail={accountEmail} onClose={() => setTeamOpen(false)} />
       )}
 
       {selectedLead && (

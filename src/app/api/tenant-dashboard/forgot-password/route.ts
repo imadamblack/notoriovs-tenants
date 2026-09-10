@@ -13,6 +13,12 @@ import { requestPasswordReset } from '@/utils/tenantUserAccount'
 // La única distinción que sí se hace es la del subdominio: si no existe el
 // tenant no hay a nombre de quién mandar nada, y qué subdominios existen ya
 // es público (basta con abrirlos).
+//
+// El `subdomain` llega en el cuerpo y NO del host, a diferencia del resto de
+// /api/tenant-dashboard/*. Es deliberado: aquí todavía no hay credencial que
+// diga de qué Tenant es quien llama, y dejarlo así mantiene abierta una entrada
+// única de login (una sola pantalla en un host compartido). No lo "arregles"
+// sin leer el ADR 0007 — la decisión y su precio están ahí.
 
 /** La misma frase para todos los casos. Ver arriba. */
 const SENT = 'Si esa cuenta existe, te mandamos un correo con el enlace para elegir una contraseña nueva.'

@@ -21,6 +21,17 @@ nadie: la base de desarrollo es local.
 Arranca vacía. Para trabajar con datos de verdad, `npm run copiar-tenant -- <subdominio> --leads 50`
 te trae un tenant de producción (solo lectura allá) a tu base local.
 
+El sitio de un cliente se abre por su subdominio, también en local:
+`http://acme.localhost:3000` (y su dashboard en `/dashboard`). Esa es la única
+forma de entrar al **dashboard**: de qué cliente es cada petición lo dice el
+`Host` y nada más, así que la ruta interna `/tenant-site/acme/dashboard` no
+tiene tenant desde ningún otro host —ni `localhost:3000` ni el del admin— y sus
+llamadas responden 401.
+
+El resto del sitio del tenant (landing y quiz) sí se sigue viendo por la ruta
+interna, incluido el Live Preview del admin: esas páginas sacan el subdominio
+de la ruta, no del `Host`.
+
 ## Pruebas
 
 ```bash

@@ -40,8 +40,7 @@ function clampPage(raw: string | null): number {
 // tenant (etapas borradas/renombradas a mano, datos importados con una
 // etapa que ya no existe, etc.). El front lo usa para la columna "Otro".
 export async function GET(req: NextRequest) {
-  const subdomain = req.nextUrl.searchParams.get('subdomain')
-  const tenant = await requireDashboardTenant(req, subdomain)
+  const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const params = req.nextUrl.searchParams
@@ -128,8 +127,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  const { subdomain, id } = body || {}
-  const tenant = await requireDashboardTenant(req, subdomain)
+  const { id } = body || {}
+  const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
 
@@ -188,11 +187,9 @@ export async function PATCH(req: NextRequest) {
 // un lead de en medio: lo marca como descalificado con el PATCH de arriba, que
 // lo quita de los números de conversión sin perder el registro.
 export async function DELETE(req: NextRequest) {
-  const params = req.nextUrl.searchParams
-  const subdomain = params.get('subdomain')
-  const id = params.get('id')
+  const id = req.nextUrl.searchParams.get('id')
 
-  const auth = await requireDashboardAuth(req, subdomain)
+  const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
 

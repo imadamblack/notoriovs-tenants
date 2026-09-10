@@ -37,7 +37,7 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
   }
 
   const companyName = tenant.generalInfo?.companyName || tenant.name
-  const auth = await resolveDashboardAuth(requestHeaders, subdomain)
+  const auth = await resolveDashboardAuth(requestHeaders)
 
   if (!auth) {
     return <DashboardLogin subdomain={subdomain} companyName={companyName} />
@@ -45,7 +45,6 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
 
   return (
     <DashboardApp
-      subdomain={subdomain}
       companyName={companyName}
       // Con quién está firmada la sesión, para el menú de cuenta.
       accountEmail={auth.session.email}

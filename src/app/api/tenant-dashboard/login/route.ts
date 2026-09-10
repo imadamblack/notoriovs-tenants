@@ -9,6 +9,12 @@ import { setTenantSessionCookie } from '@/utils/tenantSessionCookie'
 //
 // La cookie es httpOnly y host-only en el subdominio del tenant, así que la
 // sesión de un cliente nunca viaja al host de otro.
+//
+// El `subdomain` llega en el cuerpo y NO del host, a diferencia del resto de
+// /api/tenant-dashboard/*. Es deliberado: aquí todavía no hay credencial que
+// diga de qué Tenant es quien llama, y dejarlo así mantiene abierta una entrada
+// única de login (una sola pantalla en un host compartido). No lo "arregles"
+// sin leer el ADR 0007 — la decisión y su precio están ahí.
 
 /** Mismo mensaje para credenciales malas, usuario inexistente y cuenta bloqueada. */
 const BAD_CREDENTIALS = 'Email o contraseña incorrectos'

@@ -47,7 +47,12 @@ beforeEach(() => {
   getTenantUserSession.mockResolvedValue(null)
 })
 
-const noHeaders = new Headers()
+// El subdominio ya no es un argumento: `resolveDashboardAuth` lo saca del
+// `Host` de la petición, así que una petición aquí es su cabecera `Host`.
+const onHost = (host: string) => new Headers({ host })
+
+/** Una petición al dashboard de acme, tal como la manda el navegador. */
+const onAcme = onHost('acme.localhost:3000')
 
 /** Un Internal User que ve a todos los clientes. */
 const asSuperadmin = () =>
@@ -70,9 +75,11 @@ describe('autorización del dashboard', () => {
   it('un Tenant User de este tenant entra, y la sesión lo nombra', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1))
 
-    const auth = await resolveDashboardAuth(noHeaders, 'acme')
+    const auth = await resolveDashboardAuth(onAcme)
 
+    expect(getTenantBySubdomain).toHaveBeenCalledWith('acme', 'dashboardApi')
     expect(auth?.tenant).toBe(ACME)
+    expect(auth?.subdomain).toBe('acme')
     expect(auth?.session).toEqual({ userId: 7, email: 'cliente@acme.com', role: 'owner' })
   })
 
@@ -81,31 +88,37 @@ describe('autorización del dashboard', () => {
   it('un Tenant User de otro tenant no entra aunque cambie el subdominio', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(2))
 
-    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
   })
 
   it('un Tenant User sin tenant asignado no entra a ninguno', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(null as unknown as number))
 
-    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
   })
 
-  it('sin subdominio no hay tenant que resolver', async () => {
-    expect(await resolveDashboardAuth(noHeaders, null)).toBeNull()
+  // La regla del ADR 0002 vista desde el otro lado: en un host que no es el de
+  // ningún tenant no hay a quién autorizar, y ya no queda ningún parámetro con
+  // el que el cliente pueda nombrar uno.
+  it('en un host sin subdominio de tenant no hay tenant que resolver', async () => {
+    getTenantUserSession.mockResolvedValue(tenantUser(1))
+
+    expect(await resolveDashboardAuth(onHost('localhost:3000'))).toBeNull()
+    expect(await resolveDashboardAuth(new Headers())).toBeNull()
     expect(getTenantBySubdomain).not.toHaveBeenCalled()
   })
 
   // Sin sesión de Tenant User no queda ninguna otra puerta: la contraseña
   // compartida por Tenant se retiró con su campo.
   it('sin sesión de Tenant User no entra nadie', async () => {
-    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
   })
 
   it('un tenant inexistente o inactivo no autoriza ni con sesión válida', async () => {
     getTenantBySubdomain.mockResolvedValue(null)
     getTenantUserSession.mockResolvedValue(tenantUser(1))
 
-    expect(await resolveDashboardAuth(noHeaders, 'acme')).toBeNull()
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
   })
 })
 
@@ -294,7 +307,7 @@ describe('qué puede hacer cada rol dentro del dashboard', () => {
   it('la sesión del dashboard lleva el rol del usuario', async () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1, 'member'))
 
-    const auth = await resolveDashboardAuth(noHeaders, 'acme')
+    const auth = await resolveDashboardAuth(onAcme)
 
     expect(auth?.session.role).toBe('member')
     expect(auth && sessionCan(auth.session, 'leads:delete')).toBe(false)

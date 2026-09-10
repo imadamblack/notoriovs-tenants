@@ -14,7 +14,6 @@ import StageColumn from '@/components/dashboard/ui/organisms/StageColumn'
 import LeadListTable from '@/components/dashboard/ui/organisms/LeadListTable'
 
 type KanbanBoardProps = {
-  subdomain: string
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
   onCardClick: (lead: Lead) => void
@@ -82,7 +81,7 @@ const emptyColumn: ColumnState = {
 // es lo que hace viable un tenant con miles de leads sin traer todo a la vez
 // (ver `handleColumnScroll`/`handleListScroll`: cargan la siguiente página
 // al acercarse al fondo del contenedor, sin botón).
-export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCardClick, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
+export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
   const [view, setView] = useState<BoardView>('kanban')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -129,13 +128,13 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
 
   const buildParams = useCallback(
     (extra: Record<string, string>) => {
-      const params = new URLSearchParams({subdomain, sort: sortKey, ...extra})
+      const params = new URLSearchParams({sort: sortKey, ...extra})
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (sinceKey !== 'all') params.set('since', sinceKey)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       return params
     },
-    [subdomain, sortKey, debouncedSearch, sinceKey, statusFilter],
+    [sortKey, debouncedSearch, sinceKey, statusFilter],
   )
 
   const loadColumn = useCallback(
@@ -176,7 +175,7 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
   )
 
   const loadCounts = useCallback(async () => {
-    const params = new URLSearchParams({subdomain})
+    const params = new URLSearchParams()
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (sinceKey !== 'all') params.set('since', sinceKey)
     if (statusFilter !== 'all') params.set('status', statusFilter)
@@ -186,7 +185,7 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
     setStageCounts(data.counts || {})
     setOtherCount(data.other || 0)
     setTotalCount(data.total || 0)
-  }, [subdomain, debouncedSearch, sinceKey, statusFilter])
+  }, [debouncedSearch, sinceKey, statusFilter])
 
   const loadList = useCallback(
     async (page: number) => {
