@@ -73,6 +73,7 @@ export interface Config {
     media: Media;
     tenants: Tenant;
     leads: Lead;
+    'lead-exports': LeadExport;
     'marketing-reports': MarketingReport;
     'payload-kv': PayloadKv;
     'payload-folders': FolderInterface;
@@ -91,6 +92,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
+    'lead-exports': LeadExportsSelect<false> | LeadExportsSelect<true>;
     'marketing-reports': MarketingReportsSelect<false> | MarketingReportsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
@@ -638,6 +640,40 @@ export interface Lead {
   createdAt: string;
 }
 /**
+ * Registro de cada descarga de Leads en CSV desde el Dashboard de Cliente. Solo lectura.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lead-exports".
+ */
+export interface LeadExport {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  /**
+   * El Tenant User con cuya sesión se hizo la descarga.
+   */
+  exportedBy?: (number | null) | TenantUser;
+  exportedByEmail: string;
+  leadCount: number;
+  /**
+   * Los filtros del dashboard en el momento de la descarga, en palabras.
+   */
+  filtersLabel: string;
+  /**
+   * Los mismos filtros tal como llegaron, para poder repetir la consulta.
+   */
+  filters?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * KPIs semanales de campañas de ads por tenant (ingesta desde n8n).
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -718,6 +754,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'leads';
         value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'lead-exports';
+        value: number | LeadExport;
       } | null)
     | ({
         relationTo: 'marketing-reports';
@@ -1077,6 +1117,20 @@ export interface LeadsSelect<T extends boolean = true> {
   notes?: T;
   answers?: T;
   utm?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lead-exports_select".
+ */
+export interface LeadExportsSelect<T extends boolean = true> {
+  tenant?: T;
+  exportedBy?: T;
+  exportedByEmail?: T;
+  leadCount?: T;
+  filtersLabel?: T;
+  filters?: T;
   updatedAt?: T;
   createdAt?: T;
 }

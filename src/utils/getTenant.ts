@@ -153,6 +153,15 @@ export const TENANT_PROJECTIONS = {
     depth: 0,
     select: { ...PIPELINE },
   },
+  // Exportación de Leads a CSV. Pide lo mismo que `dashboardApi` más los
+  // pasos del quiz, que son los que dan las columnas de respuestas y sus
+  // encabezados. No se agrega a `dashboardApi` para que las rutas del
+  // Kanban —que se piden decenas de veces por sesión— no carguen el quiz
+  // entero en memoria para nada.
+  dashboardExport: {
+    depth: 0,
+    select: { ...PIPELINE, quizSteps: true },
+  },
   // Único consumidor del token de la Conversions API: la ruta server-side
   // que reenvía el evento a Meta.
   conversionsApi: {

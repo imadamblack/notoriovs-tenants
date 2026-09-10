@@ -6,6 +6,7 @@ import Select from '@/components/dashboard/ui/atoms/Select'
 import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
 import IconFilter from '@/components/dashboard/ui/atoms/icons/IconFilter'
 import IconPlus from '@/components/dashboard/ui/atoms/icons/IconPlus'
+import IconDownload from '@/components/dashboard/ui/atoms/icons/IconDownload'
 import Button from '@/components/dashboard/ui/atoms/Button'
 import PeriodFilter from '@/components/dashboard/ui/molecules/PeriodFilter'
 import { type SinceKey } from '@/utils/dashboardPeriod'
@@ -103,6 +104,9 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
   const [listHasNextPage, setListHasNextPage] = useState(false)
   const [listLoading, setListLoading] = useState(false)
   const [listLoadingMore, setListLoadingMore] = useState(false)
+
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [draggingLead, setDraggingLead] = useState<Lead | null>(null)
@@ -377,6 +381,40 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
     setBoardScrollProgress(max > 0 ? el.scrollLeft / max : 0)
   }, [])
 
+  // Descarga el CSV de lo que está en pantalla. Manda EXACTAMENTE los
+  // mismos parámetros que las consultas del tablero (`buildParams`) menos la
+  // etapa, que es de cada columna: lo que se exporta es lo que el filtro deja
+  // ver, no todo el cliente.
+  //
+  // Se baja por fetch y no navegando a la URL para poder decir "Exportando…"
+  // mientras el servidor arma el archivo y avisar si algo falla — una
+  // descarga que se queda muda parece un botón roto.
+  const handleExport = useCallback(async () => {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const res = await fetch(`/api/tenant-dashboard/leads/export?${buildParams({})}`)
+      if (!res.ok) throw new Error('export failed')
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      // El nombre lo pone el servidor (trae el subdominio y la fecha); el de
+      // aquí solo cubre el caso raro de que la cabecera no llegue.
+      link.download =
+        /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'leads.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setExportError('No se pudo exportar')
+    } finally {
+      setExporting(false)
+    }
+  }, [buildParams])
+
   const handleDrop = async (stageKey: string) => {
     setDragOverKey(null)
     const lead = draggingLead
@@ -412,6 +450,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
           <div className="flex items-center gap-2 text-neutral-400 -ft-3">
             {visibleTotal} leads
           </div>
+          {exportError && <span className="-ft-3 text-red-400">{exportError}</span>}
         </div>
 
         <div className="flex flex-grow items-center justify-between md:justify-end gap-4">
@@ -483,6 +522,28 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
               onClear={() => setSearch('')}
               placeholder="Buscar leads"
             />
+
+            <div className="hidden md:flex shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="items-center justify-center disabled:opacity-40"
+                onClick={handleExport}
+                disabled={exporting || visibleTotal === 0}
+                aria-label="Exportar leads a CSV"
+                title={
+                  visibleTotal === 0
+                    ? 'No hay leads que exportar con estos filtros'
+                    : exporting
+                      ? 'Exportando…'
+                      : `Exportar a CSV los ${visibleTotal} leads filtrados`
+                }
+              >
+                <span className="w-6 h-6 inline-flex items-center justify-center">
+                  <IconDownload/>
+                </span>
+              </Button>
+            </div>
 
             {/* El que llegó por teléfono o en persona se captura aquí, donde
                 ya se están viendo los demás, y no en un formulario aparte. */}

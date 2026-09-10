@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
-import type { Where } from 'payload'
 import config from '@payload-config'
 import { requireDashboardAuth, requireDashboardTenant, sessionCan } from '@/utils/requireDashboardAuth'
-import { applyStatusAndSinceFilters, SEARCH_FIELDS } from '@/utils/leadDashboardFilters'
+import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
 
 // Todas las rutas bajo /api/tenant-dashboard/* usan la Local API de Payload
 // con `overrideAccess: true` (Leads.access exige `req.user`, que aquí nunca
@@ -35,48 +34,22 @@ function clampPage(raw: string | null): number {
 // esto una vez por columna (`stage`), la Lista lo pide sin `stage` con su
 // propia página.
 //
-// `stage=__other__` es un valor sintético (no existe en la DB): representa
-// leads cuya `stage` no coincide con ninguna etapa del pipeline actual del
-// tenant (etapas borradas/renombradas a mano, datos importados con una
-// etapa que ya no existe, etc.). El front lo usa para la columna "Otro".
+// Los filtros (etapa, status, periodo, búsqueda) los arma
+// `buildLeadsWhere`, compartido con los conteos del Kanban y con la
+// exportación a CSV: ahí vive también qué significa `stage=__other__`.
 export async function GET(req: NextRequest) {
   const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const params = req.nextUrl.searchParams
-  const stage = params.get('stage')?.trim() || undefined
-  const status = params.get('status')?.trim() || undefined
-  const since = params.get('since')?.trim() || undefined
-  const search = params.get('search')?.trim() || undefined
   const sort = SORT_MAP[params.get('sort') || 'created_desc'] || SORT_MAP.created_desc
   const page = clampPage(params.get('page'))
   const limit = clampLimit(params.get('limit'))
 
-  const and: Where[] = [{ tenant: { equals: tenant.id } }]
-
-  if (stage) {
-    if (stage === '__other__') {
-      const pipelineIds = (tenant.leadPipeline || []).map((s) => s.id)
-      // Si el tenant no tiene pipeline configurado, "otro" es simplemente
-      // "todos los leads": no hay ninguna etapa contra la cual comparar.
-      if (pipelineIds.length) and.push({ stage: { not_in: pipelineIds } })
-    } else {
-      and.push({ stage: { equals: stage } })
-    }
-  }
-
-  applyStatusAndSinceFilters(and, tenant, status, since)
-
-  if (search) {
-    and.push({
-      or: SEARCH_FIELDS.map((field) => ({ [field]: { contains: search } })),
-    })
-  }
-
   const payload = await getPayload({ config })
   const result = await payload.find({
     collection: 'leads',
-    where: { and },
+    where: buildLeadsWhere(tenant, readLeadFilters(params)),
     sort,
     page,
     limit,

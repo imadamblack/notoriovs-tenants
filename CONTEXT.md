@@ -92,6 +92,18 @@ La aplicación que ve un Tenant User en `{subdomain}.notoriovs.com/dashboard`:
 Kanban de Leads, KPIs y (a futuro) recomendaciones. Es un producto distinto del
 panel de Payload, aunque compartan base de datos.
 
+## Exportación de Leads
+
+Una descarga en CSV de los Leads que un Tenant User tenía filtrados en su
+Dashboard de Cliente. Es la principal vía por la que los datos personales de
+los Leads de un Tenant salen de la plataforma en bloque: una vez descargado, el
+archivo ya no está sujeto a ningún control de acceso.
+
+Por eso cada Exportación queda registrada —quién, cuándo, cuántos Leads y con
+qué filtros— y ese registro no se puede editar ni borrar desde el panel. No es
+una bitácora de uso: es la única forma de responderle a un cliente qué se llevó
+alguien y cuándo.
+
 ## Actor
 
 Quien hace una petición a la API de un Tenant y queda resuelto a **un solo**

@@ -61,10 +61,22 @@ describe('proyecciones del tenant', () => {
     expect(TENANT_PROJECTIONS.dashboard.select).not.toHaveProperty('landingBlocks')
   })
 
+  // Las columnas del CSV de leads salen del quiz del tenant, así que la
+  // exportación es la única proyección de una ruta de API que carga
+  // `quizSteps`. Que las del Kanban NO lo hagan es lo que evita arrastrar el
+  // quiz entero en cada una de las decenas de consultas de una sesión.
+  it('solo la exportación a CSV pide el quiz junto con el pipeline', () => {
+    expect(TENANT_PROJECTIONS.dashboardExport.select).toMatchObject({
+      leadPipeline: true,
+      quizSteps: true,
+    })
+    expect(TENANT_PROJECTIONS.dashboardApi.select).not.toHaveProperty('quizSteps')
+  })
+
   it('solo pobla relaciones (depth 1) la proyección que pinta una Media', () => {
     // `depth: 1` es un join más por consulta; las proyecciones de las rutas
     // de API no pintan nada, así que no lo pagan.
-    for (const name of ['dashboardApi', 'conversionsApi', 'quizSubmit', 'identity'] as const) {
+    for (const name of ['dashboardApi', 'dashboardExport', 'conversionsApi', 'quizSubmit', 'identity'] as const) {
       expect(TENANT_PROJECTIONS[name].depth, name).toBe(0)
     }
     for (const name of ['chrome', 'quiz', 'thankYou', 'notEligible'] as const) {

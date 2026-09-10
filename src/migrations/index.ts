@@ -3,6 +3,7 @@ import * as migration_20260908_233634_tenant_users from './20260908_233634_tenan
 import * as migration_20260909_050114_roles_y_scope from './20260909_050114_roles_y_scope';
 import * as migration_20260909_101800_retirar_contrasena_compartida from './20260909_101800_retirar_contrasena_compartida';
 import * as migration_20260910_004723_leads_ingest from './20260910_004723_leads_ingest';
+import * as migration_20260910_224316_exportar_leads_csv from './20260910_224316_exportar_leads_csv';
 
 export const migrations = [
   {
@@ -28,6 +29,11 @@ export const migrations = [
   {
     up: migration_20260910_004723_leads_ingest.up,
     down: migration_20260910_004723_leads_ingest.down,
-    name: '20260910_004723_leads_ingest'
+    name: '20260910_004723_leads_ingest',
+  },
+  {
+    up: migration_20260910_224316_exportar_leads_csv.up,
+    down: migration_20260910_224316_exportar_leads_csv.down,
+    name: '20260910_224316_exportar_leads_csv'
   },
 ];
