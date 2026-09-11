@@ -21,8 +21,7 @@ function isValidRole(value: unknown): value is TenantUserRole {
 }
 
 export async function GET(req: NextRequest) {
-  const subdomain = req.nextUrl.searchParams.get('subdomain')
-  const auth = await requireDashboardAuth(req, subdomain)
+  const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   if (!sessionCan(auth.session, 'users:manage')) {
     return NextResponse.json({ error: 'Tu rol no administra usuarios' }, { status: 403 })
@@ -40,9 +39,8 @@ export async function POST(req: NextRequest) {
   }
 
   const data = (body ?? {}) as Record<string, unknown>
-  const subdomain = typeof data.subdomain === 'string' ? data.subdomain.toLowerCase() : ''
 
-  const auth = await requireDashboardAuth(req, subdomain)
+  const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   if (!sessionCan(auth.session, 'users:manage')) {
     return NextResponse.json({ error: 'Tu rol no administra usuarios' }, { status: 403 })
@@ -62,11 +60,15 @@ export async function POST(req: NextRequest) {
 
   // El nombre de la empresa, para el remitente y el cuerpo del correo. La
   // proyección de la autorización no lo trae (solo necesita el pipeline).
-  const tenant = await getTenantBySubdomain(subdomain, 'tenantMail')
+  const tenant = await getTenantBySubdomain(auth.subdomain, 'tenantMail')
   if (!tenant) return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
 
   const outcome = await inviteTenantUser(
-    { id: auth.tenant.id, subdomain, companyName: tenant.generalInfo?.companyName || tenant.name },
+    {
+      id: auth.tenant.id,
+      subdomain: auth.subdomain,
+      companyName: tenant.generalInfo?.companyName || tenant.name,
+    },
     email,
     role,
   )

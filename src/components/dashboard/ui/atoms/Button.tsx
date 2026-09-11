@@ -26,7 +26,7 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
 const SIZE_CLASSES: Record<ButtonSize, string> = {
   md: 'px-4 py-2',
   sm: 'px-3 py-1.5 -ft-4',
-  icon: 'w-11 h-11 p-0',
+  icon: 'w-12 h-12 p-0',
 }
 
 export default function Button({ variant = 'primary', size = 'md', className = '', ...props }: ButtonProps) {

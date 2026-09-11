@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import type { Where } from 'payload'
 import config from '@payload-config'
 import { requireDashboardTenant } from '@/utils/requireDashboardAuth'
-import { applyStatusAndSinceFilters, SEARCH_FIELDS } from '@/utils/leadDashboardFilters'
+import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
 
 // Conteo de leads por etapa del pipeline, para los badges de cantidad del
 // Kanban. Vive separado de GET /api/tenant-dashboard/leads a propósito: las
@@ -13,25 +13,17 @@ import { applyStatusAndSinceFilters, SEARCH_FIELDS } from '@/utils/leadDashboard
 // así que es barato incluso con miles de leads por tenant (los índices
 // `tenant+stage` / `tenant+status` de Leads.ts ya cubren esta consulta).
 export async function GET(req: NextRequest) {
-  const subdomain = req.nextUrl.searchParams.get('subdomain')
-  const tenant = await requireDashboardTenant(req, subdomain)
+  const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const params = req.nextUrl.searchParams
-  const search = params.get('search')?.trim() || undefined
-  // Mismos filtros de status ("Estancados/Abiertos/Ganados/Perdidos/
-  // Descalificados") y tiempo que .../leads, para que el número en el
-  // badge de cada columna sea el mismo conjunto de leads que esa columna
-  // termina mostrando.
-  const status = params.get('status')?.trim() || undefined
-  const since = params.get('since')?.trim() || undefined
   const payload = await getPayload({ config })
 
-  const baseAnd: Where[] = [{ tenant: { equals: tenant.id } }]
-  if (search) {
-    baseAnd.push({ or: SEARCH_FIELDS.map((field) => ({ [field]: { contains: search } })) })
-  }
-  applyStatusAndSinceFilters(baseAnd, tenant, status, since)
+  // Mismos filtros de status ("Estancados/Abiertos/Ganados/Perdidos/
+  // Descalificados"), tiempo y búsqueda que .../leads, para que el número
+  // en el badge de cada columna sea el mismo conjunto de leads que esa
+  // columna termina mostrando. La etapa no: aquí se cuenta una por una.
+  const filters = readLeadFilters(req.nextUrl.searchParams)
+  const baseAnd = (buildLeadsWhere(tenant, { ...filters, stage: undefined }).and ?? []) as Where[]
 
   const pipeline = tenant.leadPipeline || []
   const pipelineIds = pipeline.map((s) => s.id)

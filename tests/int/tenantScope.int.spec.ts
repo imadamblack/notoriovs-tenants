@@ -40,7 +40,7 @@ describe('alcance de un Internal User sobre los clientes', () => {
   }
 
   it('un superadmin sigue viendo todos los clientes y sus datos', async () => {
-    for (const slug of ['tenants', 'leads', 'marketing-reports'] as const) {
+    for (const slug of ['tenants', 'leads', 'lead-exports', 'marketing-reports'] as const) {
       expect(await access(slug, 'read')(asSuperadmin()), slug).toBe(true)
     }
   })
@@ -49,14 +49,14 @@ describe('alcance de un Internal User sobre los clientes', () => {
     expect(await access('tenants', 'read')(asAccountManager([7, 9]))).toEqual({ id: { in: [7, 9] } })
   })
 
-  it('y solo los Leads y Marketing Reports de esos clientes', async () => {
-    for (const slug of ['leads', 'marketing-reports'] as const) {
+  it('y solo los Leads, Exportaciones y Marketing Reports de esos clientes', async () => {
+    for (const slug of ['leads', 'lead-exports', 'marketing-reports'] as const) {
       expect(await access(slug, 'read')(asAccountManager([7])), slug).toEqual({ tenant: { in: [7] } })
     }
   })
 
   it('un account manager sin clientes asignados no ve datos de nadie', async () => {
-    for (const slug of ['leads', 'marketing-reports'] as const) {
+    for (const slug of ['leads', 'lead-exports', 'marketing-reports'] as const) {
       expect(await access(slug, 'read')(asAccountManager([])), slug).toBe(false)
     }
   })
@@ -65,6 +65,15 @@ describe('alcance de un Internal User sobre los clientes', () => {
     expect(await access('tenants', 'delete')(asAccountManager([7]))).toBe(false)
     expect(await access('tenants', 'create')(asAccountManager([7]))).toBe(false)
     expect(await access('tenants', 'delete')(asSuperadmin())).toBe(true)
+  })
+
+  // La bitácora de exportaciones existe para poder decir quién se llevó los
+  // datos de un cliente. Si desde el panel se pudiera crear, editar o borrar
+  // una fila, dejaría de ser una respuesta y pasaría a ser una opinión.
+  it('la bitácora de exportaciones no se escribe desde el panel', async () => {
+    for (const operation of ['create', 'update', 'delete'] as const) {
+      expect(await access('lead-exports', operation)(asSuperadmin()), operation).toBe(false)
+    }
   })
 
   // Un account manager que puede crear usuarios internos se hace superadmin en

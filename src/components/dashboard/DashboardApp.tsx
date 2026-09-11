@@ -7,6 +7,7 @@ import LeadDetailPanel from '@/components/dashboard/LeadDetailPanel'
 import KpiReport from '@/components/dashboard/KpiReport'
 import DashboardNav from '@/components/dashboard/ui/organisms/DashboardNav'
 import TeamPanel from '@/components/dashboard/TeamPanel'
+import NewLeadPanel from '@/components/dashboard/NewLeadPanel'
 import { DEFAULT_SINCE_KEY, type SinceKey } from '@/utils/dashboardPeriod'
 import type { DashboardPermissions } from '@/access/tenantUserPermissions'
 
@@ -36,12 +37,31 @@ export type Lead = {
 // cambio: sin ella, una columna no sabría de dónde quitar la tarjeta cuando
 // el lead se movió de etapa desde el panel de detalle (en vez de
 // arrastrado, donde el propio drag ya conoce su origen).
-export type LeadUpdateEvent = { lead: Lead; previousStage: string; deleted?: boolean }
+export type LeadUpdateEvent = { lead: Lead; previousStage: string; deleted?: boolean; created?: boolean }
+
+/** Lo que se captura en el alta a mano (ver NewLeadPanel). */
+export type CreateLeadInput = {
+  name: string
+  phone: string
+  whatsapp: string
+  email: string
+  stage: string
+  notes: string
+}
+
+/**
+ * Tres desenlaces distintos, no un booleano: `duplicate` no es un error —es
+ * un aviso con un lead adentro, para poder ofrecer abrirlo— y la interfaz
+ * tiene que poder distinguirlo de "no se pudo guardar".
+ */
+export type CreateLeadResult =
+  | { status: 'created'; lead: Lead }
+  | { status: 'duplicate'; duplicate: Lead }
+  | { status: 'error'; message: string }
 
 export type DashboardTab = 'kanban' | 'kpis'
 
 type DashboardAppProps = {
-  subdomain: string
   companyName?: string | null
   /** Email del Tenant User con el que está firmada la sesión. */
   accountEmail: string
@@ -52,7 +72,6 @@ type DashboardAppProps = {
 }
 
 export default function DashboardApp({
-  subdomain,
   companyName,
   accountEmail,
   permissions,
@@ -67,6 +86,7 @@ export default function DashboardApp({
   const [sinceKey, setSinceKey] = useState<SinceKey>(DEFAULT_SINCE_KEY)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [teamOpen, setTeamOpen] = useState(false)
+  const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [updateEvent, setUpdateEvent] = useState<LeadUpdateEvent | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [kpis, setKpis] = useState<any>(null)
@@ -87,7 +107,7 @@ export default function DashboardApp({
     const requestId = ++kpiRequestRef.current
     setRefreshing(true)
     try {
-      const params = new URLSearchParams({ subdomain })
+      const params = new URLSearchParams()
       if (sinceKey !== 'all') params.set('since', sinceKey)
       const res = await fetch(`/api/tenant-dashboard/kpis?${params.toString()}`)
       if (requestId !== kpiRequestRef.current) return
@@ -95,7 +115,7 @@ export default function DashboardApp({
     } finally {
       if (requestId === kpiRequestRef.current) setRefreshing(false)
     }
-  }, [subdomain, sinceKey])
+  }, [sinceKey])
 
   useEffect(() => {
     loadKpis()
@@ -111,7 +131,7 @@ export default function DashboardApp({
       const res = await fetch('/api/tenant-dashboard/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, id: lead.id, ...patch }),
+        body: JSON.stringify({ id: lead.id, ...patch }),
       })
       if (!res.ok) return null
 
@@ -122,7 +142,44 @@ export default function DashboardApp({
       loadKpis()
       return updated
     },
-    [subdomain, loadKpis],
+    [loadKpis],
+  )
+
+  // Alta a mano de un lead (issue 13). Vive aquí y no en el panel por la
+  // misma razón que `updateLead`: es quien conoce el `updateEvent` con el
+  // que el Kanban mete la tarjeta nueva sin recargar, y los KPIs que hay
+  // que volver a pedir.
+  const createLead = useCallback(
+    async (input: CreateLeadInput, confirmDuplicate: boolean): Promise<CreateLeadResult> => {
+      let res: Response
+      try {
+        res = await fetch('/api/tenant-dashboard/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...input, confirmDuplicate }),
+        })
+      } catch {
+        return { status: 'error', message: 'Error de conexión, intenta de nuevo' }
+      }
+
+      const data = await res.json().catch(() => ({}))
+
+      if (res.status === 409 && data.duplicate) {
+        return { status: 'duplicate', duplicate: data.duplicate as Lead }
+      }
+      if (!res.ok) {
+        return { status: 'error', message: data.error || 'No se pudo guardar el lead' }
+      }
+
+      const lead = data.lead as Lead
+      // `previousStage` es la misma etapa en la que nació: un lead nuevo no
+      // viene de ninguna columna. `created` es lo que le dice a la vista que
+      // lo agregue (y suba el contador) en vez de reubicar uno que ya tenía.
+      setUpdateEvent({ lead, previousStage: lead.stage, created: true })
+      loadKpis()
+      return { status: 'created', lead }
+    },
+    [loadKpis],
   )
 
   // Borrar de verdad, no descalificar: el lead desaparece de la base. Solo
@@ -130,7 +187,7 @@ export default function DashboardApp({
   // comprobar); un `member` no ve el botón.
   const deleteLead = useCallback(
     async (lead: Lead): Promise<boolean> => {
-      const params = new URLSearchParams({ subdomain, id: String(lead.id) })
+      const params = new URLSearchParams({ id: String(lead.id) })
       const res = await fetch(`/api/tenant-dashboard/leads?${params.toString()}`, { method: 'DELETE' })
       if (!res.ok) return false
 
@@ -142,7 +199,7 @@ export default function DashboardApp({
       loadKpis()
       return true
     },
-    [subdomain, loadKpis],
+    [loadKpis],
   )
 
   const handleLogout = async () => {
@@ -164,10 +221,10 @@ export default function DashboardApp({
       <main className="flex-1 overflow-auto min-h-0">
         {tab === 'kanban' ? (
           <KanbanBoard
-            subdomain={subdomain}
             pipeline={pipeline}
             stuckAfterDays={stuckAfterDays}
             onCardClick={setSelectedLead}
+            onCreateLead={() => setNewLeadOpen(true)}
             onStageChange={(lead, stage) => updateLead(lead, { stage })}
             updateEvent={updateEvent}
             sinceKey={sinceKey}
@@ -185,7 +242,19 @@ export default function DashboardApp({
       </main>
 
       {teamOpen && (
-        <TeamPanel subdomain={subdomain} accountEmail={accountEmail} onClose={() => setTeamOpen(false)} />
+        <TeamPanel accountEmail={accountEmail} onClose={() => setTeamOpen(false)} />
+      )}
+
+      {newLeadOpen && (
+        <NewLeadPanel
+          pipeline={pipeline}
+          onClose={() => setNewLeadOpen(false)}
+          onCreate={createLead}
+          onOpenLead={(lead) => {
+            setNewLeadOpen(false)
+            setSelectedLead(lead)
+          }}
+        />
       )}
 
       {selectedLead && (

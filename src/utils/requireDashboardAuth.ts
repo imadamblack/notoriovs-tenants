@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { getTenantBySubdomain, type TenantView } from '@/utils/getTenant'
+import { getSubdomainFromHeaders } from '@/utils/subdomain'
 import { getTenantUserSession } from '@/utils/tenantUserAuth'
 import {
   permissionsForRole,
@@ -23,26 +24,26 @@ export type DashboardSession = {
 export type DashboardAuth = {
   tenant: TenantView<'dashboardApi'>
   session: DashboardSession
+  /** El subdominio del host que autorizó, para quien necesite nombrar al tenant. */
+  subdomain: string
 }
 
 /**
- * Autoriza una petición al dashboard de `subdomain` y devuelve el tenant ya
- * proyectado a lo que usan esas rutas (`id` para scopear la query a `leads`,
- * más pipeline y corte de "estancado") junto con la sesión que la autorizó.
- * `null` si no cuadra: quien llama responde 401/404 sin filtrar información.
+ * Autoriza una petición al dashboard y devuelve el tenant ya proyectado a lo
+ * que usan esas rutas (`id` para scopear la query a `leads`, más pipeline y
+ * corte de "estancado") junto con la sesión que la autorizó. `null` si no
+ * cuadra: quien llama responde 401/404 sin filtrar información.
  *
- * El tenant SIEMPRE sale del subdominio de la petición, nunca de la sesión: un
- * Tenant User de otro cliente no entra aquí porque su `tenantId` no coincide
- * con el del host.
+ * De qué cliente es la petición lo dice su `Host` y nada más (ADR 0002): ni un
+ * parámetro, ni el cuerpo, ni la sesión. Un Tenant User de otro cliente no
+ * entra aquí porque su `tenantId` no coincide con el del host, y ya no hay
+ * ningún parámetro con el que pueda decir a qué tenant cree pertenecer.
  */
-export async function resolveDashboardAuth(
-  headers: Headers,
-  subdomain: string | null | undefined,
-): Promise<DashboardAuth | null> {
+export async function resolveDashboardAuth(headers: Headers): Promise<DashboardAuth | null> {
+  const subdomain = getSubdomainFromHeaders(headers)
   if (!subdomain) return null
 
-  const normalized = subdomain.toLowerCase()
-  const tenant = await getTenantBySubdomain(normalized, 'dashboardApi')
+  const tenant = await getTenantBySubdomain(subdomain, 'dashboardApi')
   if (!tenant) return null
 
   const tenantUser = await getTenantUserSession(headers)
@@ -51,6 +52,7 @@ export async function resolveDashboardAuth(
 
   return {
     tenant,
+    subdomain,
     session: { userId: tenantUser.id, email: tenantUser.email, role: tenantUser.role },
   }
 }
@@ -61,9 +63,8 @@ export async function resolveDashboardAuth(
  */
 export async function requireDashboardTenant(
   req: NextRequest,
-  subdomain: string | null | undefined,
 ): Promise<TenantView<'dashboardApi'> | null> {
-  const auth = await requireDashboardAuth(req, subdomain)
+  const auth = await requireDashboardAuth(req)
 
   return auth?.tenant ?? null
 }
@@ -82,9 +83,6 @@ export function sessionPermissions(session: DashboardSession): DashboardPermissi
  * La autorización completa (tenant + sesión) para las rutas que además del
  * tenant necesitan saber QUIÉN pide y con qué rol.
  */
-export async function requireDashboardAuth(
-  req: NextRequest,
-  subdomain: string | null | undefined,
-): Promise<DashboardAuth | null> {
-  return resolveDashboardAuth(req.headers, subdomain)
+export async function requireDashboardAuth(req: NextRequest): Promise<DashboardAuth | null> {
+  return resolveDashboardAuth(req.headers)
 }

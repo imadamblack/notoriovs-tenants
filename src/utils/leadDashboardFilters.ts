@@ -51,3 +51,67 @@ export function applyStatusAndSinceFilters(
   const sinceCutoff = sinceCutoffISO(since)
   if (sinceCutoff) and.push({ createdAt: { greater_than_equal: sinceCutoff } })
 }
+
+/** Lo que el toolbar del dashboard tiene prendido en este momento. */
+export type LeadFilters = {
+  /** Id de una etapa del pipeline, o `__other__`. Solo lo usa el Kanban. */
+  stage?: string
+  status?: string
+  since?: string
+  search?: string
+}
+
+export function readLeadFilters(params: URLSearchParams): LeadFilters {
+  return {
+    stage: params.get('stage')?.trim() || undefined,
+    status: params.get('status')?.trim() || undefined,
+    since: params.get('since')?.trim() || undefined,
+    search: params.get('search')?.trim() || undefined,
+  }
+}
+
+/**
+ * El `where` de una consulta de leads del dashboard, con el tenant siempre
+ * al frente. Lo comparten el listado, los conteos del Kanban y la
+ * exportación a CSV, y eso es justo lo que hace que el archivo que se
+ * descarga traiga los mismos leads que están en pantalla: no hay dos
+ * lecturas de los filtros que puedan separarse con el tiempo.
+ */
+export function buildLeadsWhere(
+  tenant: Pick<TenantDoc, 'id' | 'leadPipeline' | 'leadStuckAfterDays'>,
+  filters: LeadFilters,
+): Where {
+  const and: Where[] = [{ tenant: { equals: tenant.id } }]
+
+  if (filters.stage) {
+    if (filters.stage === '__other__') {
+      const pipelineIds = (tenant.leadPipeline || []).map((s) => s.id)
+      // Si el tenant no tiene pipeline configurado, "otro" es simplemente
+      // "todos los leads": no hay ninguna etapa contra la cual comparar.
+      if (pipelineIds.length) and.push({ stage: { not_in: pipelineIds } })
+    } else {
+      and.push({ stage: { equals: filters.stage } })
+    }
+  }
+
+  applyStatusAndSinceFilters(and, tenant, filters.status, filters.since)
+
+  if (filters.search) {
+    and.push({ or: SEARCH_FIELDS.map((field) => ({ [field]: { contains: filters.search } })) })
+  }
+
+  return { and }
+}
+
+/**
+ * Los filtros activos en palabras, para el registro de exportaciones: lo que
+ * hay que poder leer meses después para saber qué se llevó alguien.
+ */
+export function describeLeadFilters(filters: LeadFilters): string {
+  const parts: string[] = []
+  if (filters.status) parts.push(`status: ${filters.status}`)
+  if (filters.since) parts.push(`periodo: ${filters.since}`)
+  if (filters.search) parts.push(`búsqueda: "${filters.search}"`)
+  if (filters.stage) parts.push(`etapa: ${filters.stage}`)
+  return parts.length ? parts.join(', ') : 'sin filtros (todos los leads)'
+}

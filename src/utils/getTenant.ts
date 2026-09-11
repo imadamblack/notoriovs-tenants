@@ -153,6 +153,15 @@ export const TENANT_PROJECTIONS = {
     depth: 0,
     select: { ...PIPELINE },
   },
+  // Exportación de Leads a CSV. Pide lo mismo que `dashboardApi` más los
+  // pasos del quiz, que son los que dan las columnas de respuestas y sus
+  // encabezados. No se agrega a `dashboardApi` para que las rutas del
+  // Kanban —que se piden decenas de veces por sesión— no carguen el quiz
+  // entero en memoria para nada.
+  dashboardExport: {
+    depth: 0,
+    select: { ...PIPELINE, quizSteps: true },
+  },
   // Único consumidor del token de la Conversions API: la ruta server-side
   // que reenvía el evento a Meta.
   conversionsApi: {
@@ -176,6 +185,13 @@ export const TENANT_PROJECTIONS = {
   identity: {
     depth: 0,
     select: { id: true },
+  },
+  // Ingest de leads (POST /api/leads/ingest, el n8n de Notoriovs). Necesita
+  // más que `identity` porque un lead nace en una etapa concreta: el
+  // pipeline es para saber cuál es la primera. El nombre, para los logs.
+  leadIngest: {
+    depth: 0,
+    select: { name: true, leadPipeline: true },
   },
 } as const satisfies Record<string, TenantProjection>
 

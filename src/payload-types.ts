@@ -73,6 +73,7 @@ export interface Config {
     media: Media;
     tenants: Tenant;
     leads: Lead;
+    'lead-exports': LeadExport;
     'marketing-reports': MarketingReport;
     'payload-kv': PayloadKv;
     'payload-folders': FolderInterface;
@@ -91,6 +92,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
+    'lead-exports': LeadExportsSelect<false> | LeadExportsSelect<true>;
     'marketing-reports': MarketingReportsSelect<false> | MarketingReportsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
@@ -604,7 +606,11 @@ export interface Lead {
    * Resultado del lead, independiente de la etapa en la que esté. Se actualiza solo al mover la etapa hacia una marcada como "Ganado"/"Perdido" en el pipeline del tenant; también se puede fijar a mano (ej. "Descalificado") desde el panel de detalle del lead.
    */
   status: 'open' | 'won' | 'lost' | 'disqualified';
-  source?: ('quiz' | 'manual') | null;
+  source?: ('quiz' | 'manual' | 'meta' | 'whatsapp' | 'import') | null;
+  /**
+   * Id que trae el lead en el sistema donde nació (el id del lead en Meta, por ejemplo). Es lo único que permite que n8n reintente el mismo envío sin duplicar el lead: al reingresar, un lead con el mismo id dentro del mismo tenant se actualiza en vez de crearse otra vez. Los leads del quiz no lo llevan.
+   */
+  externalId?: string | null;
   /**
    * Notas visibles y editables desde el dashboard de cliente.
    */
@@ -622,6 +628,40 @@ export interface Lead {
     | boolean
     | null;
   utm?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Registro de cada descarga de Leads en CSV desde el Dashboard de Cliente. Solo lectura.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lead-exports".
+ */
+export interface LeadExport {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  /**
+   * El Tenant User con cuya sesión se hizo la descarga.
+   */
+  exportedBy?: (number | null) | TenantUser;
+  exportedByEmail: string;
+  leadCount: number;
+  /**
+   * Los filtros del dashboard en el momento de la descarga, en palabras.
+   */
+  filtersLabel: string;
+  /**
+   * Los mismos filtros tal como llegaron, para poder repetir la consulta.
+   */
+  filters?:
     | {
         [k: string]: unknown;
       }
@@ -714,6 +754,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'leads';
         value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'lead-exports';
+        value: number | LeadExport;
       } | null)
     | ({
         relationTo: 'marketing-reports';
@@ -1069,9 +1113,24 @@ export interface LeadsSelect<T extends boolean = true> {
   stage?: T;
   status?: T;
   source?: T;
+  externalId?: T;
   notes?: T;
   answers?: T;
   utm?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lead-exports_select".
+ */
+export interface LeadExportsSelect<T extends boolean = true> {
+  tenant?: T;
+  exportedBy?: T;
+  exportedByEmail?: T;
+  leadCount?: T;
+  filtersLabel?: T;
+  filters?: T;
   updatedAt?: T;
   createdAt?: T;
 }

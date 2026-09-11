@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
-import type { Where } from 'payload'
 import config from '@payload-config'
 import { requireDashboardAuth, requireDashboardTenant, sessionCan } from '@/utils/requireDashboardAuth'
-import { applyStatusAndSinceFilters, SEARCH_FIELDS } from '@/utils/leadDashboardFilters'
+import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
 
 // Todas las rutas bajo /api/tenant-dashboard/* usan la Local API de Payload
 // con `overrideAccess: true` (Leads.access exige `req.user`, que aquí nunca
@@ -35,49 +34,22 @@ function clampPage(raw: string | null): number {
 // esto una vez por columna (`stage`), la Lista lo pide sin `stage` con su
 // propia página.
 //
-// `stage=__other__` es un valor sintético (no existe en la DB): representa
-// leads cuya `stage` no coincide con ninguna etapa del pipeline actual del
-// tenant (etapas borradas/renombradas a mano, datos importados con una
-// etapa que ya no existe, etc.). El front lo usa para la columna "Otro".
+// Los filtros (etapa, status, periodo, búsqueda) los arma
+// `buildLeadsWhere`, compartido con los conteos del Kanban y con la
+// exportación a CSV: ahí vive también qué significa `stage=__other__`.
 export async function GET(req: NextRequest) {
-  const subdomain = req.nextUrl.searchParams.get('subdomain')
-  const tenant = await requireDashboardTenant(req, subdomain)
+  const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const params = req.nextUrl.searchParams
-  const stage = params.get('stage')?.trim() || undefined
-  const status = params.get('status')?.trim() || undefined
-  const since = params.get('since')?.trim() || undefined
-  const search = params.get('search')?.trim() || undefined
   const sort = SORT_MAP[params.get('sort') || 'created_desc'] || SORT_MAP.created_desc
   const page = clampPage(params.get('page'))
   const limit = clampLimit(params.get('limit'))
 
-  const and: Where[] = [{ tenant: { equals: tenant.id } }]
-
-  if (stage) {
-    if (stage === '__other__') {
-      const pipelineIds = (tenant.leadPipeline || []).map((s) => s.id)
-      // Si el tenant no tiene pipeline configurado, "otro" es simplemente
-      // "todos los leads": no hay ninguna etapa contra la cual comparar.
-      if (pipelineIds.length) and.push({ stage: { not_in: pipelineIds } })
-    } else {
-      and.push({ stage: { equals: stage } })
-    }
-  }
-
-  applyStatusAndSinceFilters(and, tenant, status, since)
-
-  if (search) {
-    and.push({
-      or: SEARCH_FIELDS.map((field) => ({ [field]: { contains: search } })),
-    })
-  }
-
   const payload = await getPayload({ config })
   const result = await payload.find({
     collection: 'leads',
-    where: { and },
+    where: buildLeadsWhere(tenant, readLeadFilters(params)),
     sort,
     page,
     limit,
@@ -94,6 +66,123 @@ export async function GET(req: NextRequest) {
     hasNextPage: result.hasNextPage,
     hasPrevPage: result.hasPrevPage,
   })
+}
+
+/**
+ * Texto ya recortado, o `undefined` si venía vacío. Un campo de contacto en
+ * blanco no se guarda como cadena vacía: eso haría que un lead "sin correo"
+ * y uno "con el correo borrado" se vieran distintos en la base sin serlo.
+ */
+function toText(value: unknown): string | undefined {
+  if (typeof value === 'number') return String(value)
+  if (typeof value !== 'string') return undefined
+  return value.trim() || undefined
+}
+
+// Alta a mano de un Lead desde el propio dashboard: el que llegó por
+// teléfono o en persona y nunca pasó por el quiz (issue 13). Queda marcado
+// con `source: 'manual'`, que es lo que lo distingue para siempre de los
+// del quiz y de los que mete n8n por /api/leads/ingest.
+//
+// No pide un permiso de rol: capturar un lead es el trabajo diario tanto de
+// un `owner` como de un `member`, igual que editarlo con el PATCH de arriba.
+// Lo único que se exige es sesión válida en ESTE tenant.
+export async function POST(req: NextRequest) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
+  }
+
+  const tenant = await requireDashboardTenant(req)
+  if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const name = toText(body?.name)
+  const phone = toText(body?.phone)
+  const whatsapp = toText(body?.whatsapp)
+  const email = toText(body?.email)
+
+  // Lo mínimo para que el lead sirva de algo: cómo se llama y por dónde
+  // buscarlo. Nada más es obligatorio — quien captura un lead en medio de
+  // una llamada no tiene por qué llenar un formulario largo.
+  if (!name) {
+    return NextResponse.json({ error: 'Escribe el nombre del lead' }, { status: 400 })
+  }
+  if (!phone && !whatsapp && !email) {
+    return NextResponse.json(
+      { error: 'Deja al menos un teléfono, un WhatsApp o un correo' },
+      { status: 400 },
+    )
+  }
+
+  // Nace en la primera etapa del pipeline del tenant, igual que los del
+  // quiz y los del ingest, salvo que quien lo captura elija otra: un lead
+  // que llega por teléfono a veces entra ya avanzado ("me habló para
+  // agendar"). Sin pipeline configurado cae al sentinel 'nuevo', que no
+  // coincide con ningún id real y lo deja en la columna "Otro".
+  const pipeline = tenant.leadPipeline || []
+  const requestedStage = toText(body?.stage)
+  if (requestedStage && pipeline.length && !pipeline.some((stage) => stage.id === requestedStage)) {
+    return NextResponse.json({ error: 'Etapa inválida para este tenant' }, { status: 400 })
+  }
+  const stage = requestedStage || pipeline[0]?.id || 'nuevo'
+
+  const payload = await getPayload({ config })
+
+  // Duplicado por teléfono: se avisa, NO se bloquea. La segunda llamada
+  // llega con `confirmDuplicate` y captura el lead de todos modos — el
+  // mismo número puede ser de dos personas (una empresa, una familia), y
+  // perder un lead por eso es peor que tener dos.
+  //
+  // La comparación es exacta contra lo que se escribió, en `phone` y en
+  // `whatsapp` (el mismo número suele quedar registrado en cualquiera de
+  // los dos). Dos formatos distintos del mismo número no se reconocen: eso
+  // pediría guardar una versión normalizada aparte, y este aviso no vale
+  // ese campo.
+  const numbers = [phone, whatsapp].filter((value): value is string => Boolean(value))
+  if (numbers.length && !body?.confirmDuplicate) {
+    const found = await payload.find({
+      collection: 'leads',
+      where: {
+        and: [
+          { tenant: { equals: tenant.id } },
+          { or: [{ phone: { in: numbers } }, { whatsapp: { in: numbers } }] },
+        ],
+      },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    const duplicate = found.docs[0]
+    if (duplicate) {
+      return NextResponse.json(
+        { error: 'Ya tienes un lead con ese teléfono', duplicate },
+        { status: 409 },
+      )
+    }
+  }
+
+  const created = await payload.create({
+    collection: 'leads',
+    data: {
+      tenant: Number(tenant.id),
+      name,
+      phone,
+      whatsapp,
+      email,
+      stage,
+      status: 'open',
+      source: 'manual',
+      notes: toText(body?.notes),
+    },
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  return NextResponse.json({ lead: created }, { status: 201 })
 }
 
 /**
@@ -128,8 +217,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  const { subdomain, id } = body || {}
-  const tenant = await requireDashboardTenant(req, subdomain)
+  const { id } = body || {}
+  const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
 
@@ -188,11 +277,9 @@ export async function PATCH(req: NextRequest) {
 // un lead de en medio: lo marca como descalificado con el PATCH de arriba, que
 // lo quita de los números de conversión sin perder el registro.
 export async function DELETE(req: NextRequest) {
-  const params = req.nextUrl.searchParams
-  const subdomain = params.get('subdomain')
-  const id = params.get('id')
+  const id = req.nextUrl.searchParams.get('id')
 
-  const auth = await requireDashboardAuth(req, subdomain)
+  const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
 

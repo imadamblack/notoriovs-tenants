@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getSubdomainFromHost } from '@/utils/subdomain'
-
-// Configura este valor con el dominio raíz real de producción, ej: "notoriovs.com".
-// Puede sobreescribirse con la env var ROOT_DOMAIN sin tocar código.
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'notoriovs.com'
+import { getSubdomainFromHost, ROOT_DOMAIN } from '@/utils/subdomain'
 
 // Se enumeran las extensiones en vez de aceptar cualquier punto: un slug de
 // tenant podría traerlo y no queremos dejar de reescribir su página.

@@ -30,8 +30,7 @@ import {
 //    anuncios; partirlo a la mitad para que cuadre con "30 días" daría un
 //    gasto y un CPL que no coinciden con lo que el cliente ve en Meta.
 export async function GET(req: NextRequest) {
-  const subdomain = req.nextUrl.searchParams.get('subdomain')
-  const tenant = await requireDashboardTenant(req, subdomain)
+  const tenant = await requireDashboardTenant(req)
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const sinceKey = normalizeSinceKey(req.nextUrl.searchParams.get('since'))

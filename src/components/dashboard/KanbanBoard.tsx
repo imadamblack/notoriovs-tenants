@@ -5,6 +5,9 @@ import type {Lead, LeadUpdateEvent, PipelineStage} from '@/components/dashboard/
 import Select from '@/components/dashboard/ui/atoms/Select'
 import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
 import IconFilter from '@/components/dashboard/ui/atoms/icons/IconFilter'
+import IconPlus from '@/components/dashboard/ui/atoms/icons/IconPlus'
+import IconDownload from '@/components/dashboard/ui/atoms/icons/IconDownload'
+import Button from '@/components/dashboard/ui/atoms/Button'
 import PeriodFilter from '@/components/dashboard/ui/molecules/PeriodFilter'
 import { type SinceKey } from '@/utils/dashboardPeriod'
 import SearchInput from '@/components/dashboard/ui/molecules/SearchInput'
@@ -14,10 +17,11 @@ import StageColumn from '@/components/dashboard/ui/organisms/StageColumn'
 import LeadListTable from '@/components/dashboard/ui/organisms/LeadListTable'
 
 type KanbanBoardProps = {
-  subdomain: string
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
   onCardClick: (lead: Lead) => void
+  /** Abre el alta a mano de un lead (ver NewLeadPanel). */
+  onCreateLead: () => void
   onStageChange: (lead: Lead, stage: string) => Promise<Lead | null>
   updateEvent: LeadUpdateEvent | null
   // El periodo lo controla DashboardApp: es el mismo filtro que usan los
@@ -82,7 +86,7 @@ const emptyColumn: ColumnState = {
 // es lo que hace viable un tenant con miles de leads sin traer todo a la vez
 // (ver `handleColumnScroll`/`handleListScroll`: cargan la siguiente página
 // al acercarse al fondo del contenedor, sin botón).
-export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCardClick, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
+export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCreateLead, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
   const [view, setView] = useState<BoardView>('kanban')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -100,6 +104,9 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
   const [listHasNextPage, setListHasNextPage] = useState(false)
   const [listLoading, setListLoading] = useState(false)
   const [listLoadingMore, setListLoadingMore] = useState(false)
+
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [draggingLead, setDraggingLead] = useState<Lead | null>(null)
@@ -129,13 +136,13 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
 
   const buildParams = useCallback(
     (extra: Record<string, string>) => {
-      const params = new URLSearchParams({subdomain, sort: sortKey, ...extra})
+      const params = new URLSearchParams({sort: sortKey, ...extra})
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (sinceKey !== 'all') params.set('since', sinceKey)
       if (statusFilter !== 'all') params.set('status', statusFilter)
       return params
     },
-    [subdomain, sortKey, debouncedSearch, sinceKey, statusFilter],
+    [sortKey, debouncedSearch, sinceKey, statusFilter],
   )
 
   const loadColumn = useCallback(
@@ -176,7 +183,7 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
   )
 
   const loadCounts = useCallback(async () => {
-    const params = new URLSearchParams({subdomain})
+    const params = new URLSearchParams()
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (sinceKey !== 'all') params.set('since', sinceKey)
     if (statusFilter !== 'all') params.set('status', statusFilter)
@@ -186,7 +193,7 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
     setStageCounts(data.counts || {})
     setOtherCount(data.other || 0)
     setTotalCount(data.total || 0)
-  }, [subdomain, debouncedSearch, sinceKey, statusFilter])
+  }, [debouncedSearch, sinceKey, statusFilter])
 
   const loadList = useCallback(
     async (page: number) => {
@@ -231,6 +238,31 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
     if (!updateEvent) return
     const {lead, previousStage} = updateEvent
     const targetKey = pipelineIds.has(lead.stage) ? lead.stage : '__other__'
+
+    // Un lead recién capturado a mano no viene de ninguna columna: se
+    // agrega a la suya y sube los contadores. Se mete tal cual aunque haya
+    // filtros puestos (un status, una búsqueda) — verlo aparecer donde uno
+    // acaba de crearlo pesa más que la pureza del filtro, y basta recargar
+    // para que la vista vuelva a cuadrar.
+    if (updateEvent.created) {
+      setColumnData((cols) => {
+        const state = cols[targetKey]
+        if (!state) return cols
+        if (state.leads.some((l) => String(l.id) === String(lead.id))) return cols
+        return {...cols, [targetKey]: {...state, leads: [lead, ...state.leads], totalDocs: state.totalDocs + 1}}
+      })
+      if (targetKey === '__other__') {
+        setOtherCount((c) => c + 1)
+      } else {
+        setStageCounts((counts) => ({...counts, [lead.stage]: (counts[lead.stage] ?? 0) + 1}))
+      }
+      setTotalCount((c) => c + 1)
+      // La Lista solo lo agrega si ya cargó su primera página; si no, lo
+      // traerá ella sola cuando se abra esa vista.
+      setListLeads((leads) => (leads.length ? [lead, ...leads] : leads))
+      setListTotalDocs((total) => total + 1)
+      return
+    }
 
     // Un lead borrado no se mueve de columna: se va. Es el mismo trabajo de
     // reconciliación, pero quitando en vez de reubicando.
@@ -349,6 +381,40 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
     setBoardScrollProgress(max > 0 ? el.scrollLeft / max : 0)
   }, [])
 
+  // Descarga el CSV de lo que está en pantalla. Manda EXACTAMENTE los
+  // mismos parámetros que las consultas del tablero (`buildParams`) menos la
+  // etapa, que es de cada columna: lo que se exporta es lo que el filtro deja
+  // ver, no todo el cliente.
+  //
+  // Se baja por fetch y no navegando a la URL para poder decir "Exportando…"
+  // mientras el servidor arma el archivo y avisar si algo falla — una
+  // descarga que se queda muda parece un botón roto.
+  const handleExport = useCallback(async () => {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const res = await fetch(`/api/tenant-dashboard/leads/export?${buildParams({})}`)
+      if (!res.ok) throw new Error('export failed')
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      // El nombre lo pone el servidor (trae el subdominio y la fecha); el de
+      // aquí solo cubre el caso raro de que la cabecera no llegue.
+      link.download =
+        /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'leads.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setExportError('No se pudo exportar')
+    } finally {
+      setExporting(false)
+    }
+  }, [buildParams])
+
   const handleDrop = async (stageKey: string) => {
     setDragOverKey(null)
     const lead = draggingLead
@@ -384,6 +450,7 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
           <div className="flex items-center gap-2 text-neutral-400 -ft-3">
             {visibleTotal} leads
           </div>
+          {exportError && <span className="-ft-3 text-red-400">{exportError}</span>}
         </div>
 
         <div className="flex flex-grow items-center justify-between md:justify-end gap-4">
@@ -455,6 +522,43 @@ export default function KanbanBoard({subdomain, pipeline, stuckAfterDays, onCard
               onClear={() => setSearch('')}
               placeholder="Buscar leads"
             />
+
+            <div className="hidden md:flex shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="items-center justify-center disabled:opacity-40"
+                onClick={handleExport}
+                disabled={exporting || visibleTotal === 0}
+                aria-label="Exportar leads a CSV"
+                title={
+                  visibleTotal === 0
+                    ? 'No hay leads que exportar con estos filtros'
+                    : exporting
+                      ? 'Exportando…'
+                      : `Exportar a CSV los ${visibleTotal} leads filtrados`
+                }
+              >
+                <span className="w-6 h-6 inline-flex items-center justify-center">
+                  <IconDownload/>
+                </span>
+              </Button>
+            </div>
+
+            {/* El que llegó por teléfono o en persona se captura aquí, donde
+                ya se están viendo los demás, y no en un formulario aparte. */}
+            <Button
+              variant="primary"
+              size="icon"
+              className="rounded-full shrink-0 flex items-center justify-center"
+              onClick={onCreateLead}
+              aria-label="Nuevo lead"
+              title="Nuevo lead"
+            >
+              <span className="w-6 h-6 inline-flex items-center justify-center">
+                <IconPlus/>
+              </span>
+            </Button>
           </div>
         </div>
       </div>

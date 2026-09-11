@@ -7,10 +7,16 @@ import { setTenantSessionCookie } from '@/utils/tenantSessionCookie'
 // igual para recuperar la propia y para aceptar una invitación — son el mismo
 // token.
 //
-// El tenant sale del subdominio de la petición y el módulo comprueba que el
-// dueño del token pertenezca a ÉL antes de tocar nada: un enlace legítimo del
-// cliente A abierto en el subdominio del cliente B no canjea, no cambia
+// El tenant sale del subdominio que manda la pantalla, y el módulo comprueba
+// que el dueño del token pertenezca a ÉL antes de tocar nada: un enlace
+// legítimo del cliente A canjeado contra el cliente B no sirve, no cambia
 // ninguna contraseña y no abre ninguna sesión.
+//
+// El `subdomain` llega en el cuerpo y NO del host, a diferencia del resto de
+// /api/tenant-dashboard/*. Es deliberado: aquí todavía no hay credencial que
+// diga de qué Tenant es quien llama, y dejarlo así mantiene abierta una entrada
+// única de login (una sola pantalla en un host compartido). No lo "arregles"
+// sin leer el ADR 0007 — la decisión y su precio están ahí.
 
 const INVALID_TOKEN =
   'Este enlace ya no sirve: venció o ya se usó. Pide uno nuevo desde "¿Olvidaste tu contraseña?".'
