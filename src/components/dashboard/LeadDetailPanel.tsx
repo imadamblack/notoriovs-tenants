@@ -1,7 +1,7 @@
 'use client'
 
 import {useRef, useState} from 'react'
-import type {Lead, PipelineStage} from '@/components/dashboard/DashboardApp'
+import type {Lead, PipelineStage, QuizQuestion} from '@/components/dashboard/DashboardApp'
 import {leadBadge} from '@/components/dashboard/leadPresentation'
 import Button from '@/components/dashboard/ui/atoms/Button'
 import KeyValueRow from '@/components/dashboard/ui/molecules/KeyValueRow'
@@ -11,11 +11,15 @@ import LeadDetailHeader from '@/components/dashboard/ui/organisms/LeadDetailHead
 import LeadQuickEditRow from '@/components/dashboard/ui/organisms/LeadQuickEditRow'
 import LeadNotesEditor from '@/components/dashboard/ui/organisms/LeadNotesEditor'
 import LeadAnswersList from '@/components/dashboard/ui/organisms/LeadAnswersList'
+import LeadAnswersFields from '@/components/dashboard/ui/organisms/LeadAnswersFields'
+import {editableAnswers} from '@/components/dashboard/leadAnswersView'
 import LeadEditForm from '@/components/dashboard/ui/organisms/LeadEditForm'
 
 type LeadDetailPanelProps = {
   lead: Lead
   pipeline: PipelineStage[]
+  /** Las preguntas del quiz del tenant, para mostrar y editar sus respuestas. */
+  questions: QuizQuestion[]
   stuckAfterDays?: number | null
   onClose: () => void
   onSave: (patch: Partial<Lead>) => Promise<boolean>
@@ -27,8 +31,6 @@ type LeadDetailPanelProps = {
   onDelete?: () => Promise<boolean>
 }
 
-const EXCLUDED_ANSWER_KEYS = new Set(['nombre', 'telefono', 'whatsapp', 'email'])
-
 type LeadForm = {
   name: string
   phone: string
@@ -37,6 +39,11 @@ type LeadForm = {
   stage: string
   status: Lead['status']
   notes: string
+  // Las respuestas del quiz son campos del lead como los de arriba: se editan
+  // en esta misma forma y se guardan con el mismo botón. Solo las editables
+  // (sin los datos de contacto, que ya viven en `name`, `phone`…), porque son
+  // tal cual lo que se manda en el PATCH.
+  answers: Record<string, unknown>
 }
 
 function buildFormFromLead(lead: Lead): LeadForm {
@@ -48,10 +55,11 @@ function buildFormFromLead(lead: Lead): LeadForm {
     stage: lead.stage,
     status: lead.status,
     notes: lead.notes || '',
+    answers: editableAnswers(lead.answers),
   }
 }
 
-export default function LeadDetailPanel({lead, pipeline, stuckAfterDays, onClose, onSave, onDelete}: LeadDetailPanelProps) {
+export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDays, onClose, onSave, onDelete}: LeadDetailPanelProps) {
   const [mode, setMode] = useState<'read' | 'write'>('read')
   const [form, setForm] = useState<LeadForm>(() => buildFormFromLead(lead))
   const [saving, setSaving] = useState(false)
@@ -161,10 +169,6 @@ export default function LeadDetailPanel({lead, pipeline, stuckAfterDays, onClose
     }
   }
 
-  const answerEntries = Object.entries(lead.answers || {}).filter(
-    ([key, value]) => !EXCLUDED_ANSWER_KEYS.has(key) && value !== undefined && value !== '',
-  )
-
   const whatsappNumber = (form.whatsapp || form.phone || '').replace(/\D/g, '')
 
   return (
@@ -208,7 +212,7 @@ export default function LeadDetailPanel({lead, pipeline, stuckAfterDays, onClose
                   <KeyValueRow label="Email" value={<ContactLink type="email" value={form.email} />} />
 
                   <div className="mt-8">
-                    <LeadAnswersList entries={answerEntries} />
+                    <LeadAnswersList answers={lead.answers} questions={questions} />
                   </div>
                 </>
               ) : (
@@ -246,7 +250,13 @@ export default function LeadDetailPanel({lead, pipeline, stuckAfterDays, onClose
               onStageChange={handleStageChange}
             />
 
-            <LeadAnswersList entries={answerEntries} />
+            <LeadAnswersFields
+              answers={form.answers}
+              questions={questions}
+              onChange={(field, value) =>
+                setForm((f) => ({...f, answers: {...f.answers, [field]: value}}))
+              }
+            />
 
             <LeadNotesEditor
               label="Notas internas"

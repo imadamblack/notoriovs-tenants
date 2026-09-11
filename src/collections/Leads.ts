@@ -138,7 +138,8 @@ export const Leads: CollectionConfig = {
       type: 'json',
       label: 'Respuestas del quiz',
       admin: {
-        description: 'Copia cruda de todas las respuestas enviadas por el lead (react-hook-form values).',
+        description:
+          'Lo que contestó el lead (react-hook-form values), ya con las ediciones que haya hecho quien lo atiende: si el lead se equivocó al contestar, se corrige aquí y punto. Es lo que muestran el panel de detalle y la exportación, y lo que leerá cualquier número sobre respuestas — medir sobre un error del lead no le sirve a nadie. Se edita desde el dashboard de cliente, no desde aquí.',
         readOnly: true,
       },
     },
