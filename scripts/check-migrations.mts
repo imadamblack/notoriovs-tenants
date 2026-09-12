@@ -8,7 +8,10 @@
 // aplicadas (tabla `payload_migrations`), y sale con código 1 si falta alguna.
 // Nunca aplica nada — aplicar sigue siendo un acto deliberado:
 //
-//   npm run prod -- npm run migrate
+//   npm run prod -- npm run migrate:debug
+//
+// Y es `migrate:debug`, no `migrate`, a propósito: contra producción el CLI de
+// Payload no imprime ni aplica nada (ver el encabezado de migrate-debug.mts).
 //
 // POR QUÉ NO APLICARLAS AQUÍ. Es la pregunta obvia, y la respuesta está en
 // ADR 0006 más lo que se aprendió con la migración de exportación a CSV:
@@ -115,8 +118,10 @@ try {
         pending.map((migration) => `    · ${migration.name}`).join('\n') +
         '\n\n  El despliegue se detiene aquí para no subir código adelantado al esquema.\n' +
         '  Aplícalas y vuelve a desplegar:\n\n' +
-        '    npm run prod -- npm run migrate\n' +
-        '    npm run prod -- npm run migrate:status\n',
+        '    npm run prod -- npm run migrate:debug\n\n' +
+        '  Ojo: contra producción `npm run migrate` y `migrate:status` no imprimen\n' +
+        '  ni aplican nada. Para preguntar sin aplicar:\n\n' +
+        '    CHECK_MIGRATIONS=1 npm run prod -- npm run migrate:check\n',
     )
     process.exit(1)
   }

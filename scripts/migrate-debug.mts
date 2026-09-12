@@ -3,12 +3,21 @@
 //   npm run migrate:debug              # contra tu base de desarrollo
 //   npm run prod -- npm run migrate:debug   # contra producción
 //
-// Hace exactamente el mismo trabajo que `npm run migrate`, pero sin el CLI de
-// Payload en medio. Ese CLI, en los comandos de migración, se traga los errores
-// de arranque y sale con código 0: si le falta una variable de entorno o no
-// puede conectarse, no imprime absolutamente nada. O sea que "falló" y "todavía
-// no termina" se ven idénticos —una línea en blanco— y no hay forma de
+// **Contra producción, ésta es la ÚNICA forma de migrar que funciona**, no una
+// alternativa verbosa. Hace el mismo trabajo que `npm run migrate` pero sin el
+// CLI de Payload en medio, y ese CLI, en los comandos de migración, se traga los
+// errores de arranque y sale con código 0: si le falta una variable de entorno o
+// no puede conectarse, no imprime absolutamente nada. O sea que "falló" y
+// "todavía no termina" se ven idénticos —una línea en blanco— y no hay forma de
 // distinguirlos mirando la pantalla.
+//
+// Contra producción eso ya no es un riesgo teórico: pasó dos veces, con la
+// migración de roles (issue 09) y con la que borró los webhooks viejos
+// (2026-09-12). Las dos veces `npm run prod -- npm run migrate` volvió al prompt
+// en silencio sin haber aplicado nada, y las dos veces entraron con este guion.
+// `migrate:status` tampoco imprime ahí, así que no sirve para confirmar: lo que
+// confirma es el `✓` de aquí, o `CHECK_MIGRATIONS=1 npm run prod -- npm run
+// migrate:check`. Por qué el CLI falla ahí y no en otra shell, sigue sin saberse.
 //
 // Aquí, si algo truena, se ve el error completo y el proceso sale con código 1.
 import payload from 'payload'
