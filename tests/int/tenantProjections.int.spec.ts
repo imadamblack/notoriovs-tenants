@@ -56,17 +56,19 @@ describe('proyecciones del tenant', () => {
     expect(TENANT_PROJECTIONS.quiz.select).toMatchObject({ quizSteps: true })
     expect(TENANT_PROJECTIONS.quiz.select).not.toHaveProperty('leadPipeline')
 
-    expect(TENANT_PROJECTIONS.dashboard.select).toMatchObject({ leadPipeline: true })
-    expect(TENANT_PROJECTIONS.dashboard.select).not.toHaveProperty('quizSteps')
+    // La página del dashboard sí carga el quiz: el panel de detalle deja
+    // corregir respuestas y necesita la pregunta (título y opciones) para
+    // hacerlo. Es una vez por carga de página, no por consulta del Kanban.
+    expect(TENANT_PROJECTIONS.dashboard.select).toMatchObject({ leadPipeline: true, quizSteps: true })
     expect(TENANT_PROJECTIONS.dashboard.select).not.toHaveProperty('landingBlocks')
   })
 
-  // Las columnas del CSV de leads salen del quiz del tenant, así que la
-  // exportación es la única proyección de una ruta de API que carga
-  // `quizSteps`. Que las del Kanban NO lo hagan es lo que evita arrastrar el
-  // quiz entero en cada una de las decenas de consultas de una sesión.
-  it('solo la exportación a CSV pide el quiz junto con el pipeline', () => {
-    expect(TENANT_PROJECTIONS.dashboardExport.select).toMatchObject({
+  // El quiz solo lo cargan las rutas que lo necesitan: la exportación a CSV
+  // (sus columnas de respuestas) y la corrección de una respuesta. Que las
+  // del Kanban NO lo hagan es lo que evita arrastrar el quiz entero en cada
+  // una de las decenas de consultas de una sesión.
+  it('el quiz junto con el pipeline solo viaja en su propia proyección', () => {
+    expect(TENANT_PROJECTIONS.dashboardQuiz.select).toMatchObject({
       leadPipeline: true,
       quizSteps: true,
     })
@@ -76,7 +78,7 @@ describe('proyecciones del tenant', () => {
   it('solo pobla relaciones (depth 1) la proyección que pinta una Media', () => {
     // `depth: 1` es un join más por consulta; las proyecciones de las rutas
     // de API no pintan nada, así que no lo pagan.
-    for (const name of ['dashboardApi', 'dashboardExport', 'conversionsApi', 'quizSubmit', 'identity'] as const) {
+    for (const name of ['dashboardApi', 'dashboardQuiz', 'conversionsApi', 'quizSubmit', 'identity'] as const) {
       expect(TENANT_PROJECTIONS[name].depth, name).toBe(0)
     }
     for (const name of ['chrome', 'quiz', 'thankYou', 'notEligible'] as const) {

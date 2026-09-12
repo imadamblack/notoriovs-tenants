@@ -74,3 +74,46 @@ correcta, solo que a futuro.
   en pantalla. Es interno —un cliente nunca llega a esos hosts—, y el día que la
   entrada única se descarte, se cierra rechazando en el login los hosts sin
   Tenant.
+
+## Actualizaciones
+
+El cuerpo de arriba queda como se escribió: su valor es el razonamiento del día
+que se decidió. Lo que cambió después se anota aquí, fechado.
+
+### 2026-09-11 — La regla se queda sin excepciones: el login también sale del host
+
+Se cierra la excepción de las tres rutas pre-credencial (`login`,
+`forgot-password`, `reset-password`). Pasan a derivar el Tenant del host como
+todas las demás, y un host sin Tenant rechaza el login en vez de dejar una
+sesión válida sin destino.
+
+La excepción se sostenía en una **entrada única de login** que no existe, no
+está en ningún issue y nadie ha pedido. Es el mismo razonamiento con el que este
+ADR mató la API v1 —mientras no haya quien lo pida, es mantenimiento sin
+usuario—, aplicado al revés. Y una excepción viva a una regla de seguridad es la
+que alguien copia al escribir la siguiente ruta, cosa que este mismo ADR admitía.
+
+Si la entrada única llega algún día, reabrirla cuesta lo mismo que cerrarla hoy.
+Es el **issue 34**.
+
+### 2026-09-11 — El perímetro se declara aparte, en el ADR 0009
+
+El supuesto que sostiene la mitad de este ADR —"no hay un tercero
+integrándose"— dejó de vivir suelto aquí: está en el **ADR 0009**, con el
+inventario de quién toca el sistema, las dos reglas que salen de ahí, y el hueco
+que este ADR nunca nombró (`/api/quiz-submit` es público y sin credencial).
+Cuando alguien quiera volver a discutir si hace falta autenticar algo entre
+nuestro servidor y nuestro n8n, se cita el 0009.
+
+### 2026-09-11 — Las llaves de ingesta se quedan en env vars, por ahora
+
+La consecuencia que dice *"una integración de plataforma nueva se protege con su
+propia env var"* sigue vigente. El **issue 32** proponía moverlas al panel —para
+poder rotar y revocar sin desplegar— y quedó **congelado**: sus tres argumentos
+son de comodidad operativa, todos ciertos, y ninguno urgente mientras la única
+consumidora sea nuestro propio n8n y no se haya filtrado ninguna llave. Lo
+despierta una llave filtrada, o el primer cliente que quiera integrarse.
+
+Lo que no se mueve en ningún escenario: generadas donde sea, las llaves de
+**entrada** se guardan hasheadas. Los eventos salientes del ADR 0008 no llevan
+credencial, así que ahí no hay nada que guardar.

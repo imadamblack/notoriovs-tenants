@@ -13,6 +13,20 @@ import type { DashboardPermissions } from '@/access/tenantUserPermissions'
 
 export type PipelineStage = { id: string; label: string; isWon?: boolean | null; isLost?: boolean | null }
 
+/**
+ * Una pregunta del quiz del tenant, recortada a lo que necesita el panel de
+ * detalle para mostrar la respuesta y dejar editarla: cómo se llama el campo,
+ * cómo se le preguntó al lead y qué opciones tenía.
+ */
+export type QuizQuestion = {
+  name: string
+  label: string
+  type: string
+  options: { label: string; value: string }[]
+}
+
+
+
 export type Lead = {
   id: string | number
   tenant: string | number
@@ -69,6 +83,7 @@ type DashboardAppProps = {
   permissions: DashboardPermissions
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
+  questions: QuizQuestion[]
 }
 
 export default function DashboardApp({
@@ -77,6 +92,7 @@ export default function DashboardApp({
   permissions,
   pipeline,
   stuckAfterDays,
+  questions,
 }: DashboardAppProps) {
   const router = useRouter()
   const [tab, setTab] = useState<DashboardTab>('kanban')
@@ -263,6 +279,7 @@ export default function DashboardApp({
           pipeline={pipeline}
           stuckAfterDays={stuckAfterDays}
           onClose={() => setSelectedLead(null)}
+          questions={questions}
           onSave={async (patch) => Boolean(await updateLead(selectedLead, patch))}
           onDelete={permissions.canDeleteLeads ? () => deleteLead(selectedLead) : undefined}
         />

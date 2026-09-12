@@ -3,6 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { requireDashboardAuth, requireDashboardTenant, sessionCan } from '@/utils/requireDashboardAuth'
 import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
+import { getTenantBySubdomain } from '@/utils/getTenant'
+import { mergeAnswersPatch, quizQuestions, readAnswers } from '@/utils/leadAnswers'
 
 // Todas las rutas bajo /api/tenant-dashboard/* usan la Local API de Payload
 // con `overrideAccess: true` (Leads.access exige `req.user`, que aquí nunca
@@ -218,18 +220,22 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { id } = body || {}
-  const tenant = await requireDashboardTenant(req)
-  if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const auth = await requireDashboardAuth(req)
+  if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
 
+  const tenant = auth.tenant
   const payload = await getPayload({ config })
 
-  if (!(await findLeadOfTenant(payload, id, tenant.id))) {
+  const lead = await findLeadOfTenant(payload, id, tenant.id)
+  if (!lead) {
     return NextResponse.json({ error: 'Lead no encontrado' }, { status: 404 })
   }
 
   // Solo estos campos son editables desde el dashboard de cliente. Nunca se
-  // permite tocar `answers`, `utm`, `tenant` o `source` desde aquí.
+  // permite tocar `utm`, `tenant` o `source` desde aquí. `answers` no está en
+  // la lista porque no se guarda tal cual llega: pasa por `mergeAnswersPatch`
+  // más abajo.
   const allowedFields = ['stage', 'status', 'notes', 'name', 'phone', 'whatsapp', 'email'] as const
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: Record<string, any> = {}
@@ -258,6 +264,25 @@ export async function PATCH(req: NextRequest) {
   const ALLOWED_STATUSES = new Set(['open', 'won', 'lost', 'disqualified'])
   if ('status' in data && !ALLOWED_STATUSES.has(data.status)) {
     return NextResponse.json({ error: 'Status inválido' }, { status: 400 })
+  }
+
+  // Las respuestas del quiz son campos del lead como cualquier otro: si el
+  // lead se equivocó al contestar, quien lo atiende lo corrige aquí (issue
+  // 15). No se guardan en bruto: cada pregunta se valida contra el quiz del
+  // tenant —una pregunta de opciones solo admite sus opciones— y se mezcla
+  // con lo que el lead ya tenía, para que mandar una respuesta no borre las
+  // demás. El quiz se carga solo en este caso: las decenas de PATCH que mueven
+  // una tarjeta de columna no tienen por qué pagarlo.
+  if ('answers' in (body || {})) {
+    const tenantQuiz = await getTenantBySubdomain(auth.subdomain, 'dashboardQuiz')
+    const merged = mergeAnswersPatch({
+      current: readAnswers(lead.answers),
+      patch: body.answers,
+      questions: quizQuestions(tenantQuiz?.quizSteps),
+    })
+    if (!merged.ok) return NextResponse.json({ error: merged.error }, { status: 400 })
+
+    data.answers = merged.answers
   }
 
   const updated = await payload.update({

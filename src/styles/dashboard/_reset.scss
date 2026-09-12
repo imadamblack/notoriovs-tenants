@@ -22,8 +22,16 @@
     }
   }
 
+  // La flecha del select se repone a mano: `appearance: none` se la quita a
+  // todo el sitio (ver form.scss) y el quiz la devuelve con un wrapper
+  // `.select` que aquí no existe. Sin flecha, un select se ve igual que un
+  // campo de texto y nada dice que se despliega.
   select {
-    background-image: none;
+    padding-right: 3rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a3a3a3'%3E%3Cpath d='M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.6rem 1.6rem;
   }
 }
 

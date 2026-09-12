@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   // El pipeline (para la columna "Etapa") y el quiz (para las columnas de
   // respuestas) del tenant que autorizó el host, nunca uno pedido por el
   // cliente.
-  const tenant = await getTenantBySubdomain(subdomain, 'dashboardExport')
+  const tenant = await getTenantBySubdomain(subdomain, 'dashboardQuiz')
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const filters = readLeadFilters(req.nextUrl.searchParams)

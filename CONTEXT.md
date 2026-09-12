@@ -15,8 +15,8 @@ Un Tenant puede estar **inactivo**: su suscripción venció o fue cancelada. Un
 Tenant inactivo conserva su landing y su quiz **vivos y capturando Leads** —
 apagarlos significaría tirarle la publicidad que tiene corriendo— pero pierde
 todo lo demás: sus Tenant Users no pueden entrar al Dashboard de Cliente, no
-se envían notificaciones de Leads nuevos, y no se generan ni entregan
-Recomendaciones creativas ni reportes.
+recibe **Avisos**, y no se generan ni entregan Recomendaciones creativas ni
+reportes.
 
 ## Internal User
 
@@ -85,6 +85,20 @@ Un Marketing Report mensual **no** es la suma de los semanales: `reach`,
 `frequency`, `cpm` y `ctr` no son aditivos (una misma persona alcanzada en dos
 semanas cuenta una vez al mes). Cada granularidad se ingesta por separado desde
 la fuente.
+
+## Aviso
+
+Lo que la plataforma le manda a un Tenant cuando pasa algo que le importa —hoy,
+que entró un Lead— por fuera del Dashboard de Cliente: un WhatsApp o un correo
+que llega sin tener nada abierto.
+
+Va dirigido al **contacto general del Tenant**, uno solo, no a cada Tenant User
+por separado: quién lo lee adentro de la empresa es asunto del cliente. Un
+Tenant inactivo no recibe Avisos.
+
+Su entrega **no está garantizada**: si el aviso no sale, el hecho igual quedó
+guardado y visible en el Dashboard. Nada del producto debe construirse asumiendo
+que un Aviso llegó.
 
 ## Dashboard de Cliente
 

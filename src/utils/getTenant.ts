@@ -143,7 +143,11 @@ export const TENANT_PROJECTIONS = {
   // del Tenant.
   dashboard: {
     depth: 0,
-    select: { ...IDENTITY, ...PIPELINE },
+    // `quizSteps` viaja aquí porque el panel de detalle deja corregir lo que
+    // contestó un lead (issue 15), y para eso tiene que saber cómo era la
+    // pregunta: su título, y si era de opciones, cuáles. Se paga una vez por
+    // carga del dashboard, no en cada consulta del Kanban.
+    select: { ...IDENTITY, ...PIPELINE, quizSteps: true },
   },
   // Rutas /api/tenant-dashboard/* (leads, counts, kpis) y la autorización de
   // la página del dashboard: el `id` para scopear la query a `leads` y el
@@ -153,12 +157,13 @@ export const TENANT_PROJECTIONS = {
     depth: 0,
     select: { ...PIPELINE },
   },
-  // Exportación de Leads a CSV. Pide lo mismo que `dashboardApi` más los
-  // pasos del quiz, que son los que dan las columnas de respuestas y sus
-  // encabezados. No se agrega a `dashboardApi` para que las rutas del
-  // Kanban —que se piden decenas de veces por sesión— no carguen el quiz
-  // entero en memoria para nada.
-  dashboardExport: {
+  // Las dos rutas de API que necesitan el quiz: la exportación a CSV (los
+  // pasos dan las columnas de respuestas y sus encabezados) y la corrección
+  // de una respuesta (los pasos dicen si esa pregunta era de opciones, y
+  // cuáles). No se agrega a `dashboardApi` para que las rutas del Kanban
+  // —que se piden decenas de veces por sesión— no carguen el quiz entero en
+  // memoria para nada.
+  dashboardQuiz: {
     depth: 0,
     select: { ...PIPELINE, quizSteps: true },
   },

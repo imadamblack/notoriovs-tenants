@@ -5,6 +5,28 @@ import { resolveDashboardAuth, sessionPermissions } from '@/utils/requireDashboa
 import DashboardLogin from '@/components/dashboard/DashboardLogin'
 import DashboardApp from '@/components/dashboard/DashboardApp'
 import DashboardUnavailable from '@/components/dashboard/DashboardUnavailable'
+import { quizQuestions } from '@/utils/leadAnswers'
+import { headerFromQuizStep } from '@/utils/leadsCsv'
+import type { TenantQuizStep } from '@/utils/tenantQuiz'
+import type { QuizQuestion } from '@/components/dashboard/DashboardApp'
+
+/**
+ * Las preguntas del quiz recortadas a lo que usa el panel de detalle: cómo se
+ * llama el campo, cómo se le preguntó al lead y qué podía contestar. El resto
+ * del paso (textos de error, columnas del grid, HTML de los checkpoints) no
+ * tiene nada que hacer cruzando al navegador.
+ *
+ * El título pasa por el mismo limpiador que los encabezados del CSV:
+ * `quizSteps.title` admite HTML y aquí se pinta como texto.
+ */
+function dashboardQuestions(steps: TenantQuizStep[] | null | undefined): QuizQuestion[] {
+  return quizQuestions(steps).map((step) => ({
+    name: step.name,
+    label: headerFromQuizStep(step),
+    type: step.type,
+    options: (step.options || []).map((option) => ({ label: option.label, value: option.value })),
+  }))
+}
 
 type DashboardPageProps = {
   params: Promise<{ subdomain: string }>
@@ -57,6 +79,10 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
       // tenant se guardó, así que esto nunca debería quitar etapas reales.
       pipeline={(tenant.leadPipeline || []).filter((stage): stage is typeof stage & { id: string } => Boolean(stage.id))}
       stuckAfterDays={tenant.leadStuckAfterDays}
+      // Las preguntas del quiz, para que el panel de detalle pueda mostrar
+      // cada respuesta con su pregunta y ofrecer las mismas opciones que vio
+      // el lead al corregirla.
+      questions={dashboardQuestions(tenant.quizSteps)}
     />
   )
 }
