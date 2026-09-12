@@ -16,13 +16,13 @@ WhatsApp o correo, sin tener el dashboard abierto. La plataforma emite el evento
 - [ ] Un fallo al emitir nunca impide que el Lead se guarde, ni revierte nada
 - [ ] Un Tenant inactivo no emite el evento (la regla se cumple en el emisor,
       no en n8n)
-- [ ] Un Tenant sin `eventsWebhook` sale por `EVENTS_WEBHOOK_URL`; sin ninguna
-      de las dos, no se emite y queda una línea en el log
+- [ ] El evento sale al `eventsWebhook` de ese Tenant, que viene lleno desde el
+      alta; si alguien lo dejó vacío, no se emite y queda una línea en el log
 
 ## Lo que este issue ya no decide
 
 El transporte está decidido en el **ADR 0008** y no se vuelve a abrir: un solo
-tubo por Tenant (`eventsWebhook`, con `EVENTS_WEBHOOK_URL` de default), el sobre
+tubo por Tenant (`eventsWebhook`, autogenerado al crear y editable), el sobre
 con `id`/`event`/`version`/`occurredAt`/`tenant`/`data`, un solo punto de
 emisión en el hook `afterChange` de `leads`, un `POST` sin esperar la respuesta,
 sin cola y sin reintentos.

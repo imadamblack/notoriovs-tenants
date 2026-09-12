@@ -27,26 +27,43 @@ Cada Tenant tiene **una** URL de destino, `eventsWebhook`, y **todos** sus
 eventos salen por ahí. El tipo de evento se distingue por un campo del cuerpo,
 no por la URL.
 
-Si `eventsWebhook` está vacío —el caso normal— se usa la URL de plataforma
-`EVENTS_WEBHOOK_URL`: un solo workflow que recibe a los 50+ clientes y ramifica
-por `tenant.subdomain` adentro.
+El campo **nunca está vacío y no hay default de plataforma**: al dar de alta el
+Tenant se llena solo con `{N8N_WEBHOOK_BASE}{subdomain}`, igual que hoy se llena
+`quizWebhook`. La diferencia con `quizWebhook` es que éste **sí es editable**:
+el valor autogenerado es un punto de partida, no una imposición.
 
 Por qué así y no una URL de plataforma por evento:
 
 - El consumidor no tiene por qué ser n8n. Una URL por evento, fija para todos,
   clava a n8n como *el* receptor del producto. Una URL por Tenant deja que un
-  cliente apunte a su propio CRM sin que el contrato cambie.
+  cliente apunte a su propio CRM sin que el contrato cambie — y eso es
+  justamente lo que un campo de solo lectura cerraría, por eso es editable.
 - Un workflow por evento igual tendría que ramificar por Tenant adentro para
   saber a qué WhatsApp notificar y con qué credenciales. La ramificación no se
   evita, solo se mueve.
-- Y al mismo tiempo, el default de plataforma evita el costo del otro extremo:
-  un cliente nuevo **no** obliga a crear un workflow nuevo. Se mantiene uno
-  solo, para todos, mientras nadie pida lo contrario.
 
-No se reutiliza `quizWebhook` para esto. Su valor se autogenera a partir del
-subdominio en cada guardado —es adivinable por diseño— y es el que consumen los
-workflows viejos. `eventsWebhook` es un campo nuevo, editable, opcional y sin
-valor por defecto.
+Y por qué **no** hay una URL de plataforma común como respaldo: porque no hace
+falta. El campo siempre viene lleno, así que el respaldo cubriría un caso que no
+existe — una env var, un workflow que ramifica entre 50+ clientes, y una segunda
+ruta por la que un evento puede salir, todo para nada.
+
+No se reutiliza `quizWebhook` para esto: es de solo lectura, se reescribe en
+cada guardado y es el que consumen los workflows viejos, que se van (decisión 7).
+`eventsWebhook` es un campo nuevo.
+
+**Dos cosas que hay que saber, y que son el precio de autogenerar:**
+
+- **La URL es adivinable desde el subdominio.** Quien la adivine puede
+  inventarle eventos a ese cliente; lo que se vería es un WhatsApp anunciando un
+  Lead que no existe. Es el mismo riesgo que ya se acepta hoy con `quizWebhook`,
+  y la razón por la que se acepta está en la decisión 6 y en el ADR 0009.
+- **Cambiar el subdominio de un Tenant no repunta el webhook.** A diferencia de
+  `quizWebhook`, que se reescribe en cada guardado, aquí el valor se fija una
+  vez al crear y después es del que edita. Renombrar un subdominio deja el
+  `eventsWebhook` apuntando al workflow viejo: si n8n lo renombró también, hay
+  que corregir el campo a mano. Es preferible a lo contrario —que se repunte
+  solo a una URL que en n8n no existe y los avisos se pierdan en silencio— pero
+  hay que acordarse.
 
 ### 2. Todos los eventos van en el mismo sobre
 
@@ -193,9 +210,10 @@ Lo que sí hay que respetar al implementarlo:
   dice "fire-and-forget: no bloquea" y sí bloquea. Es el issue 33.
 - **Un fallo al emitir nunca revierte ni impide la escritura.** El error se
   atrapa y se registra; el Lead ya está guardado.
-- Si un Tenant no tiene `eventsWebhook` y no hay `EVENTS_WEBHOOK_URL`, el evento
-  no se manda y se deja una línea en el log. No es un error: es un sistema sin
-  consumidor configurado.
+- Si un Tenant se quedó sin `eventsWebhook` —alguien lo borró editando— el
+  evento no se manda y se deja una línea en el log. No es un error: es un
+  sistema sin consumidor configurado. No debería pasar, porque el campo se llena
+  solo al crear.
 
 El día que la entrega importe de verdad —un cliente que factura contra ese
 aviso, o n8n cayéndose seguido— la cola se agrega sin tocar nada de lo demás:
@@ -223,9 +241,9 @@ a ninguna respuesta del dashboard, así que no hay tercero que pueda conocerlo.
 Lo que se acepta a cambio, dicho sin adorno: quien llegue a conocer la URL de un
 `eventsWebhook` puede inventarle eventos a ese cliente, y lo que se vería es un
 WhatsApp anunciando un Lead que no existe. No escala más allá de eso —este tubo
-solo sale, nunca escribe en la plataforma— y no es una regresión: hoy es
-exactamente así, con la agravante de que la URL de hoy se adivina desde el
-subdominio y la nueva no.
+solo sale, nunca escribe en la plataforma— y no es una regresión: la URL se
+autogenera desde el subdominio (decisión 1), o sea que es tan adivinable como la
+de hoy, ni más ni menos.
 
 El supuesto que sostiene todo esto es **que el destino es nuestro**. El día que
 un cliente apunte su `eventsWebhook` a un sistema que no controlamos, ese día
@@ -252,26 +270,39 @@ leer el sobre, antes de subir el código.
 
 ## Qué tiene que hacer quien dé de alta un cliente nuevo en n8n
 
-**Nada.** Ése es el punto del default de plataforma: el cliente nuevo empieza a
-emitir por `EVENTS_WEBHOOK_URL` en cuanto se guarda, y el workflow único ya lo
-recibe porque ramifica por `tenant.subdomain`. Lo que antes se hacía —crear el
-workflow del cliente en la URL que su subdominio generaba— desaparece.
+**Nada**, y no porque haya un workflow común que reciba a todos, sino porque n8n
+**se provisiona solo**: el hook `afterChange` del alta ya dispara hoy el evento
+de cliente nuevo, y del otro lado hay un workflow que crea la infraestructura de
+ese Tenant en n8n. Con el contrato nuevo ese disparo es `tenant.created`, con el
+sobre, y sigue haciendo lo mismo.
 
 Solo hay trabajo en el caso excepcional: si el cliente quiere sus eventos en su
-propio sistema, se llena `eventsWebhook` en Tenants → Webhooks. Ese cliente deja
-de llegarle al workflow común.
+propio sistema, se edita `eventsWebhook` en Tenants → Webhooks.
 
-Del lado de n8n, el workflow único tiene que hacer dos cosas: descartar por
-`X-Notoriovs-Delivery` lo ya visto y enrutar por `event`. Autenticación no tiene
-que verificar ninguna: el nodo Webhook se deja sin autenticar a propósito
+**Y aquí está el evento que sí duele perder.** La decisión 5 acepta que un
+evento no entregado se pierde, con el argumento de que lo perdido es un aviso y
+no un dato. Para `tenant.created` no es así: si ese evento no llega, el Tenant
+queda **sin infraestructura en n8n**, y entonces no se pierde un aviso — se
+pierden *todos* los de ese cliente, para siempre, y nada en la plataforma lo
+dice. El síntoma aparece semanas después como "a este cliente nunca le llegan
+sus leads".
+
+No se resuelve con una cola (ver decisión 5), se resuelve mirando: **acción tuya
+al dar de alta un cliente**, confirmar en n8n que su infraestructura quedó
+creada. Es una vez por cliente y es el momento en que ya estás ahí.
+
+Del lado de n8n, el workflow de cada Tenant tiene que hacer dos cosas: descartar
+por `X-Notoriovs-Delivery` lo ya visto y enrutar por `event`. Autenticación no
+tiene que verificar ninguna: el nodo Webhook se deja sin autenticar a propósito
 (decisión 6). Y no hace falta que conteste rápido: nadie está esperando su
 respuesta.
 
 ## Consecuencias
 
-- Un campo nuevo en Tenants (`eventsWebhook`) con su migración, y **una** env
-  var nueva: `EVENTS_WEBHOOK_URL`. Ningún secreto nuevo, así que tampoco hay
-  default-deny que respetar: el único requisito para emitir es tener a dónde.
+- Un campo nuevo en Tenants (`eventsWebhook`) con su migración, y **ninguna env
+  var nueva**: el campo se autogenera al crear el Tenant y después es editable,
+  así que no hay URL de plataforma que configurar ni default-deny que respetar.
+  El único requisito para emitir es tener a dónde, y siempre se tiene.
 - **No** se enciende la cola de jobs de Payload. Nada que purgar en los
   runbooks, nada que configurar en el despliegue.
 - El bloque `tenant` del sobre se arma con sus cinco campos enumerados, no
@@ -279,7 +310,7 @@ respuesta.
   que sale del Tenant se enumera, no se filtra. Y como ahora va en **todos** los
   eventos, un descuido ahí ya no se escapa por un evento sino por los tres.
 - El issue 16 ya no tiene nada que decidir sobre el transporte: emite
-  `lead.created`, lo consume el workflow único. Lo que sí cambió es a quién
+  `lead.created`, lo consume el workflow de ese Tenant. Lo que sí cambió es a quién
   avisa —el contacto general del Tenant, no cada Tenant User con su
   interruptor—, y ese issue quedó recortado en consecuencia.
 - El issue 32 **no** hereda nada de aquí. Sigue siendo sobre las llaves de
