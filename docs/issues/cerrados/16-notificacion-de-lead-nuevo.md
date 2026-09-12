@@ -6,8 +6,8 @@ WhatsApp o correo, sin tener el dashboard abierto. La plataforma emite el evento
 
 **Blocked by:** 09 (roles y scope) — hecho
 
-**Status:** IMPLEMENTADO en dev, **sin desplegar**. Ver "El día del
-despliegue" al final.
+**Status:** CERRADO. En `main` y desplegado; los pasos de "El día del
+despliegue" ya se aplicaron en producción.
 
 - [x] Al crearse un Lead —por cualquiera de las cuatro puertas— sale un evento
       `lead.created` con el sobre del ADR 0008

@@ -5,7 +5,7 @@ esperarse, para que un n8n lento no mantenga abierta una transacción de Postgre
 
 **Blocked by:** None (can start immediately)
 
-**Status:** RESUELTO junto con el issue 16, sin desplegar. El hook de alta ya no
+**Status:** CERRADO. Resuelto junto con el issue 16, en `main` y desplegado. El hook de alta ya no
 manda el webhook a mano: emite `tenant.created` con `emitTenantEvent`
 (`src/events/tenantEvents.ts`), que difiere la entrega con `waitUntil` y no la
 espera. Es la misma pieza para los tres eventos, así que no quedaron dos formas

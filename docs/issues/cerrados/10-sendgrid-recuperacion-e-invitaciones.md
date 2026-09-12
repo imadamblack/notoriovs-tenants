@@ -7,7 +7,9 @@ con el nombre del Tenant visible en el remitente.
 
 **Blocked by:** 08 (Tenant Users con login real), 00 (cuenta de SendGrid verificada)
 
-**Status:** IMPLEMENTADO en la rama `feat/10-correo-recuperacion-e-invitaciones` (2026-09-09). Falta el prerrequisito humano del 00: la llave `SENDGRID_API_KEY` y el remitente verificado. Sin ella el código no manda correo — lo imprime en la consola — así que la rama es segura de desplegar antes de que exista la cuenta.
+**Status:** CERRADO. En `main` y desplegado. La llave `SENDGRID_API_KEY` y el
+remitente verificado ya están puestos en producción, así que el correo sale de
+verdad (antes se imprimía en consola).
 
 - [x] Un Tenant User pide recuperar su contraseña, recibe el correo y la cambia
 - [x] El enlace de recuperación expira y no se puede reusar

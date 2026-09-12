@@ -22,7 +22,7 @@ import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
 // no declara los campos viejos, así que dice que esas columnas no existen. La
 // segunda migración —la que sí las borra— hay que escribirla a mano: el
 // generador no va a proponer un borrado que él ya cree hecho. El SQL exacto
-// está en docs/issues/16-notificacion-de-lead-nuevo.md.
+// está en docs/issues/cerrados/16-notificacion-de-lead-nuevo.md.
 
 export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`

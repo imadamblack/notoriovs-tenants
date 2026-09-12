@@ -5,7 +5,7 @@ en persona, sin salir del dashboard.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** IMPLEMENTADO en `dev` (2026-09-10).
+**Status:** CERRADO. En `main` y desplegado.
 
 - [x] El formulario exige nombre y al menos un medio de contacto, nada más
 - [x] El Lead nace en la primera etapa del Pipeline del Tenant y con Status abierto, y la etapa se puede cambiar al capturarlo

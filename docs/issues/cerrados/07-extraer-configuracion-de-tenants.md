@@ -7,7 +7,8 @@ ni el esquema de la base. Hace baratos los dos tickets que vienen después.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** hecho en `dev`, sin desplegar
+**Status:** CERRADO. En `main` y desplegado. Sin cambio de esquema, así que no
+hubo nada que migrar.
 
 - [x] La configuración queda repartida por área: identidad, landing, quiz, pipeline, integraciones
 - [x] No hay cambio de esquema: no se genera ninguna migración

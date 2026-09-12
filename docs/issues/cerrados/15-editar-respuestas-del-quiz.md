@@ -12,7 +12,7 @@ lo editado es lo que vale para mostrar, exportar y medir.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** IMPLEMENTADO en `dev` (commit 2a40214, 2026-09-11), sin desplegar.
+**Status:** CERRADO. En `main` y desplegado (commit 2a40214).
 
 - [x] Las respuestas se editan en el panel de edición del lead, junto al resto
       de sus campos, y se guardan con el mismo botón

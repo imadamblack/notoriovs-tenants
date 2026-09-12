@@ -10,7 +10,7 @@ memoria.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** hecho en `dev`, sin desplegar
+**Status:** CERRADO. En `main` y desplegado.
 
 - [x] El filtro de periodo ofrece presets y afecta los KPIs derivados de Leads
 - [x] La sección de marketing muestra el rango real de semanas completas que está representando

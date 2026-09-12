@@ -15,4 +15,4 @@ desbloquea el alta automática de Tenants y todo el correo transaccional.
 - [ ] Confirmar que llega y sale correo de los ~30 buzones corporativos, y que n8n y SendGrid siguen resolviendo
 - [ ] Agregar el dominio wildcard en Vercel y verificar que un subdominio nuevo resuelve sin darlo de alta a mano
 - [ ] No borrar la zona vieja durante 2-3 semanas
-- [ ] Cuenta de SendGrid con el dominio remitente de Notoriovs verificado
+- [x] Cuenta de SendGrid con el dominio remitente de Notoriovs verificado

@@ -5,7 +5,7 @@ clona un Tenant molde de su vertical y se ajustan marca y textos. Se aprovecha e
 duplicado que el panel ya ofrece; lo único que hay que resolver es que el
 subdominio no choque al clonar.
 
-**Blocked by:** 07 (extraer configuración de Tenants)
+**Blocked by:** 07 (extraer configuración de Tenants) — hecho
 
 **Status:** ready-for-agent
 
