@@ -5,8 +5,9 @@ import { revalidateTenantSite } from '@/utils/tenantSiteCache'
 import { identityFields, generalInfoTab } from './identity'
 import { landingTab } from './landing'
 import { quizTab, thankYouTab, notEligibleTab } from './quiz'
-import { integrationsTab, N8N_WEBHOOK_BASE } from './integrations'
+import { integrationsTab } from './integrations'
 import { pipelineTab } from './pipeline'
+import { emitTenantEvent, EVENTS_WEBHOOK_BASE } from '@/events/tenantEvents'
 
 // La configuración del tenant vive repartida por área en los módulos vecinos.
 // Este archivo solo ensambla: los hooks de colección y el orden de los tabs.
@@ -54,19 +55,24 @@ export const Tenants: CollectionConfig = {
     delete: isSuperadmin,
   },
   hooks: {
-    // Autogenera `quizWebhook` a partir de `subdomain`. Va aquí (a nivel de
-    // colección) y no como hook de campo porque `subdomain` es un campo raíz
-    // y `quizWebhook` vive anidado dentro de `tabs`: los hooks beforeValidate
-    // de campo corren todos en paralelo (Promise.all) y el recorrido síncrono
-    // llega al campo anidado antes de que se resuelva el microtask que
-    // escribe el valor de `subdomain`, dejando `quizWebhook` vacío. El hook
-    // de colección beforeValidate, en cambio, corre solo después de que
-    // TODO el árbol de hooks de campo terminó, así que aquí `data.subdomain`
-    // ya es el valor final.
+    // Autogenera `eventsWebhook` a partir de `subdomain`, **solo al crear**:
+    // después es un campo editable y reescribirlo en cada guardado borraría la
+    // edición del que lo apuntó a su propio sistema (ADR 0008, decisión 1).
+    //
+    // Va aquí (a nivel de colección) y no como hook de campo porque `subdomain`
+    // es un campo raíz y `eventsWebhook` vive anidado dentro de `tabs`: los
+    // hooks beforeValidate de campo corren todos en paralelo (Promise.all) y el
+    // recorrido síncrono llega al campo anidado antes de que se resuelva el
+    // microtask que escribe el valor de `subdomain`, dejándolo vacío. El hook
+    // de colección beforeValidate, en cambio, corre solo después de que TODO el
+    // árbol de hooks de campo terminó, así que aquí `data.subdomain` ya es el
+    // valor final.
     beforeValidate: [
-      ({ data }) => {
+      ({ data, operation }) => {
+        if (operation !== 'create') return data
+        if (typeof data?.eventsWebhook === 'string' && data.eventsWebhook.trim()) return data
         if (typeof data?.subdomain === 'string' && data.subdomain.trim()) {
-          return { ...data, quizWebhook: `${N8N_WEBHOOK_BASE}${data.subdomain}` }
+          return { ...data, eventsWebhook: `${EVENTS_WEBHOOK_BASE}${data.subdomain}` }
         }
         return data
       },
@@ -88,30 +94,35 @@ export const Tenants: CollectionConfig = {
         await revalidateTenantSite([doc.subdomain, previousDoc?.subdomain], req.payload)
       },
 
-      // Notifica a n8n cuando se da de alta un tenant nuevo (no en updates).
-      // Fire-and-forget: no bloquea ni revierte la creación si el webhook falla.
-      async ({ doc, operation, req }) => {
+      // Avisa que se dio de alta un cliente nuevo (no en updates). Va al tubo
+      // de PLATAFORMA, no al del cliente: del otro lado, este evento es el que
+      // crea la infraestructura de este Tenant en n8n —incluida la ruta de su
+      // propio `eventsWebhook`—, así que mandarlo al tubo del cliente sería
+      // mandarlo a una URL que todavía no escucha nadie. Si no llega, el
+      // cliente queda sin infraestructura y no se pierde un aviso: se pierden
+      // todos. Por eso el ADR 0008 pide confirmarlo a mano al dar de alta.
+      //
+      // `emitTenantEvent` no se espera: este hook corre dentro de la
+      // transacción de Postgres del guardado, y un n8n lento la mantendría
+      // abierta (issue 33).
+      ({ doc, operation, req }) => {
         if (operation !== 'create') return
 
-        try {
-          await fetch(`${N8N_WEBHOOK_BASE}tenant-created`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: doc.name,
-              subdomain: doc.subdomain,
-              whatsapp: doc.generalInfo?.whatsapp,
-              email: doc.generalInfo?.email,
-              quizWebhook: doc.quizWebhook,
-              quizQuestions: Array.isArray(doc.quizSteps)
-                ? doc.quizSteps.map((step: { name?: string }) => step?.name)
-                : [],
-              createdAt: new Date().toISOString(),
-            }),
-          })
-        } catch (err) {
-          req.payload.logger.warn(`No se pudo notificar tenant-created a n8n para tenant ${doc.name}: ${err}`)
-        }
+        emitTenantEvent({
+          event: 'tenant.created',
+          // El doc recién guardado ya es el Tenant: no hace falta releerlo, y
+          // el sobre se arma enumerando sus cinco campos, no esparciéndolo.
+          tenant: doc,
+          // Quién es el cliente y cómo contactarlo ya viaja en el sobre de
+          // todos los eventos; `data` es lo que el sobre no dice.
+          data: {
+            quizQuestions: Array.isArray(doc.quizSteps)
+              ? doc.quizSteps.map((step: { name?: string }) => step?.name)
+              : [],
+            createdAt: doc.createdAt ?? new Date().toISOString(),
+          },
+          payload: req.payload,
+        })
       },
     ],
 

@@ -1,11 +1,11 @@
 import type { CollectionConfig } from 'payload'
 import { isInternalUser } from '@/access/isInternalUser'
+import { emitTenantEventById, leadEventData } from '@/events/tenantEvents'
 
 // Leads generados por el quiz de cada tenant. Antes solo se reenviaban a un
-// webhook de n8n (ver `Tenants.quizWebhook` y /api/quiz-submit); ahora
-// además se guardan aquí para poder mostrarlos en el dashboard de cliente
-// (Kanban + edición + KPIs). El envío a n8n se mantiene igual (dual-write)
-// para no romper automatizaciones existentes.
+// webhook de n8n (ver /api/quiz-submit); ahora además se guardan aquí para
+// poder mostrarlos en el dashboard de cliente (Kanban + edición + KPIs), y el
+// aviso al cliente sale del hook `afterChange` de abajo.
 //
 // Dos campos separados para dos preguntas distintas:
 //   - `stage`: EN QUÉ COLUMNA del Kanban está el lead ahora mismo. Guarda el
@@ -36,6 +36,42 @@ export const Leads: CollectionConfig = {
     useAsTitle: 'name',
     defaultColumns: ['name', 'tenant', 'stage', 'status', 'phone', 'createdAt'],
     description: 'Leads capturados por el quiz de cada tenant.',
+  },
+  hooks: {
+    // EL punto de emisión de `lead.created` (ADR 0008, decisión 4). Está aquí,
+    // en la colección, y no en cada ruta que crea Leads, porque un Lead entra
+    // hoy por cuatro puertas —el quiz, el alta a mano del cliente, el ingest de
+    // n8n y el panel de Payload— y solo esta las cubre todas: el panel no pasa
+    // por ninguna ruta nuestra, y una ruta nueva queda cubierta sin acordarse
+    // de nada.
+    //
+    // `operation === 'create'` es también lo que sostiene la idempotencia del
+    // ingest: un reintento de n8n que cae en `update` por `externalId` no
+    // vuelve a avisar.
+    afterChange: [
+      async ({ doc, operation, req }) => {
+        if (operation !== 'create') return
+
+        // Según la profundidad con que se guardó, `tenant` llega como id o ya
+        // poblado.
+        const tenantId =
+          doc.tenant && typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+
+        // No se espera la entrega, y un fallo no revierte nada: el Lead ya
+        // está guardado (este hook corre dentro de su transacción). Lo único
+        // que se espera es leer el Tenant, que es una lectura por id contra la
+        // misma base.
+        await emitTenantEventById({
+          event: 'lead.created',
+          tenantId,
+          // El Lead completo salvo campos internos, en el mismo cuerpo que
+          // usa `quiz.completed`: un solo juego de nodos en n8n lee los dos.
+          data: leadEventData(doc),
+          payload: req.payload,
+          req,
+        })
+      },
+    ],
   },
   access: {
     // Solo usuarios internos (colección `users`) pueden leer, crear, editar o

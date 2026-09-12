@@ -5,7 +5,11 @@ esperarse, para que un n8n lento no mantenga abierta una transacción de Postgre
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** RESUELTO junto con el issue 16, sin desplegar. El hook de alta ya no
+manda el webhook a mano: emite `tenant.created` con `emitTenantEvent`
+(`src/events/tenantEvents.ts`), que difiere la entrega con `waitUntil` y no la
+espera. Es la misma pieza para los tres eventos, así que no quedaron dos formas
+de mandar un webhook en el repo.
 
 ## El problema
 
@@ -36,10 +40,10 @@ Es el mismo criterio que va a usar el emisor de eventos del ADR 0008, decisión 
 Conviene resolver los dos con la misma pieza, para que no haya dos formas de
 mandar un webhook en este repo.
 
-- [ ] El alta de un Tenant no espera la respuesta de n8n
-- [ ] Un n8n caído o lento no alarga ni revierte el guardado del Tenant
-- [ ] El fallo sigue quedando en el log
-- [ ] El comentario del hook dice lo que el código hace
+- [x] El alta de un Tenant no espera la respuesta de n8n
+- [x] Un n8n caído o lento no alarga ni revierte el guardado del Tenant
+- [x] El fallo sigue quedando en el log
+- [x] El comentario del hook dice lo que el código hace
 
 ## Pruebas
 

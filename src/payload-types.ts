@@ -471,13 +471,9 @@ export interface Tenant {
     contentHTML?: string | null;
   };
   /**
-   * URL a la que se envía el lead cuando completa el opt-in inicial (antes de empezar el quiz).
+   * A dónde se mandan los eventos de este cliente (lead nuevo, quiz completado). Se genera solo al crear el cliente como https://n8n.notoriovs.com/webhook/ + subdominio; cámbialo solo si el cliente quiere sus eventos en su propio sistema. Si se deja vacío, el cliente deja de recibir avisos.
    */
-  optInWebhook?: string | null;
-  /**
-   * Se genera automáticamente como https://n8n.notoriovs.com/webhook/ + subdominio. No editable.
-   */
-  quizWebhook?: string | null;
+  eventsWebhook?: string | null;
   tracking?: {
     metaPixelId?: string | null;
     metaCapiToken?: string | null;
@@ -1079,8 +1075,7 @@ export interface TenantsSelect<T extends boolean = true> {
         content?: T;
         contentHTML?: T;
       };
-  optInWebhook?: T;
-  quizWebhook?: T;
+  eventsWebhook?: T;
   tracking?:
     | T
     | {

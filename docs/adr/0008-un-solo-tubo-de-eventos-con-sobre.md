@@ -1,4 +1,4 @@
-# Los eventos salen por un solo tubo, con sobre
+# Los eventos salen con sobre, por el tubo de quien es el hecho
 
 Hasta hoy cada integración saliente se inventó su convención. Este ADR fija una
 sola, y la deja definida para los eventos que todavía no existen —empezando por
@@ -21,18 +21,29 @@ hoy por cuatro puertas y solo una de ellas avisa a alguien.
 
 ## Las decisiones
 
-### 1. Un solo tubo por Tenant, no uno por evento
+### 1. Dos tubos, y la línea entre ellos es de quién es el hecho
 
-Cada Tenant tiene **una** URL de destino, `eventsWebhook`, y **todos** sus
-eventos salen por ahí. El tipo de evento se distingue por un campo del cuerpo,
-no por la URL.
+Hay **dos** destinos, y cuál le toca a un evento no lo decide la comodidad sino
+a quién le pasó la cosa:
 
-El campo **nunca está vacío y no hay default de plataforma**: al dar de alta el
-Tenant se llena solo con `{N8N_WEBHOOK_BASE}{subdomain}`, igual que hoy se llena
-`quizWebhook`. La diferencia con `quizWebhook` es que éste **sí es editable**:
-el valor autogenerado es un punto de partida, no una imposición.
+| Tipo de evento | Qué es | A dónde sale |
+| --- | --- | --- |
+| **Del Tenant** | Le pasó algo al negocio de ese cliente | Su `eventsWebhook` |
+| **De plataforma** | Le pasó algo a nuestra cartera de clientes | `{EVENTS_WEBHOOK_BASE}tenants-crm`, uno solo para todos |
 
-Por qué así y no una URL de plataforma por evento:
+Dentro de cada tubo, el tipo de evento se distingue por un campo del cuerpo, no
+por la URL: quien recibe tiene un solo nodo de entrada que enruta por `event`.
+Eso vale para los dos, y por eso el tubo de plataforma se llama por el tubo
+(`tenants-crm`) y no por un evento — si se llamara `tenant-created`, el segundo
+evento de plataforma abriría una URL nueva y estaríamos otra vez en una URL por
+evento, que es justo lo que este ADR no quiere.
+
+**El `eventsWebhook` de cada Tenant nunca está vacío**: al dar de alta el Tenant
+se llena solo con `{EVENTS_WEBHOOK_BASE}{subdomain}`, igual que hoy se llena
+`quizWebhook`. La diferencia con `quizWebhook` es que éste **sí es editable**: el
+valor autogenerado es un punto de partida, no una imposición.
+
+Por qué los eventos del Tenant no salen a una URL de plataforma por evento:
 
 - El consumidor no tiene por qué ser n8n. Una URL por evento, fija para todos,
   clava a n8n como *el* receptor del producto. Una URL por Tenant deja que un
@@ -42,14 +53,38 @@ Por qué así y no una URL de plataforma por evento:
   saber a qué WhatsApp notificar y con qué credenciales. La ramificación no se
   evita, solo se mueve.
 
-Y por qué **no** hay una URL de plataforma común como respaldo: porque no hace
-falta. El campo siempre viene lleno, así que el respaldo cubriría un caso que no
-existe — una env var, un workflow que ramifica entre 50+ clientes, y una segunda
-ruta por la que un evento puede salir, todo para nada.
+**Y por qué entonces existe el tubo de plataforma.** Esta versión del ADR dice lo
+contrario de la anterior, que no admitía ninguna URL común; se corrigió al
+implementar el issue 16, antes de desplegar nada. El caso que la tumbó es
+`tenant.created`:
+
+- Ese evento es el que **crea** la infraestructura de un Tenant en n8n, incluida
+  la ruta de su propio `eventsWebhook`. Mandarlo al tubo del cliente es mandarlo
+  a una URL que todavía no escucha nadie: el campo está lleno en nuestra base y
+  vacío del otro lado. El cliente nace sin aprovisionar y nada en la plataforma
+  lo dice.
+- Los dos argumentos de arriba no le aplican. Ningún cliente quiere que le
+  avisen que lo dimos de alta —ese hecho es de nuestra cartera, no de su
+  negocio—, así que no hay a quién dejarle apuntarlo a otro lado. Y el workflow
+  que lo recibe es justamente el que **no** ramifica por Tenant: hace lo mismo
+  para todos.
+
+Ojo con lo que **no** es esto: no es un respaldo. Un respaldo sería una segunda
+ruta por la que puede salir un evento cuando la primera falta, y eso sigue sin
+existir — cada evento tiene exactamente una salida posible, la que dice su
+renglón del catálogo. Tampoco trae una env var nueva: la base ya está en el
+código.
+
+Lo que esta línea compra, además de destrabar el alta, es que ya está contestado
+dónde caen los eventos que todavía no existen. `tenant.activated` y
+`tenant.deactivated` (issue 21) son de plataforma: son hechos de la relación
+comercial con el cliente, no de su negocio, y el que los escucha es el mismo que
+provisiona.
 
 No se reutiliza `quizWebhook` para esto: es de solo lectura, se reescribe en
 cada guardado y es el que consumen los workflows viejos, que se van (decisión 7).
-`eventsWebhook` es un campo nuevo.
+`eventsWebhook` es un campo nuevo, y la constante con la base de las URLs de n8n
+pasa a llamarse `EVENTS_WEBHOOK_BASE` (era `N8N_WEBHOOK_BASE`).
 
 **Dos cosas que hay que saber, y que son el precio de autogenerar:**
 
@@ -124,11 +159,27 @@ que un consumidor pueda tener un solo nodo de entrada que enruta por `event`.
 
 Tres, y son los tres que hoy tienen quién los espere:
 
-| Evento | Cuándo | `data` |
-| --- | --- | --- |
-| `lead.created` | Nace un Lead, venga por donde venga, **si el Tenant está activo** | El Lead completo salvo campos internos: `id`, `name`, `phone`, `whatsapp`, `email`, `source`, `externalId`, `stage`, `status`, `notes`, `utm`, `answers`, `createdAt` |
-| `quiz.completed` | Alguien termina el quiz | `answers`, `leadId` (puede faltar), `utm` |
-| `tenant.created` | Se da de alta un cliente | `quizQuestions`, `createdAt` |
+| Evento | Cuándo | Tubo | `data` |
+| --- | --- | --- | --- |
+| `lead.created` | Nace un Lead, venga por donde venga, **si el Tenant está activo** | Tenant | El Lead |
+| `quiz.completed` | Alguien termina el quiz | Tenant | El Lead |
+| `tenant.created` | Se da de alta un cliente | Plataforma | `quizQuestions`, `createdAt` |
+
+**Los dos eventos que hablan de un Lead mandan el mismo `data`**, campo por
+campo: `id`, `name`, `phone`, `whatsapp`, `email`, `source`, `externalId`,
+`stage`, `status`, `notes`, `utm`, `answers`, `createdAt`. Lo arma una sola
+función (`leadEventData`), así que no es una coincidencia que haya que mantener.
+
+La razón es del otro lado del tubo: los dos caen en la misma URL, y si cada uno
+nombrara sus campos a su manera —`id` aquí, `leadId` allá— cada workflow
+necesitaría dos mapeos para los mismos dos datos. Se enruta por `event` para
+decidir qué hacer, no para saber dónde está el teléfono.
+
+Un `quiz.completed` cuyo Lead no se pudo guardar manda los mismos campos: el
+contacto sale de las respuestas, y va en nulo solo lo que de verdad no existe
+sin un Lead guardado (`id`, `stage`, `status`, `createdAt`). La forma no cambia
+porque el guardado haya fallado — y ese es justo el momento en que alguien tiene
+que atender a mano, o sea el peor para mandar un cuerpo distinto.
 
 `tenant.created` trae un `data` casi vacío a propósito: quién es el cliente y
 cómo contactarlo ya viaja en el sobre de **todos** los eventos, y repetirlo
@@ -147,8 +198,8 @@ se emiten hoy:
 
 - **`lead.status_changed`**. Ningún issue lo pide. Un evento que nadie escucha
   es un contrato que hay que respetar sin que nadie lo use.
-- **`tenant.activated` / `tenant.deactivated`**. Nacen del issue 21 (Stripe),
-  que no tiene fecha. Y si el 21 termina necesitando avisar *antes* de
+- **`tenant.activated` / `tenant.deactivated`**. Serían de plataforma
+  (decisión 1). Nacen del issue 21 (Stripe), que no tiene fecha. Y si el 21 termina necesitando avisar *antes* de
   desactivar, va a querer decidir su propio evento: mejor que lo encuentre sin
   escribir que escrito y teniendo que honrarlo o romperlo.
 - **`lead.stage_changed`**. Además de no tener consumidor, el Stage es el id
@@ -164,6 +215,16 @@ No es redundancia: hoy, si el guardado del Lead falla, el quiz igual avisa a
 n8n, y colapsarlos en uno perdería ese aviso. El que sirve para notificar al
 cliente es `lead.created` —es el único que dispara las cuatro puertas—; el del
 quiz es para lo que n8n ya hace con las respuestas.
+
+**Que salgan los dos siempre es decisión, no descuido**, y se revisó al
+implementar el issue 16: como los dos mandan el mismo `data`, se puede hacer que
+la ruta del quiz emita **solo** cuando el guardado falló, y entonces sale un
+único evento por submit. Se descartó por ahora: los workflows ya tienen que
+enrutar por `event` de todos modos, y un evento que solo aparece cuando algo se
+rompe es un camino que nadie ejerce hasta el día que importa. El precio de esta
+decisión hay que tenerlo presente y es concreto: **un workflow que no enrute por
+`event` manda dos mensajes por cada lead**, y como los cuerpos son idénticos,
+nada más los distingue.
 
 ### 4. Qué evento produce cada puerta por la que entra un Lead
 
@@ -255,26 +316,42 @@ Mientras el destino sea nuestro, no se construye.
 
 ### 7. Compatibilidad: corte seco, sin convivencia
 
-El contrato viejo y el nuevo **no conviven**. En el mismo despliegue se agrega
-`eventsWebhook` con el sobre, y se borran `quizWebhook` (campo y migración), el
-disparo a `{base}tenant-created`, la constante `N8N_WEBHOOK_BASE` y
-`optInWebhook`, que ya no lo lee nadie.
+El contrato viejo y el nuevo **no conviven**. En el mismo despliegue entra
+`eventsWebhook` con el sobre y salen del CÓDIGO `quizWebhook`, la URL fija
+`{base}tenant-created` y `optInWebhook`, que ya no lo lee nadie.
+
+Las dos columnas viejas se borran de la base **después**, en una segunda
+migración. No es una convivencia de contratos: nada las lee desde el momento del
+despliegue, son dos columnas muertas esperando el sepelio. Es por el orden en
+que ocurre un despliegue —la migración se aplica antes de que el código nuevo
+esté vivo, porque el build lo exige—, así que una migración que borre lo que el
+código viejo todavía nombra lo tira durante esos minutos. Ver el comentario de
+`20260912_035248_eventos_con_sobre.ts`.
+
+El alta de cliente cambia de URL, no solo de cuerpo: pasa de
+`{base}tenant-created` a `{base}tenants-crm`, el tubo de plataforma de la
+decisión 1. Es el mismo workflow escuchando en otra ruta.
 
 La convivencia existe para no romperle la integración a un tercero que no
 controlamos. Aquí son dos workflows y son nuestros: se migran a leer el sobre el
 mismo día. Una fase de transición sin fecha es permanente, y mientras dure, un
 submit del quiz sale dos veces y el cliente recibe dos WhatsApps.
 
-**Acción tuya el día del despliegue:** actualizar los dos workflows de n8n para
-leer el sobre, antes de subir el código.
+**Acción tuya el día del despliegue, antes de subir el código:** que los dos
+workflows de n8n lean el sobre, y que el de alta escuche en `tenants-crm`.
 
 ## Qué tiene que hacer quien dé de alta un cliente nuevo en n8n
 
-**Nada**, y no porque haya un workflow común que reciba a todos, sino porque n8n
-**se provisiona solo**: el hook `afterChange` del alta ya dispara hoy el evento
-de cliente nuevo, y del otro lado hay un workflow que crea la infraestructura de
-ese Tenant en n8n. Con el contrato nuevo ese disparo es `tenant.created`, con el
-sobre, y sigue haciendo lo mismo.
+**Nada**, y no porque haya un workflow común que reciba todos los eventos de
+todos, sino porque n8n **se provisiona solo**: el hook `afterChange` del alta
+dispara `tenant.created` al tubo de plataforma, y del otro lado hay un workflow
+que crea la infraestructura de ese Tenant en n8n —incluida la ruta en la que va
+a escuchar su `eventsWebhook`, que se deduce del `subdomain` del sobre igual que
+la deducimos nosotros—.
+
+Que la URL del `eventsWebhook` no viaje en el sobre no es un olvido: ninguna URL
+de webhook viaja adentro (decisión 2), y el que provisiona no la necesita porque
+la sabe armar.
 
 Solo hay trabajo en el caso excepcional: si el cliente quiere sus eventos en su
 propio sistema, se edita `eventsWebhook` en Tenants → Webhooks.
@@ -291,18 +368,18 @@ No se resuelve con una cola (ver decisión 5), se resuelve mirando: **acción tu
 al dar de alta un cliente**, confirmar en n8n que su infraestructura quedó
 creada. Es una vez por cliente y es el momento en que ya estás ahí.
 
-Del lado de n8n, el workflow de cada Tenant tiene que hacer dos cosas: descartar
-por `X-Notoriovs-Delivery` lo ya visto y enrutar por `event`. Autenticación no
-tiene que verificar ninguna: el nodo Webhook se deja sin autenticar a propósito
-(decisión 6). Y no hace falta que conteste rápido: nadie está esperando su
-respuesta.
+Del lado de n8n, cada workflow —el de cada Tenant y el de plataforma— tiene que
+hacer dos cosas: descartar por `X-Notoriovs-Delivery` lo ya visto y enrutar por
+`event`. Autenticación no tiene que verificar ninguna: el nodo Webhook se deja
+sin autenticar a propósito (decisión 6). Y no hace falta que conteste rápido:
+nadie está esperando su respuesta.
 
 ## Consecuencias
 
 - Un campo nuevo en Tenants (`eventsWebhook`) con su migración, y **ninguna env
-  var nueva**: el campo se autogenera al crear el Tenant y después es editable,
-  así que no hay URL de plataforma que configurar ni default-deny que respetar.
-  El único requisito para emitir es tener a dónde, y siempre se tiene.
+  var nueva**: el campo se autogenera al crear el Tenant y después es editable, y
+  la URL del tubo de plataforma es una constante al lado de la base que ya
+  estaba. El único requisito para emitir es tener a dónde, y siempre se tiene.
 - **No** se enciende la cola de jobs de Payload. Nada que purgar en los
   runbooks, nada que configurar en el despliegue.
 - El bloque `tenant` del sobre se arma con sus cinco campos enumerados, no
@@ -310,7 +387,8 @@ respuesta.
   que sale del Tenant se enumera, no se filtra. Y como ahora va en **todos** los
   eventos, un descuido ahí ya no se escapa por un evento sino por los tres.
 - El issue 16 ya no tiene nada que decidir sobre el transporte: emite
-  `lead.created`, lo consume el workflow de ese Tenant. Lo que sí cambió es a quién
+  `lead.created` —que es del Tenant, así que sale por el tubo del Tenant—, y lo
+  consume el workflow de ese cliente. Lo que sí cambió es a quién
   avisa —el contacto general del Tenant, no cada Tenant User con su
   interruptor—, y ese issue quedó recortado en consecuencia.
 - El issue 32 **no** hereda nada de aquí. Sigue siendo sobre las llaves de

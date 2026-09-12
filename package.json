@@ -26,11 +26,14 @@
     "test": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts"
   },
   "dependencies": {
+    "@payloadcms/db-postgres": "3.85.2",
     "@payloadcms/next": "3.85.2",
     "@payloadcms/plugin-multi-tenant": "3.85.2",
     "@payloadcms/richtext-lexical": "3.85.2",
     "@payloadcms/storage-vercel-blob": "3.85.2",
     "@payloadcms/ui": "3.85.2",
+    "@vercel/blob": "2.3.1",
+    "@vercel/functions": "3.9.7",
     "cookies-next": "^5.1.0",
     "cross-env": "^7.0.3",
     "dotenv": "16.4.7",
@@ -42,9 +45,7 @@
     "react-calendly": "^4.3.1",
     "react-dom": "19.2.6",
     "react-hook-form": "^7.54.2",
-    "sharp": "0.34.2",
-    "@vercel/blob": "2.3.1",
-    "@payloadcms/db-postgres": "3.85.2"
+    "sharp": "0.34.2"
   },
   "devDependencies": {
     "@types/node": "22.19.9",
