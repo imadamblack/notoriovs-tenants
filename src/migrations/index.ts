@@ -5,6 +5,7 @@ import * as migration_20260909_101800_retirar_contrasena_compartida from './2026
 import * as migration_20260910_004723_leads_ingest from './20260910_004723_leads_ingest';
 import * as migration_20260910_224316_exportar_leads_csv from './20260910_224316_exportar_leads_csv';
 import * as migration_20260912_035248_eventos_con_sobre from './20260912_035248_eventos_con_sobre';
+import * as migration_20260912_194122_borrar_webhooks_viejos from './20260912_194122_borrar_webhooks_viejos';
 
 export const migrations = [
   {
@@ -40,6 +41,11 @@ export const migrations = [
   {
     up: migration_20260912_035248_eventos_con_sobre.up,
     down: migration_20260912_035248_eventos_con_sobre.down,
-    name: '20260912_035248_eventos_con_sobre'
+    name: '20260912_035248_eventos_con_sobre',
+  },
+  {
+    up: migration_20260912_194122_borrar_webhooks_viejos.up,
+    down: migration_20260912_194122_borrar_webhooks_viejos.down,
+    name: '20260912_194122_borrar_webhooks_viejos',
   },
 ];
