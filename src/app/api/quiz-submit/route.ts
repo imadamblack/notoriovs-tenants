@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getTenantBySubdomain } from '@/utils/getTenant'
+import { emitTenantEventById, leadEventData } from '@/events/tenantEvents'
 
-// Cada submit del quiz hace dos cosas en paralelo (dual-write):
-//   1. Reenvía la respuesta cruda al webhook de n8n del tenant, igual que
-//      siempre (no se toca esa integración: sigue alimentando lo que sea
-//      que n8n haga con ella hoy).
-//   2. Guarda un doc en la colección `leads` (Payload/Postgres) para que el
-//      dashboard de cliente (Kanban + KPIs) tenga de dónde leer.
-// Si (2) falla no se cae el submit: el lead igual llegó a n8n. Si (1) falla
-// tampoco se cae: el lead ya quedó guardado en Payload.
+// Cada submit del quiz hace dos cosas:
+//   1. Guarda un doc en la colección `leads` (Payload/Postgres) para que el
+//      dashboard de cliente (Kanban + KPIs) tenga de dónde leer. El aviso al
+//      cliente (`lead.created`) no sale de aquí: lo emite el hook de la
+//      colección, que cubre las cuatro puertas por las que entra un Lead.
+//   2. Emite `quiz.completed` al tubo del tenant, con las respuestas crudas.
+// Si (1) falla no se cae el submit y el evento del quiz sale igual — que es
+// justamente por lo que sigue habiendo dos eventos y no uno. Si (2) falla
+// tampoco se cae: el lead ya quedó guardado.
 export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any
@@ -40,18 +42,28 @@ export async function POST(req: NextRequest) {
   // la columna "Otro" del dashboard hasta que se les configure un pipeline.
   const firstStage = tenant.leadPipeline?.[0]?.id || 'nuevo'
 
-  let leadId: string | number | undefined
+  // Quién contestó, sacado de las respuestas. Se calcula una sola vez porque lo
+  // usan dos cosas: el Lead que se guarda y el evento que sale si ese guardado
+  // falla. Que el fallo es justo cuando más falta hace el contacto —no hay Lead
+  // en el Kanban, alguien tiene que atenderlo a mano— es la razón de que no se
+  // quede adentro del `create`.
+  const contacto = {
+    name: typeof answers?.nombre === 'string' ? answers.nombre : undefined,
+    phone: typeof answers?.telefono === 'string' ? answers.telefono : undefined,
+    whatsapp: typeof answers?.whatsapp === 'string' ? answers.whatsapp : undefined,
+    email: typeof answers?.email === 'string' ? answers.email : undefined,
+  }
+
+  // El Lead guardado, si se pudo guardar. Es lo que viaja en `quiz.completed`.
+  let lead: Awaited<ReturnType<typeof payload.create>> | undefined
+  const payload = await getPayload({ config })
 
   try {
-    const payload = await getPayload({ config })
-    const lead = await payload.create({
+    lead = await payload.create({
       collection: 'leads',
       data: {
         tenant: Number(tenant.id),
-        name: typeof answers?.nombre === 'string' ? answers.nombre : undefined,
-        phone: typeof answers?.telefono === 'string' ? answers.telefono : undefined,
-        whatsapp: typeof answers?.whatsapp === 'string' ? answers.whatsapp : undefined,
-        email: typeof answers?.email === 'string' ? answers.email : undefined,
+        ...contacto,
         stage: firstStage,
         status: 'open',
         source: 'quiz',
@@ -59,31 +71,21 @@ export async function POST(req: NextRequest) {
         utm: utm ?? null,
       },
     })
-    leadId = lead.id
   } catch (err) {
     console.error(`No se pudo guardar el lead en Payload para tenant ${tenant.name}`, err)
   }
 
-  if (!tenant.quizWebhook) {
-    console.warn(`Tenant ${tenant.name} no tiene "quizWebhook" configurado`)
-    return NextResponse.json({ ok: true, id: leadId })
-  }
+  await emitTenantEventById({
+    event: 'quiz.completed',
+    tenantId: tenant.id,
+    // El MISMO cuerpo que `lead.created`. Si el guardado de arriba falló, el
+    // evento sale igual —el cliente no pierde las respuestas por un error
+    // nuestro—: misma forma, el contacto sacado de las respuestas, y en nulo
+    // solo lo que de verdad no existe sin un Lead guardado (`id`, `stage`,
+    // `status`, `createdAt`).
+    data: leadEventData(lead ?? { ...contacto, source: 'quiz', answers, utm }),
+    payload,
+  })
 
-  try {
-    await fetch(tenant.quizWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenant: tenant.name,
-        subdomain,
-        answers,
-        leadId,
-        submittedAt: new Date().toISOString(),
-      }),
-    })
-  } catch (err) {
-    console.error(`quizWebhook falló para tenant ${tenant.name}`, err)
-  }
-
-  return NextResponse.json({ ok: true, id: leadId })
+  return NextResponse.json({ ok: true, id: lead?.id })
 }

@@ -55,8 +55,7 @@ export type TenantDoc = {
     ctaLabel?: string | null
   } | null
   quizSteps?: TenantQuizStep[] | null
-  optInWebhook?: string | null
-  quizWebhook?: string | null
+  eventsWebhook?: string | null
   tracking?: TenantTracking | null
   leadPipeline?: TenantLeadStage[] | null
   leadStuckAfterDays?: number | null
@@ -175,7 +174,7 @@ export const TENANT_PROJECTIONS = {
   },
   quizSubmit: {
     depth: 0,
-    select: { name: true, leadPipeline: true, quizWebhook: true },
+    select: { name: true, leadPipeline: true },
   },
   // Quién firma un correo transaccional: el id para acotar la búsqueda del
   // usuario al Tenant, y el nombre de la empresa para el remitente visible y

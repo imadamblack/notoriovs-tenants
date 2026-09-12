@@ -4,6 +4,7 @@ import * as migration_20260909_050114_roles_y_scope from './20260909_050114_role
 import * as migration_20260909_101800_retirar_contrasena_compartida from './20260909_101800_retirar_contrasena_compartida';
 import * as migration_20260910_004723_leads_ingest from './20260910_004723_leads_ingest';
 import * as migration_20260910_224316_exportar_leads_csv from './20260910_224316_exportar_leads_csv';
+import * as migration_20260912_035248_eventos_con_sobre from './20260912_035248_eventos_con_sobre';
 
 export const migrations = [
   {
@@ -34,6 +35,11 @@ export const migrations = [
   {
     up: migration_20260910_224316_exportar_leads_csv.up,
     down: migration_20260910_224316_exportar_leads_csv.down,
-    name: '20260910_224316_exportar_leads_csv'
+    name: '20260910_224316_exportar_leads_csv',
+  },
+  {
+    up: migration_20260912_035248_eventos_con_sobre.up,
+    down: migration_20260912_035248_eventos_con_sobre.down,
+    name: '20260912_035248_eventos_con_sobre'
   },
 ];
