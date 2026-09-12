@@ -122,38 +122,20 @@ sale. A partir de aquí los avisos ya salen con el sobre.
 **Paso 4 — confirmar en n8n** que cada cliente tiene su workflow escuchando en
 la ruta de su `eventsWebhook`, y que el de plataforma escucha en `tenants-crm`.
 
-**Paso 5 — la migración que borra, en otro commit y cuando quieras.** Dos
-columnas nulas que nadie lee no molestan a nadie, así que esto puede esperar
-semanas. Lo que NO se puede es commitearla antes del paso 3: mientras esté en
-`src/migrations/index.ts` sin aplicar, el build se detiene.
+**Paso 5 — la migración que borra: `20260912_194122_borrar_webhooks_viejos`.**
+Ya está escrita y registrada; se aplica igual que la otra y en el mismo orden
+—primero la base, después el merge—, aunque aquí el orden ya no protege nada:
+ningún código vivo nombra esas columnas.
 
-Hay que escribirla **a mano**: el snapshot (`.json`) de la primera se generó
-desde la config, que ya no declara esos campos, así que el generador cree que
-las columnas no existen y no va a proponer borrarlas. El archivo completo es
-éste, y hay que registrarlo en `src/migrations/index.ts` como los demás:
-
-```ts
-import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
-
-// La segunda mitad del corte del ADR 0008: se van las dos columnas del
-// contrato viejo, ya sin nadie que las lea (ver el comentario de
-// 20260912_035248_eventos_con_sobre.ts, que explica por qué van aparte).
-//
-// El `down` las devuelve vacías y no restaura sus valores: `quiz_webhook` se
-// regeneraba solo en cada guardado y `opt_in_webhook` nunca lo leyó nadie.
-
-export async function up({ db }: MigrateUpArgs): Promise<void> {
-  await db.execute(sql`
-   ALTER TABLE "tenants" DROP COLUMN IF EXISTS "quiz_webhook";
-  ALTER TABLE "tenants" DROP COLUMN IF EXISTS "opt_in_webhook";`)
-}
-
-export async function down({ db }: MigrateDownArgs): Promise<void> {
-  await db.execute(sql`
-   ALTER TABLE "tenants" ADD COLUMN "quiz_webhook" varchar;
-  ALTER TABLE "tenants" ADD COLUMN "opt_in_webhook" varchar;`)
-}
 ```
+npm run prod -- npm run migrate
+```
+
+Está escrita a mano a propósito, y el archivo explica por qué: el snapshot
+(`.json`) de la primera se generó desde la config, que ya no declara esos
+campos, así que el generador cree que esas columnas no existen y nunca va a
+proponer borrarlas. Tampoco trae `.json` propio, porque el estado al que lleva
+la base es exactamente el que el snapshot de la primera ya describe.
 
 En desarrollo esto pasa solo: el push del dev server borra esas columnas la
 próxima vez que levantes el servidor, porque la config ya no las declara.
