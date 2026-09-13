@@ -39,7 +39,10 @@ export async function POST(req: NextRequest) {
   // El tenant sale del host, nunca del usuario: quien se autentica bien pero
   // pertenece a otro cliente recibe exactamente la misma respuesta que quien
   // erró la contraseña, para no delatar en qué subdominio existe una cuenta.
-  const tenant = await getTenantBySubdomain(subdomain, 'identity')
+  //
+  // `dashboardIdentity` no resuelve un tenant inactivo: con la suscripción
+  // caída no se abre sesión, aunque su landing y su quiz sigan corriendo.
+  const tenant = await getTenantBySubdomain(subdomain, 'dashboardIdentity')
   if (!tenant) {
     return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
   }

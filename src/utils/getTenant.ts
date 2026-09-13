@@ -137,9 +137,9 @@ export const TENANT_PROJECTIONS = {
     depth: 0, // solo texto: razón social, domicilio, teléfono, email
     select: IDENTITY,
   },
-  // Dashboard de Cliente. Si el tenant tiene o no dashboard disponible lo
-  // responde `tenantHasDashboard`, que cuenta usuarios en vez de leer nada
-  // del Tenant.
+  // Dashboard de Cliente. Esta proyección resuelve el Tenant esté activo o
+  // no: quien decide si hay dashboard disponible es `tenantHasDashboard`
+  // (usuarios + suscripción), para poder mostrar un aviso en vez de un 404.
   dashboard: {
     depth: 0,
     // `quizSteps` viaja aquí porque el panel de detalle deja corregir lo que
@@ -190,6 +190,15 @@ export const TENANT_PROJECTIONS = {
     depth: 0,
     select: { id: true },
   },
+  // Los mismos campos que `identity`, pero para las dos rutas que abren
+  // sesión de cliente (login y reset de contraseña). Son una entrada aparte
+  // porque lo que las distingue no son los campos sino la exigencia: estas
+  // solo resuelven un Tenant activo (ver ACTIVE_ONLY_TENANT_PROJECTIONS), y
+  // el ingest de marketing no.
+  dashboardIdentity: {
+    depth: 0,
+    select: { id: true },
+  },
   // Ingest de leads (POST /api/leads/ingest, el n8n de Notoriovs). Necesita
   // más que `identity` porque un lead nace en una etapa concreta: el
   // pipeline es para saber cuál es la primera. El nombre, para los logs.
@@ -219,6 +228,50 @@ export const PUBLIC_TENANT_PROJECTIONS = [
   'tenantMail',
 ] as const satisfies readonly TenantProjectionName[]
 
+/**
+ * Proyecciones que solo resuelven un Tenant **activo**. `active` es la
+ * suscripción, no la publicación (ver CONTEXT.md): un Tenant inactivo
+ * conserva su sitio público vivo y capturando Leads, y lo que pierde es el
+ * Dashboard de Cliente. Por eso la exigencia se declara proyección por
+ * proyección y no en la query de todas.
+ *
+ * Estar fuera de esta lista es lo normal: la landing, el quiz, el envío del
+ * quiz, el ingest de leads y el de marketing reports resuelven igual un
+ * Tenant inactivo. Entra aquí lo que **es** el dashboard:
+ *
+ *  - `dashboardApi` — la autorización de todas las rutas /api/tenant-dashboard
+ *    (`resolveDashboardAuth`), así que cerrarla aquí las cierra todas.
+ *  - `dashboardQuiz` — exportación de leads a CSV y corrección de respuestas.
+ *  - `dashboardIdentity` — abrir sesión: login y reset de contraseña.
+ *  - `tenantMail` — los correos que dan acceso (invitación, recuperación).
+ *
+ * `dashboard` (la página) queda fuera a propósito: resuelve el Tenant para
+ * poder mostrar el aviso de "dashboard no disponible" en vez de un 404 seco.
+ * Quién cierra esa puerta es `tenantHasDashboard`.
+ *
+ * `tenantProjections.int.spec.ts` afirma contra esta lista que ninguna
+ * proyección del sitio público exija un Tenant activo, igual que afirma que
+ * ninguna pública arrastre un secreto.
+ */
+export const ACTIVE_ONLY_TENANT_PROJECTIONS = [
+  'dashboardApi',
+  'dashboardQuiz',
+  'dashboardIdentity',
+  'tenantMail',
+] as const satisfies readonly TenantProjectionName[]
+
+/** Proyecciones que sirven el sitio público de un Tenant, activo o no. */
+export const TENANT_SITE_PROJECTIONS = [
+  'chrome',
+  'landing',
+  'quiz',
+  'thankYou',
+  'notEligible',
+  'privacyNotice',
+  'quizSubmit',
+  'conversionsApi',
+] as const satisfies readonly TenantProjectionName[]
+
 type ProjectField<V, S> = S extends true
   ? V
   : Pick<Present<V>, Extract<keyof S, keyof Present<V>>> | Extract<V, null | undefined>
@@ -233,18 +286,24 @@ export type TenantView<K extends TenantProjectionName> = Projected<
 >
 
 /**
- * La consulta que resuelve un tenant activo por subdominio con una
- * proyección dada. Separada de la ejecución para poder afirmarla en un test
- * sin base de datos.
+ * La consulta que resuelve un tenant por subdominio con una proyección dada.
+ * Separada de la ejecución para poder afirmarla en un test sin base de datos.
+ *
+ * Pide además `active: true` solo si la proyección lo exige: el sitio público
+ * de un Tenant inactivo se sigue sirviendo (ver
+ * ACTIVE_ONLY_TENANT_PROJECTIONS).
  */
 export function buildTenantQuery(subdomain: string, projection: TenantProjectionName) {
   const { depth, select } = TENANT_PROJECTIONS[projection]
+  const onlyActive = (ACTIVE_ONLY_TENANT_PROJECTIONS as readonly TenantProjectionName[]).includes(
+    projection,
+  )
 
   return {
     collection: 'tenants' as const,
     where: {
       subdomain: { equals: subdomain.toLowerCase() },
-      active: { equals: true },
+      ...(onlyActive ? { active: { equals: true } } : {}),
     },
     limit: 1,
     depth,
@@ -267,8 +326,8 @@ const findTenant = cache(
 )
 
 /**
- * Busca un tenant activo por subdominio y devuelve solo los campos de la
- * proyección pedida. Se usa desde las páginas de /tenant-site/[subdomain] y
+ * Busca un tenant por subdominio y devuelve solo los campos de la proyección
+ * pedida (activo o no, según lo que esa proyección exija). Se usa desde las páginas de /tenant-site/[subdomain] y
  * desde las rutas de /api.
  */
 export async function getTenantBySubdomain<K extends TenantProjectionName>(
@@ -292,11 +351,36 @@ export const tenantHasUsers = cache(async (tenantId: string | number): Promise<b
   return totalDocs > 0
 })
 
+/** ¿Este tenant tiene la suscripción al corriente? */
+export const tenantIsActive = cache(async (tenantId: string | number): Promise<boolean> => {
+  const payload = await getPayload({ config })
+  const { totalDocs } = await payload.count({
+    collection: 'tenants',
+    where: { id: { equals: tenantId }, active: { equals: true } },
+    overrideAccess: true,
+  })
+
+  return totalDocs > 0
+})
+
 /**
- * ¿Hay alguna forma de entrar al dashboard de este tenant? Solo hay una:
- * tener al menos un Tenant User. Un tenant sin usuarios ve el aviso de "no
- * disponible" en vez de un login que nadie podría pasar.
+ * ¿Hay alguna forma de entrar al dashboard de este tenant? Dos condiciones, y
+ * las dos se responden aquí porque la página necesita distinguir "no hay
+ * dashboard" de "no existe el tenant": tener al menos un Tenant User, y estar
+ * activo.
+ *
+ * Que el corte por `active` viva aquí y no en la proyección `dashboard` es lo
+ * que deja al tenant inactivo con el aviso de "no disponible" en vez de un
+ * 404 — el 404 diría que el sitio no existe, y su sitio sí existe: la landing
+ * y el quiz siguen corriendo al lado. Las rutas /api/tenant-dashboard/* sí
+ * cortan por proyección (`dashboardApi`), porque una API no tiene a quién
+ * explicarle nada.
  */
 export async function tenantHasDashboard(tenantId: string | number): Promise<boolean> {
-  return tenantHasUsers(tenantId)
+  const [hasUsers, isActive] = await Promise.all([
+    tenantHasUsers(tenantId),
+    tenantIsActive(tenantId),
+  ])
+
+  return hasUsers && isActive
 }

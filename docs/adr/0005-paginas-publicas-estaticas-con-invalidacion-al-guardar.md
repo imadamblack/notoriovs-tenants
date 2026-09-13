@@ -61,6 +61,15 @@ servía el sitio duplicado en dos URLs.
   con la lista de tenants: el sitio se genera en la primera visita. Listarlos
   obligaría a tener la base disponible durante el build y a redesplegar por
   cada alta.
+- **Desactivar un Tenant no baja su sitio, lo refresca.** `active` es la
+  suscripción, no la publicación (ver `CONTEXT.md`): la landing y el quiz de
+  un Tenant inactivo se siguen sirviendo y capturando Leads, porque apagarlos
+  sería tirarle la publicidad que tiene corriendo. El hook invalida igual al
+  activar y desactivar, como con cualquier otra edición. Qué sí exige un
+  Tenant activo está declarado en `ACTIVE_ONLY_TENANT_PROJECTIONS`
+  (`src/utils/getTenant.ts`) y es el Dashboard de Cliente. La primera versión
+  de esta ADR nació con el corte por `active` aplicado a todas las
+  proyecciones por igual; lo corrigió el issue 23.
 - **Un 404 también se cachea.** Si alguien entra a un subdominio antes de que
   exista el Tenant, ese 404 queda guardado; el hook de `create` lo tira.
 - **La primera visita después de guardar paga el render.** Es la misma

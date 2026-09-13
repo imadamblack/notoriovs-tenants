@@ -19,6 +19,6 @@ Leads**, porque apagarlos sería tirarle la publicidad que tiene corriendo.
 - [ ] Un `owner` llega al portal del proveedor y puede cancelar, cambiar tarjeta y ver facturas
 - [ ] Cancelar mantiene el acceso hasta el final del periodo pagado
 - [ ] Al vencer, el Tenant queda inactivo: sus Tenant Users no entran al dashboard, no hay notificaciones y no se generan reportes ni Recomendaciones
-- [ ] La landing y el quiz de un Tenant inactivo siguen sirviéndose y capturando Leads
+- [x] La landing y el quiz de un Tenant inactivo siguen sirviéndose y capturando Leads — **ya hecho en 23**
 - [ ] Reactivar el pago devuelve el acceso sin intervención manual
 - [ ] Un `member` no ve nada de facturación
