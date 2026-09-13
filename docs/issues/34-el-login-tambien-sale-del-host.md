@@ -1,5 +1,7 @@
 # 34: El login también deriva el Tenant del host
 
+**Ola:** 1 (lanzamiento)
+
 **What to build:** Las tres rutas pre-credencial del Dashboard de Cliente
 —`login`, `forgot-password`, `reset-password`— dejan de recibir el `subdomain`
 en el cuerpo y lo derivan del `Host`, como ya hacen todas las demás desde el

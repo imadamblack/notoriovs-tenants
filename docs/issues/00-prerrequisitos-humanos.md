@@ -1,5 +1,7 @@
 # 00: Prerrequisitos humanos (DNS y correo)
 
+**Ola:** 3 (vender a desconocidos)
+
 **What to build:** Trabajo de infraestructura que un agente no puede hacer y que
 desbloquea el alta automática de Tenants y todo el correo transaccional.
 

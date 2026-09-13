@@ -78,23 +78,42 @@ Tenant, no en el Lead.
 
 ## Marketing Report
 
-Métricas de campañas de ads de un Tenant para un **Period**: un rango de fechas
-con granularidad declarada (semanal o mensual).
+Métricas de las campañas de ads de un Tenant para **un día**. Es la unidad más
+chica que se guarda, y la única que se ingesta.
 
-Un Marketing Report mensual **no** es la suma de los semanales: `reach`,
-`frequency`, `cpm` y `ctr` no son aditivos (una misma persona alcanzada en dos
-semanas cuenta una vez al mes). Cada granularidad se ingesta por separado desde
-la fuente.
+Cualquier otra ventana —una semana, un mes, "los últimos 30 días"— se **calcula**
+sumando días. Las métricas derivadas se calculan sobre la ventana, no se
+promedian: CPM, CTR y costo por Lead salen de dividir los acumulados de esos
+días.
+
+**Alcance** y **frecuencia** no forman parte del modelo: son las dos únicas
+métricas que no se reconstruyen desde días (la misma persona alcanzada el lunes
+y el jueves cuenta una vez en la semana, y el dato diario no dice quién era), y
+son métricas de quien opera la pauta, no de quien es dueño del negocio.
+
+Un día ingestado **no es definitivo**: la fuente corrige la atribución hacia
+atrás durante dos o tres días, así que la ingesta vuelve a traer los últimos
+días y los pisa. Ver el ADR 0010.
 
 ## Aviso
 
 Lo que la plataforma le manda a un Tenant cuando pasa algo que le importa —hoy,
-que entró un Lead— por fuera del Dashboard de Cliente: un WhatsApp o un correo
-que llega sin tener nada abierto.
+que entró un Lead— por fuera del Dashboard de Cliente: algo que llega sin tener
+nada abierto. Va por dos canales, con dos destinatarios distintos:
 
-Va dirigido al **contacto general del Tenant**, uno solo, no a cada Tenant User
-por separado: quién lo lee adentro de la empresa es asunto del cliente. Un
-Tenant inactivo no recibe Avisos.
+- **WhatsApp o correo**, al **contacto general del Tenant**: uno solo, no cada
+  Tenant User. Quién lo lee adentro de la empresa es asunto del cliente. Sale
+  por el tubo de eventos hacia el consumidor del cliente (ADR 0008).
+- **Notificación push**, a **cada Tenant User** que la activó, en cada
+  dispositivo donde la activó. La manda la plataforma directo, no el tubo de
+  eventos: es el producto hablándole a su propio usuario (ADR 0011).
+
+Un Aviso lleva el **gancho, no el dato**: dice que entró un Lead y de dónde
+vino, no su nombre ni su teléfono. El dato vive en el Dashboard. Un aviso que
+trae todo permite atender al Lead sin abrir el producto nunca, y eso lo
+convierte en un sustituto del producto en vez de en una puerta de entrada.
+
+Un Tenant inactivo no recibe Avisos por ningún canal.
 
 Su entrega **no está garantizada**: si el aviso no sale, el hecho igual quedó
 guardado y visible en el Dashboard. Nada del producto debe construirse asumiendo

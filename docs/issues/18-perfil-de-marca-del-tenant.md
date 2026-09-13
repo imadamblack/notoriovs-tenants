@@ -1,5 +1,7 @@
 # 18: Perfil de marca del Tenant
 
+**Ola:** 2 (después de cobrar)
+
 **What to build:** Cada Tenant gana un Perfil de marca: qué vende, a quién,
 dolores, objeciones, tono y diferenciadores. Notoriovs lo captura una vez al dar
 de alta al cliente, y es el insumo sin el cual las Recomendaciones creativas solo

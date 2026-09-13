@@ -1,5 +1,7 @@
 # 23: Un Tenant inactivo conserva su landing y su quiz
 
+**Ola:** 0 — va primero, es riesgo vivo
+
 **What to build:** Hoy marcar un Tenant como inactivo le da 404 a su landing y a
 su quiz: se le tira el tráfico de los anuncios que tiene corriendo y se le quema
 el presupuesto sin que se entere. `active` pasa a significar lo que ya dice el
@@ -32,6 +34,15 @@ webhooks, solo la semántica del campo que ya existe.
   corregirlo ahí y en el ADR 0005.
 - **Reduce 21.** Su criterio "la landing y el quiz de un Tenant inactivo siguen
   sirviéndose y capturando Leads" queda cubierto de antemano.
+- **Los Avisos ya están cubiertos.** `lead.created` tiene
+  `onlyWhenActive: true` en el catálogo de eventos y el emisor lo respeta
+  (`src/events/tenantEvents.ts`, `deliveryDecision`), así que un Tenant inactivo
+  ya no dispara el WhatsApp de Lead nuevo. Lo que **sí** sigue saliendo es
+  `quiz.completed`, que lleva los mismos datos del Lead: si el workflow de n8n
+  manda el aviso desde ese evento en vez de desde `lead.created`, el Tenant
+  inactivo sigue notificando. Revisarlo en n8n al cerrar este issue — el catálogo
+  de eventos está bien, lo que puede estar mal es de qué evento cuelga el
+  mensaje.
 - Hoy el filtro `active: { equals: true }` vive en `buildTenantQuery` y aplica a
   todas las proyecciones por igual; `tenantHasDashboard` lo repite aparte y ahí
   sí debe quedarse. `quizSubmit` es fácil de pasar por alto y es justo el que

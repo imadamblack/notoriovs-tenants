@@ -1,5 +1,7 @@
 # 27: Pulido visual de la pestaña de KPIs
 
+**Ola:** 1 (lanzamiento)
+
 **What to build:** El reporte de KPIs funciona pero se ve sin terminar: las
 cuatro secciones no comparten jerarquía y la gráfica de tendencia se quedó a
 medias. Esto es pulido visual, no de datos — los números ya son correctos

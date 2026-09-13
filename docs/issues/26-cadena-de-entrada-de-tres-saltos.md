@@ -1,5 +1,7 @@
 # 26: La entrada al quiz son 3 saltos, no 1
 
+**Ola:** sin ola — sirve al Lead, no al Tenant User
+
 **What to build:** `/` no lleva a `/survey` de una:
 
 ```

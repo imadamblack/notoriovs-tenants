@@ -393,3 +393,22 @@ nadie está esperando su respuesta.
   interruptor—, y ese issue quedó recortado en consecuencia.
 - El issue 32 **no** hereda nada de aquí. Sigue siendo sobre las llaves de
   entrada, que son las que sí se hashean. Esta salida no usa secretos.
+
+## Actualizaciones
+
+### 2026-09-12 — Los avisos al propio usuario no salen por aquí (ADR 0011)
+
+Las notificaciones push al Tenant User las manda la plataforma directo. **No es
+una excepción a este ADR**: lo que este ADR gobierna es lo que sale hacia un
+tercero, y un push es el producto hablándole a su propio usuario, igual que el
+correo de recuperación de contraseña, que tampoco pasó nunca por aquí.
+
+La razón por la que no puede pasar: una suscripción de push es una credencial de
+sesión de un dispositivo de nuestro usuario, y el `eventsWebhook` es **editable
+por el cliente** justo para que apunte a su CRM. Mandarlas ahí sería entregarle
+las llaves de los dispositivos de su equipo a una URL que él controla.
+
+`lead.created` no cambia: el mismo hecho dispara el webhook de siempre **y** el
+push interno, y `onlyWhenActive` vale para los dos. El ADR 0011 deja escrita la
+pregunta con la que se ubica un aviso nuevo: no "¿es saliente?", sino "¿quién lo
+va a leer?".

@@ -1,5 +1,7 @@
 # 21: Suscripción de Stripe y Tenant inactivo
 
+**Ola:** 3 (vender a desconocidos)
+
 **What to build:** El estado de la suscripción de cada Tenant vive en el sistema
 y lo dicta el proveedor de pagos por webhook, nunca lo que diga el navegador al
 volver. Un `owner` gestiona su suscripción y la cancela desde el portal del

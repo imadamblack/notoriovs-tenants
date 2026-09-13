@@ -1,5 +1,7 @@
 # 17: Tenants molde clonables
 
+**Ola:** 3 (vender a desconocidos)
+
 **What to build:** Dar de alta un cliente deja de ser capturar todo a mano: se
 clona un Tenant molde de su vertical y se ajustan marca y textos. Se aprovecha el
 duplicado que el panel ya ofrece; lo único que hay que resolver es que el

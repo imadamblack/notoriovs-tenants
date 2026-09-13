@@ -1,5 +1,7 @@
 # 28: El panel de Payload deja de servirse en los hosts de los Tenants
 
+**Ola:** 2 (después de cobrar)
+
 **What to build:** Hoy el middleware deja pasar `/admin` y la API de Payload en
 **todos** los hosts, así que el panel interno está montado en el subdominio de
 cada cliente. Nadie de fuera entra —`TenantUsers.access.admin` es falso y el
