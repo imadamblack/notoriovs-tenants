@@ -1,5 +1,7 @@
 # 24: Diferir el pixel de Meta fuera del camino crítico
 
+**Ola:** sin ola — sirve al Lead, no al Tenant User
+
 **What to build:** El pixel de Meta son 234 KB — el 54% de todo el JavaScript de
 `/survey` — y aporta las dos tareas largas del trace. Se carga en cadena
 secuencial de 3 peticiones (`fbevents.js` → `signals/config` → `/tr/`) empezando

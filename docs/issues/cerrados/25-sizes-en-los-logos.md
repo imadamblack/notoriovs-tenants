@@ -9,9 +9,10 @@ silueta blanca sólida.
 
 **Blocked by:** 04 (línea base medida) — hecho
 
-**Status:** hecho en `fix/sizes-en-logos-del-tenant`, sin desplegar
+**Status:** CERRADO. En `main` y desplegado (la rama `fix/sizes-en-logos-del-tenant`
+ya está absorbida).
 
-**Evidencia:** `../mediciones/04-linea-base-web-vitals.md`, cuello de botella 2.
+**Evidencia:** `../../mediciones/04-linea-base-web-vitals.md`, cuello de botella 2.
 
 Los tres logos (el hero de `survey-form.tsx:157` NO entra: ahí `w=1920` es
 correcto porque sí ocupa la pantalla):

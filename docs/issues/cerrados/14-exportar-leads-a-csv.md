@@ -7,7 +7,7 @@ registrada.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** IMPLEMENTADO en `dev` (2026-09-10).
+**Status:** CERRADO. En `main` y desplegado.
 
 - [x] Exporta exactamente los Leads que los filtros activos están mostrando, no todo el Tenant
 - [x] Incluye los campos fijos del Lead más una columna por pregunta del quiz, usando el orden y los encabezados del quiz de ese Tenant

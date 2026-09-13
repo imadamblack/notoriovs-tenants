@@ -1,5 +1,7 @@
 # 31: Un Internal User entra al Dashboard de un cliente
 
+**Ola:** 2 (después de cobrar)
+
 **What to build:** Desde el panel, una persona de Notoriovs abre el Dashboard de
 Cliente de un Tenant y lo ve como lo ve el cliente, sin pedirle su contraseña a
 nadie y sin crearse un Tenant User de mentiras. Un `superadmin` puede entrar al

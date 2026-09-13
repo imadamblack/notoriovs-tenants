@@ -10,12 +10,9 @@ env var no está puesta.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** HECHO en `dev` (commit e4b051c, 2026-09-09), **sin desplegar**.
-Falta lo de producción: poner `LEADS_INGEST_KEY` en Vercel y correr la
-migración. Esta migración solo AGREGA (tres valores al enum de `source`, la
-columna `external_id`, dos índices), así que el orden seguro es migración
-primero y despliegue después: el código viejo la ignora sin enterarse. Ojo con
-el CLI —usar `npm run prod -- npm run migrate:debug`, como en el 09—.
+**Status:** CERRADO. En `main` y desplegado. `LEADS_INGEST_KEY` está en Vercel y
+la migración ya corrió en producción (tres valores al enum de `source`, la
+columna `external_id`, dos índices).
 
 Se probó sobre una base LIMPIA, no sobre la local, que viene deformada por el
 push de `next dev`. El `down` también: achicar el enum revienta si quedó un

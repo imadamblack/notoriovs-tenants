@@ -21,7 +21,9 @@ al `.env`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** hecho (commit f984fd6) — falta correr los e2e en verde: la máquina no tenía el Chromium de Playwright (`npx playwright install chromium`), y falta decidir qué tenants de prueba se copian a la base de dev.
+**Status:** CERRADO (commit f984fd6). Lo que quedaba pendiente eran los e2e en
+verde y los tenants de prueba de la base de dev; ya no aplica: la suite se
+recortó a lo mínimo y los e2e se quitaron a propósito (ver issue 30).
 
 - [x] `npm run dev` no puede tocar la base de producción, ni su esquema ni sus datos
 - [x] `npm run test:int` y `npm run test:e2e` corren contra una base de pruebas, no contra producción ni contra la de desarrollo

@@ -1,5 +1,7 @@
 # 22: El nombre de archivo de un media se acumula en cada edición
 
+**Ola:** 1 (lanzamiento)
+
 **What to build:** Cada vez que se recorta o se cambia el focal point de una
 imagen, el nombre del archivo en Vercel Blob gana **otro** sufijo aleatorio
 encima del que ya traía, en vez de reemplazarlo. El nombre crece sin techo hasta

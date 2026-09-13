@@ -85,8 +85,10 @@ export const Tenants: CollectionConfig = {
     // Corre en TODA operación, no solo en update:
     //  - create: publica el sitio del tenant nuevo sin necesidad de desplegar
     //    (y tira el 404 que pudo haberse cacheado si alguien entró antes).
-    //  - update: incluye desactivar el tenant, porque `active: false` hace que
-    //    la página deje de resolverlo y pase a 404.
+    //  - update: incluye activar y desactivar el tenant. Ya no cambia si el
+    //    sitio se sirve o no —un tenant inactivo conserva landing y quiz (issue
+    //    23)—, pero sí cambia lo que se pinta en ellas, así que se invalida
+    //    igual que cualquier otra edición.
     // Si cambió el subdominio hay que invalidar los dos: el viejo se queda
     // sirviendo el sitio hasta que se le diga lo contrario.
     afterChange: [

@@ -4,7 +4,7 @@ Hay tres bases y ninguna se alcanza por accidente.
 
 | Base | Dónde vive | Quién la usa | Archivo |
 | --- | --- | --- | --- |
-| Desarrollo | Postgres local (`docker-compose.yml`), base `notoriovs_dev` | `npm run dev`, `npm run migrate` | `.env` |
+| Desarrollo | Postgres local (`docker-compose.yml`), base `notoriovs_dev` | `npm run dev`, `npm run migrate` (aquí el CLI sí funciona) | `.env` |
 | Pruebas | el mismo Postgres local, base `notoriovs_test` | `npm test` | `.env.test` (commiteado) |
 | Producción | Neon | el despliegue de Vercel, y en local **solo** `npm run prod -- …` | `.env.prod` (nunca se commitea) |
 
@@ -42,9 +42,17 @@ cuentas de gente.
 ## Tocar producción
 
 ```bash
-npm run prod -- npm run migrate:status
-npm run prod -- npm run migrate
+CHECK_MIGRATIONS=1 npm run prod -- npm run migrate:check   # qué falta, sin aplicar
+npm run prod -- npm run migrate:debug                      # aplicar
 ```
+
+**Contra producción usa siempre estos dos, nunca `npm run migrate` ni
+`migrate:status`.** Los del CLI de Payload no imprimen ni aplican nada ahí: se
+tragan los errores de arranque y salen con código 0, así que "aplicó" y "no hizo
+nada" se ven idénticos —una línea en blanco—. Ya mordió dos veces, con la
+migración de roles (issue 09) y con la de los webhooks viejos (2026-09-12), y
+las dos veces la migración entró con `migrate:debug`. Lo que confirma es su
+`✓ Listo: no queda ninguna migración pendiente.`
 
 Pide confirmación mostrando el host al que va. En un guion, `PROD_YES=1` la
 salta. Para `psql` contra producción, ver
@@ -111,8 +119,9 @@ almacenamiento de producción.
 2. `npm run migrate:create`, y **lee el SQL** antes de commitearlo.
 3. `npm run db:reset` otra vez: si la migración se aplica sobre una base vacía,
    sirve.
-4. Ya en producción: `npm run prod -- npm run migrate`, y confirma con
-   `npm run prod -- npm run migrate:status`. Si no imprime nada, ve arriba.
+4. Ya en producción: `npm run prod -- npm run migrate:debug`, y da por buena la
+   migración solo si imprime `Migrated:` y el `✓` del final. No uses
+   `npm run migrate` ni `migrate:status` aquí: ver "Tocar producción".
 5. Recién entonces, el deploy.
 
 **Migrar va antes de desplegar, no después.** Una migración que solo agrega

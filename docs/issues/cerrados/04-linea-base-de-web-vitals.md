@@ -27,7 +27,7 @@ en el código pero no en los datos, así que `/` redirige a `/survey`
 
 ## Resultado
 
-Ver `../mediciones/04-linea-base-web-vitals.md`.
+Ver `../../mediciones/04-linea-base-web-vitals.md`.
 
 En corto: **el trabajo de servidor está terminado** (TTFB 63-65 ms, HIT de caché
 en las 6 páginas) y **CLS es 0**. El cuello de botella se movió al cliente y es

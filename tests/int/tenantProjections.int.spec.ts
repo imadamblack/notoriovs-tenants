@@ -4,6 +4,8 @@ import { describe, it, expect } from 'vitest'
 import {
   TENANT_PROJECTIONS,
   PUBLIC_TENANT_PROJECTIONS,
+  ACTIVE_ONLY_TENANT_PROJECTIONS,
+  TENANT_SITE_PROJECTIONS,
   buildTenantQuery,
   type TenantProjectionName,
 } from '@/utils/getTenant'
@@ -86,19 +88,55 @@ describe('proyecciones del tenant', () => {
     }
   })
 
-  it('la query filtra por subdominio normalizado y tenant activo, y proyecta', () => {
+  it('la query filtra por subdominio normalizado y proyecta', () => {
     const query = buildTenantQuery('MiTenant', 'landing')
 
     expect(query).toEqual({
       collection: 'tenants',
-      where: {
-        subdomain: { equals: 'mitenant' },
-        active: { equals: true },
-      },
+      where: { subdomain: { equals: 'mitenant' } },
       limit: 1,
       depth: TENANT_PROJECTIONS.landing.depth,
       select: TENANT_PROJECTIONS.landing.select,
     })
+  })
+
+  // El corazón del issue 23: `active` es la suscripción, no la publicación.
+  // Un Tenant inactivo tiene sus anuncios corriendo; cerrarle la landing o el
+  // quiz le quema el presupuesto sin que se entere.
+  it('ninguna proyección del sitio público exige un Tenant activo', () => {
+    for (const name of TENANT_SITE_PROJECTIONS) {
+      expect(ACTIVE_ONLY_TENANT_PROJECTIONS, name).not.toContain(name)
+      expect(buildTenantQuery('acme', name).where, name).not.toHaveProperty('active')
+    }
+  })
+
+  it('el dashboard y lo que da acceso a él sí exigen un Tenant activo', () => {
+    // `dashboardApi` es la que autoriza TODAS las rutas /api/tenant-dashboard
+    // (ver `resolveDashboardAuth`), así que cerrarla aquí las cierra todas.
+    for (const name of ['dashboardApi', 'dashboardQuiz', 'dashboardIdentity', 'tenantMail'] as const) {
+      expect(ACTIVE_ONLY_TENANT_PROJECTIONS, name).toContain(name)
+      expect(buildTenantQuery('acme', name).where, name).toMatchObject({
+        active: { equals: true },
+      })
+    }
+  })
+
+  // La página del dashboard es la excepción deliberada: resuelve el tenant
+  // inactivo para poder mostrarle el aviso de "no disponible" en vez de un 404
+  // que diría que su sitio no existe. Quien cierra la puerta ahí es
+  // `tenantHasDashboard`.
+  it('la página del dashboard resuelve el tenant aunque esté inactivo', () => {
+    expect(ACTIVE_ONLY_TENANT_PROJECTIONS).not.toContain('dashboard')
+    expect(buildTenantQuery('acme', 'dashboard').where).not.toHaveProperty('active')
+  })
+
+  // El ingest de leads sostiene la captura desde el quiz, y el de marketing
+  // reports es la tubería interna de Notoriovs: ninguno de los dos depende de
+  // que el cliente esté al corriente.
+  it('los ingests resuelven un tenant inactivo', () => {
+    for (const name of ['leadIngest', 'identity'] as const) {
+      expect(ACTIVE_ONLY_TENANT_PROJECTIONS, name).not.toContain(name)
+    }
   })
 
   it('cada proyección es un select válido: solo `true` o subcampos en `true`', () => {

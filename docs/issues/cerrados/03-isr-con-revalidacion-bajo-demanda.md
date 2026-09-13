@@ -13,10 +13,12 @@ desplegar. El dashboard y los endpoints siguen siendo dinámicos.
 - [x] Landing, quiz, thankyou y not-eligible se sirven desde caché, no se rearman por visita
 - [x] La validación del host se resuelve antes de la página, de modo que la página no fuerza render dinámico
 - [x] Guardar un Tenant en Payload refresca sus páginas en segundos, sin desplegar
-- [x] Desactivar un Tenant deja de servir su sitio. OJO: este criterio describía
-      el comportamiento actual, que contradice al glosario (un Tenant inactivo
-      conserva landing y quiz vivos). Se cumplió tal cual estaba escrito, pero
-      la conducta correcta la define 23 y ahí se corrige
+- [x] ~~Desactivar un Tenant deja de servir su sitio~~ — **criterio equivocado,
+      corregido por 23.** Describía el comportamiento de entonces, que
+      contradecía al glosario: un Tenant inactivo conserva landing y quiz
+      vivos y capturando Leads, porque `active` es la suscripción y no la
+      publicación. Lo que sí hace hoy desactivar es refrescar sus páginas
+      cacheadas, igual que cualquier otra edición
 - [x] Un Tenant creado nuevo queda disponible sin desplegar
 - [x] El envío del quiz, el pixel y el tracking siguen funcionando sobre páginas cacheadas
 - [x] El dashboard y los endpoints siguen siendo dinámicos y no se cachean

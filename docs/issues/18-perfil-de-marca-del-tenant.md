@@ -1,12 +1,14 @@
 # 18: Perfil de marca del Tenant
 
+**Ola:** 2 (después de cobrar)
+
 **What to build:** Cada Tenant gana un Perfil de marca: qué vende, a quién,
 dolores, objeciones, tono y diferenciadores. Notoriovs lo captura una vez al dar
 de alta al cliente, y es el insumo sin el cual las Recomendaciones creativas solo
 pueden hablar de métricas. Al vivir dentro del Tenant, el duplicado de un molde
 lo arrastra ya prellenado con lo típico de esa vertical.
 
-**Blocked by:** 07 (extraer configuración de Tenants)
+**Blocked by:** 07 (extraer configuración de Tenants) — hecho
 
 **Status:** ready-for-agent
 
