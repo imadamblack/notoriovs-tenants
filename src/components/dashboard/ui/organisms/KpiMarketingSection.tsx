@@ -34,7 +34,7 @@ const shortDate = (iso: string) =>
 
 export default function KpiMarketingSection({ marketing, totals, range, periodLabel }: KpiMarketingSectionProps) {
   return (
-    <section>
+    <section className="flex-col">
       <SectionHeading>Marketing</SectionHeading>
       {/* El periodo de esta sección NO es el que eligió el usuario arriba:
           los Marketing Reports son semanales y se muestran en semanas
@@ -51,10 +51,12 @@ export default function KpiMarketingSection({ marketing, totals, range, periodLa
           cuando no hay reportes es la tabla, que sin filas no tiene nada
           que enseñar; el aviso ocupa su lugar y explica el porqué. */}
       <div className="flex flex-wrap gap-3 mb-3">
-        <StatTile label="Gasto total" value={currency(totals.spend)} />
+        <StatTile label="Gasto total" value={currency(totals.spend)} emphasis="primary" />
         <StatTile label="Leads (ads)" value={String(totals.leads)} />
         <StatTile label="Costo por lead prom." value={currency(totals.avgCostPerLead)} />
-        <StatTile label="Impresiones" value={totals.impressions.toLocaleString('es-MX')} />
+        {/* Dato de apoyo: explica el alcance, pero no es un número que el
+            cliente compare contra el gasto o el CPL. */}
+        <StatTile label="Impresiones" value={totals.impressions.toLocaleString('es-MX')} emphasis="support" />
       </div>
       {marketing.length === 0 ? (
         <p className="-ft-3 text-neutral-400 bg-neutral-900 rounded-xl border border-neutral-800 p-4">

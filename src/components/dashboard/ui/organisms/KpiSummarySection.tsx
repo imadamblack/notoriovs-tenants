@@ -21,10 +21,12 @@ export default function KpiSummarySection({
   disqualified,
 }: KpiSummarySectionProps) {
   return (
-    <section>
+    <section className="flex-col">
       <SectionHeading>Ventas</SectionHeading>
       <div className="flex flex-wrap gap-4">
-        <StatTile label="Leads totales" value={String(total)} />
+        {/* El KPI que resume la sección: se lee antes que las tasas, que son
+            lecturas sobre ese mismo total. */}
+        <StatTile label="Leads totales" value={String(total)} emphasis="primary" />
         <StatTile label="Tasa de conversión" value={`${conversionRate}%`} sub={`${won} lead(s) ganados`} />
         <StatTile label="Tasa de pérdida" value={`${lossRate}%`} sub={`${lost} lead(s) perdidos`} />
         <StatTile

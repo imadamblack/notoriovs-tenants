@@ -97,11 +97,43 @@ export async function GET(req: NextRequest) {
   // Progreso por etapa: agrupa por `stage` (la columna del Kanban), no por
   // `status`. Las dos cosas son independientes desde que se separaron: un
   // lead puede estar "Ganado" (status) sentado en cualquier etapa.
+  //
+  // Y es un EMBUDO, no un corte por columna: cada etapa cuenta los leads que
+  // llegaron AL MENOS hasta ahí, no los que están sentados en ella hoy. Un
+  // lead en "Paid" ya pasó por "Opt In", así que suma en las dos. Leído como
+  // corte, el dashboard decía que solo 2 de 59 habían hecho opt-in, cuando
+  // los 59 lo hicieron y 2 además ya pagaron.
+  //
+  // Se calcula como suma de sufijos sobre `pipeline`, que ya viene en orden
+  // de embudo: es el mismo orden en el que se pintan las columnas del Kanban.
+  const reachedStage: number[] = []
+  let carried = 0
+  for (let i = stageCounts.length - 1; i >= 0; i--) {
+    carried += stageCounts[i]
+    reachedStage[i] = carried
+  }
+
+  // El porcentaje sigue siendo sobre `total` (todos los leads del periodo), no
+  // sobre la primera etapa: así la primera barra llega a 100% solo cuando
+  // TODOS los leads están en el pipeline actual, y el hueco que queda es
+  // exactamente el `otherCount` que la vista explica abajo.
   const byStage = pipeline.map((stage, i) => ({
     id: stage.id,
     label: stage.label,
-    count: stageCounts[i],
-    pct: pct(stageCounts[i]),
+    count: reachedStage[i],
+    pct: pct(reachedStage[i]),
+    // Conversión contra la etapa ANTERIOR ("de los que llegaron a Survey,
+    // cuántos agendaron"), que es la que dice DÓNDE se cae el embudo: el
+    // porcentaje sobre el total no distingue entre una etapa que pierde mucha
+    // gente y una que simplemente hereda pocos leads de arriba.
+    //
+    // `null` en la primera etapa (no hay anterior) y también cuando la
+    // anterior venía en cero: ahí no hay conversión que medir, y un "0%"
+    // se leería como una fuga que no existe.
+    stepPct:
+      i === 0 || !reachedStage[i - 1]
+        ? null
+        : Math.round((reachedStage[i] / reachedStage[i - 1]) * 1000) / 10,
   }))
 
   const trend = buckets.map((bucket, i) => ({ week: bucket.week, count: trendCounts[i] }))
