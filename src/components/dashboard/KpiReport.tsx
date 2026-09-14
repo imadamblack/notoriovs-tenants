@@ -9,7 +9,7 @@ import KpiTrendChart from '@/components/dashboard/ui/organisms/KpiTrendChart'
 import KpiMarketingSection from '@/components/dashboard/ui/organisms/KpiMarketingSection'
 import { SINCE_LABELS, type SinceKey } from '@/utils/dashboardPeriod'
 
-export type StageKpi = { id: string; label: string; count: number; pct: number }
+export type StageKpi = { id: string; label: string; count: number; pct: number; stepPct: number | null }
 export type TrendPoint = { week: string; count: number }
 export type MarketingRow = {
   id: string | number
@@ -60,7 +60,7 @@ export default function KpiReport({ data, pipeline, refreshing, sinceKey, onSinc
   const header = (
     <header className="flex items-center justify-between gap-4">
       <div>
-        <h1 className="ft-2 font-semibold text-neutral-100">Reporte</h1>
+        <h1 className="ft-3 font-bold text-neutral-100">Reporte</h1>
         <p className="-ft-3 text-neutral-400">
           Periodo: {SINCE_LABELS[sinceKey]}
           {refreshing && data && <span className="ml-2 text-neutral-600">actualizando…</span>}
