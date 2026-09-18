@@ -1,13 +1,23 @@
 import type { CollectionConfig } from 'payload'
 import { isInternalUser } from '@/access/isInternalUser'
 
-// Métricas semanales de las campañas de ads por tenant (hoy viven en un
-// Google Sheet por cliente, ver ejemplo compartido: date_start, date_stop,
-// campaign, impressions, reach, frequency, cpm, clicks, ctr,
-// landing_page_views, leads, cost_per_lead, spend, ads). Se ingesta vía
-// POST /api/marketing-reports/ingest (server-to-server, protegido con
-// MARKETING_REPORT_INGEST_KEY) para que el workflow de n8n que ya arma
-// estos números pueda empujarlos aquí en vez de (o además de) al Sheet.
+// Un Marketing Report es UN DÍA de una campaña de un tenant (issue #19: antes
+// era una semana). Semana, mes o cualquier otro rango se calculan en
+// plataforma sumando días — no se vuelven a ingestar por separado. Se
+// ingesta vía POST /api/marketing-reports/ingest (server-to-server,
+// protegido con MARKETING_REPORT_INGEST_KEY) desde un job de n8n que corre
+// diario y trae una ventana móvil de los últimos 7 días, PISANDO lo que ya
+// había: Meta corrige la atribución hacia atrás durante dos o tres días, y
+// la llave (tenant, campaign, date) es lo que hace que pisar sea seguro.
+//
+// `reach` y `frequency` NO se guardan: no se pueden reconstruir sumando
+// días (la misma persona alcanzada el lunes y el jueves cuenta una vez en
+// la semana) y no son métricas que le importen al dueño del negocio.
+//
+// `cpm`, `ctr` y `costPerLead` TAMPOCO se guardan aquí a propósito: son
+// divisiones, y una columna con el promedio diario invita a que alguien la
+// promedie por error. Se calculan siempre al vuelo sobre la ventana pedida,
+// en /api/tenant-dashboard/kpis.
 //
 // Igual que en Leads.ts: el campo `tenant` lo agrega `multiTenantPlugin`
 // (ver payload.config.ts), no está a mano en `fields`.
@@ -15,8 +25,8 @@ export const MarketingReports: CollectionConfig = {
   slug: 'marketing-reports',
   admin: {
     useAsTitle: 'campaign',
-    defaultColumns: ['tenant', 'campaign', 'weekStart', 'weekEnd', 'leads', 'spend'],
-    description: 'KPIs semanales de campañas de ads por tenant (ingesta desde n8n).',
+    defaultColumns: ['tenant', 'campaign', 'date', 'leads', 'spend'],
+    description: 'KPIs diarios de campañas de ads por tenant (ingesta desde n8n).',
   },
   access: {
     // Internos, no "cualquiera autenticado": ver la nota en `isInternalUser`.
@@ -28,28 +38,13 @@ export const MarketingReports: CollectionConfig = {
     delete: isInternalUser,
   },
   fields: [
-    {
-      type: 'row',
-      fields: [
-        { name: 'weekStart', type: 'date', required: true, admin: { date: { pickerAppearance: 'dayOnly' } } },
-        { name: 'weekEnd', type: 'date', required: true, admin: { date: { pickerAppearance: 'dayOnly' } } },
-      ],
-    },
+    { name: 'date', type: 'date', required: true, admin: { date: { pickerAppearance: 'dayOnly' } } },
     { name: 'campaign', type: 'text', required: true },
     {
       type: 'row',
       fields: [
         { name: 'impressions', type: 'number' },
-        { name: 'reach', type: 'number' },
-        { name: 'frequency', type: 'number' },
-        { name: 'cpm', type: 'number', admin: { description: 'MXN' } },
-      ],
-    },
-    {
-      type: 'row',
-      fields: [
         { name: 'clicks', type: 'number' },
-        { name: 'ctr', type: 'number', admin: { description: 'Porcentaje, ej: 0.91' } },
         { name: 'landingPageViews', type: 'number' },
       ],
     },
@@ -57,14 +52,14 @@ export const MarketingReports: CollectionConfig = {
       type: 'row',
       fields: [
         { name: 'leads', type: 'number' },
-        { name: 'costPerLead', type: 'number', admin: { description: 'MXN' } },
         { name: 'spend', type: 'number', admin: { description: 'MXN' } },
       ],
     },
-    { name: 'ads', type: 'text', hasMany: true, label: 'Anuncios activos esa semana' },
+    { name: 'ads', type: 'text', hasMany: true, label: 'Anuncios activos ese día' },
   ],
   // Mismo criterio que en Leads.ts: el reporte de KPIs siempre pide "las
-  // filas de este tenant, más recientes primero".
-  indexes: [{ fields: ['tenant', 'weekStart'] }],
+  // filas de este tenant, más recientes primero". Y es la llave del upsert
+  // en /ingest: un (tenant, campaign, date) determina una fila única.
+  indexes: [{ fields: ['tenant', 'date'] }],
   timestamps: true,
 }

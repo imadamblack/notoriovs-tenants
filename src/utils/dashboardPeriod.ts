@@ -84,26 +84,3 @@ export function trendStartMs(sinceKey: SinceKey, now: number = Date.now()): numb
   if (days) return now - days * DAY_MS
   return weekStartUTC(new Date(now)).getTime() - (TREND_WEEKS_WHEN_ALL - 1) * WEEK_MS
 }
-
-// Ventana de SEMANAS COMPLETAS contenida en el periodo, para los KPIs de
-// marketing. Un Marketing Report es semanal y viene tal cual de la
-// plataforma de anuncios: si se recortara a la mitad para que cuadre con
-// "30 días", el gasto y el CPL que muestra el dashboard no coincidirían
-// con lo que el cliente ve en Meta. Por eso aquí el periodo se redondea
-// hacia adentro: empieza en el primer lunes DENTRO del rango y termina en
-// el último domingo ya cerrado.
-export function fullWeekWindow(sinceKey: SinceKey, now: number = Date.now()): { startISO?: string; endISO: string } {
-  // Fin: el domingo 23:59:59.999 de la última semana ya terminada, o sea
-  // el lunes de la semana en curso menos un milisegundo.
-  const endISO = new Date(weekStartUTC(new Date(now)).getTime() - 1).toISOString()
-
-  const days = SINCE_DAYS[sinceKey]
-  if (!days) return { endISO }
-
-  const cutoff = now - days * DAY_MS
-  const cutoffWeekStart = weekStartUTC(new Date(cutoff)).getTime()
-  // Si el corte cae a mitad de semana, esa semana queda fuera: el primer
-  // lunes dentro del rango es el de la semana siguiente.
-  const startMs = cutoffWeekStart === cutoff ? cutoffWeekStart : cutoffWeekStart + WEEK_MS
-  return { startISO: new Date(startMs).toISOString(), endISO }
-}

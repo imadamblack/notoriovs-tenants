@@ -16,17 +16,16 @@ const currency = (n?: number) =>
   typeof n === 'number' ? n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }) : '—'
 
 const columns: DataTableColumn<MarketingRow>[] = [
-  {
-    key: 'week',
-    header: 'Semana',
-    render: (row) =>
-      row.weekStart ? new Date(row.weekStart).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) : '—',
-  },
   { key: 'campaign', header: 'Campaña', render: (row) => row.campaign },
   { key: 'leads', header: 'Leads', align: 'right', render: (row) => row.leads ?? '—' },
-  { key: 'cpl', header: 'CPL', align: 'right', render: (row) => currency(row.costPerLead) },
+  { key: 'cpl', header: 'CPL', align: 'right', render: (row) => currency(row.costPerLead ?? undefined) },
   { key: 'spend', header: 'Gasto', align: 'right', render: (row) => currency(row.spend) },
-  { key: 'ctr', header: 'CTR', align: 'right', render: (row) => (typeof row.ctr === 'number' ? `${row.ctr}%` : '—') },
+  {
+    key: 'ctr',
+    header: 'CTR',
+    align: 'right',
+    render: (row) => (typeof row.ctr === 'number' ? `${row.ctr}%` : '—'),
+  },
 ]
 
 const shortDate = (iso: string) =>
@@ -36,15 +35,18 @@ export default function KpiMarketingSection({ marketing, totals, range, periodLa
   return (
     <section className="flex-col">
       <SectionHeading>Marketing</SectionHeading>
-      {/* El periodo de esta sección NO es el que eligió el usuario arriba:
-          los Marketing Reports son semanales y se muestran en semanas
-          completas y ya cerradas (ver la ruta de KPIs). Por eso el rango
-          va escrito a la vista: sin él, un "30 días" arriba y 4 semanas de
-          gasto abajo se leerían como el mismo rango cuando no lo son. */}
+      {/* Desde el issue #19 un Marketing Report es un día, así que esta
+          sección usa la MISMA ventana que el resto del dashboard (antes
+          era "semanas completas" propias, porque el reporte era semanal).
+          El rango sigue escrito a la vista porque es el REAL de los días
+          que trajo n8n, no el teórico del periodo: si el tenant lleva
+          semanas sin ads, el rango lo dice en vez de mentir con "30 días". */}
       <p className="-ft-3 text-neutral-400 -mt-2 mb-3">
         {range
-          ? `Semanas completas del ${shortDate(range.start)} al ${shortDate(range.end)}`
-          : 'Semanas completas y ya cerradas'}
+          ? `Del ${shortDate(range.start)} al ${shortDate(range.end)}`
+          : periodLabel
+            ? `Sin datos de ads en "${periodLabel}"`
+            : 'Aún sin datos de ads'}
       </p>
       {/* Los totales se pintan siempre, en cero si no hubo ads en el rango:
           mismo criterio que en el resto del reporte. Lo que desaparece
@@ -61,12 +63,12 @@ export default function KpiMarketingSection({ marketing, totals, range, periodLa
       {marketing.length === 0 ? (
         <p className="-ft-3 text-neutral-400 bg-neutral-900 rounded-xl border border-neutral-800 p-4">
           {periodLabel
-            ? `No hay ninguna semana completa de ads dentro de "${periodLabel}".`
+            ? `No hay ads registrados dentro de "${periodLabel}".`
             : 'Aún no hay reportes de marketing capturados para este tenant.'}
         </p>
       ) : (
         <div className="bg-neutral-900 rounded-xl border border-neutral-800 overflow-x-auto px-3">
-          <DataTable columns={columns} rows={marketing} rowKey={(row) => row.id} />
+          <DataTable columns={columns} rows={marketing} rowKey={(row) => row.campaign} />
         </div>
       )}
     </section>

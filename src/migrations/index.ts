@@ -6,6 +6,7 @@ import * as migration_20260910_004723_leads_ingest from './20260910_004723_leads
 import * as migration_20260910_224316_exportar_leads_csv from './20260910_224316_exportar_leads_csv';
 import * as migration_20260912_035248_eventos_con_sobre from './20260912_035248_eventos_con_sobre';
 import * as migration_20260912_194122_borrar_webhooks_viejos from './20260912_194122_borrar_webhooks_viejos';
+import * as migration_20260918_151144_ingest_diario_marketing_reports from './20260918_151144_ingest_diario_marketing_reports';
 
 export const migrations = [
   {
@@ -47,5 +48,10 @@ export const migrations = [
     up: migration_20260912_194122_borrar_webhooks_viejos.up,
     down: migration_20260912_194122_borrar_webhooks_viejos.down,
     name: '20260912_194122_borrar_webhooks_viejos',
+  },
+  {
+    up: migration_20260918_151144_ingest_diario_marketing_reports.up,
+    down: migration_20260918_151144_ingest_diario_marketing_reports.down,
+    name: '20260918_151144_ingest_diario_marketing_reports'
   },
 ];
