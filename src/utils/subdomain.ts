@@ -1,7 +1,7 @@
 // Lógica compartida para resolver el subdominio de un host, usada tanto por
 // src/middleware.ts (server/edge) como por las rutas del dashboard, para que
 // todos los sitios coincidan en qué cuenta como "subdominio de tenant".
-const RESERVED_SUBDOMAINS = new Set(['app', 'admin'])
+const RESERVED_SUBDOMAINS = new Set(['app', 'admin', 'test'])
 
 // El dominio raíz real de producción, ej: "notoriovs.com". Puede
 // sobreescribirse con la env var ROOT_DOMAIN sin tocar código.
