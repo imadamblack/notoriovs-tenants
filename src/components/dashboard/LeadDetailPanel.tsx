@@ -195,10 +195,14 @@ export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDa
               onStatusChange={handleQuickStatusChange}
             />
 
+            <div className="flex my-6">
+              {whatsappNumber && <ContactLink type="whatsapp" value={whatsappNumber} variant="button" />}
+            </div>
+
             <SectionTabs
               value={readTab}
               onChange={setReadTab}
-              className="mt-8"
+              className=""
               options={[
                 {value: 'notas', label: 'Notas'},
                 {value: 'detalles', label: 'Detalles'},
@@ -226,10 +230,6 @@ export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDa
                 />
               )}
             </div>
-
-            <div className="flex">
-              {whatsappNumber && <ContactLink type="whatsapp" value={whatsappNumber} variant="button" />}
-            </div>
             {lead.createdAt && (
               <p className="-ft-4 text-neutral-400">
                 Creado el {new Date(lead.createdAt).toLocaleString('es-MX')}
@@ -240,6 +240,7 @@ export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDa
                 Actualizado el {new Date(lead.updatedAt).toLocaleString('es-MX')}
               </p>
             )}
+            <div className="absolute -inset-x-8 -bottom-8 h-[4rem] bg-neutral-900"/>
           </>
         ) : (
           <>
