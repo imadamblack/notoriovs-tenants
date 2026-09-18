@@ -12,17 +12,22 @@ reconstruir desde días y no son métricas de dueño de negocio.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** Plataforma hecha en la rama (colección, migración, endpoint de
+ingesta y dashboard). Falta el lado de n8n (pull diario a Meta en vez de
+semanal) y el backfill del histórico; ver "Notas de verificación" al final.
 
-- [ ] Un Marketing Report es un día de una campaña de un Tenant
-- [ ] La ingesta acepta varios días en una llamada y **actualiza** por
+- [x] Un Marketing Report es un día de una campaña de un Tenant
+- [x] La ingesta acepta varios días en una llamada y **actualiza** por
       `(tenant, campaña, día)` en vez de insertar
-- [ ] Reingestar los últimos 7 días todos los días no duplica ni deja huecos
-- [ ] El dashboard calcula la ventana que pide (semana, mes, un rango) sumando días
-- [ ] Las métricas derivadas se calculan **para la ventana**, no se promedian:
+- [x] Reingestar los últimos 7 días todos los días no duplica ni deja huecos
+      (lo garantiza el upsert por llave, ver `MarketingReports.ts`)
+- [x] El dashboard calcula la ventana que pide (semana, mes, un rango) sumando días
+- [x] Las métricas derivadas se calculan **para la ventana**, no se promedian:
       CPM, CTR y costo por Lead salen de dividir los acumulados de esa ventana
-- [ ] El histórico semanal queda borrado y repuesto con días reales traídos de Meta
-- [ ] El dashboard dice con claridad qué ventana está viendo
+- [ ] El histórico semanal queda borrado **(hecho, ver migración)** y
+      **repuesto con días reales traídos de Meta (pendiente: depende de correr
+      el job de n8n sobre fechas viejas una vez esté cambiado)**
+- [x] El dashboard dice con claridad qué ventana está viendo
 
 ## Por qué diario y no semanal + mensual
 
@@ -81,3 +86,73 @@ atreve a tocar después.
 El endpoint de ingesta (`POST /api/marketing-reports/ingest`, protegido con
 `MARKETING_REPORT_INGEST_KEY`) conserva su forma `{ subdomain, reports: [...] }`;
 lo que cambia es qué trae cada renglón y que la escritura es un upsert.
+
+## Notas de verificación
+
+**Hecho en esta rama** (`src/collections/MarketingReports.ts`,
+`src/app/api/marketing-reports/ingest/route.ts`,
+`src/app/api/tenant-dashboard/kpis/route.ts`, `src/utils/dashboardPeriod.ts`,
+y las vistas `KpiReport.tsx`/`KpiMarketingSection.tsx`):
+
+- Colección `marketing-reports`: `date` en vez de `weekStart`/`weekEnd`,
+  `reach`/`frequency`/`cpm`/`ctr`/`costPerLead` fuera del modelo, índice
+  `['tenant', 'date']`.
+- Migración `20260918_151144_ingest_diario_marketing_reports`: revisada a
+  mano, `DELETE FROM marketing_reports` antes de agregar `date NOT NULL`
+  (si no, el `ADD COLUMN` truena con filas existentes), todo lo demás
+  `IF EXISTS`/`IF NOT EXISTS` por seguridad. **Borra el histórico semanal a
+  propósito**, como pide el checklist.
+- `/ingest` hace upsert por `(tenant, campaign, date)`.
+- `/api/tenant-dashboard/kpis`: la sección de Marketing ya usa la MISMA
+  ventana que el resto del dashboard (antes era "semanas completas" aparte,
+  porque el reporte era semanal), y la tabla agrupa por campaña sumando los
+  días de la ventana — CTR y costo por Lead salen de esas sumas, no de
+  promediar renglones.
+- `npm run lint` y `npx tsc --noEmit`: limpios en los archivos tocados.
+- **No lo pude probar contra la app corriendo** (el navegador de esta sesión
+  no respondió); no toqué la base local para no arriesgar los datos de
+  prueba de Fernando. Verificar en la app queda pendiente — ver abajo.
+
+**Pendiente, y de quién es**:
+
+1. → **Acción de Fernando (o de quien edite el workflow de n8n).** Cambiar el
+   nodo que llama a Meta Insights: pedir `time_increment=1` (un renglón por
+   día) en vez de la semana completa, y mandar cada fila al `/ingest` con
+   este contrato (reemplaza al de antes):
+
+   ```json
+   {
+     "subdomain": "cliente",
+     "reports": [
+       {
+         "date_start": "2026-09-17",
+         "date_stop": "2026-09-17",
+         "campaign": "SM :: Conversión",
+         "impressions": 12345,
+         "clicks": 210,
+         "landing_page_views": 180,
+         "leads": 9,
+         "spend": "$652.05",
+         "ads": "SM :: A, SM :: B"
+       }
+     ]
+   }
+   ```
+
+   `date_stop` es opcional pero, si viene, debe ser el mismo día que
+   `date_start` (el endpoint lo rechaza si no). `reach`, `frequency`, `cpm`,
+   `ctr`, `cost_per_lead` ya no hace falta mandarlos: si el nodo los sigue
+   trayendo no pasa nada, el endpoint los ignora. La ventana móvil de 7 días
+   pisando lo que ya había es la misma idea de antes, solo que ahora una fila
+   es un día, no una semana.
+
+2. → **Acción de Fernando.** Una vez el job diario ya mande días: correrlo a
+   mano sobre el histórico viejo (Meta guarda hasta 37 meses) para reponer lo
+   que la migración borra. Sin este paso el dashboard va a mostrar "sin datos
+   de ads" hasta que empiece a acumular días nuevos.
+
+3. → **Acción de quien despliegue.** Producción se migra solo con
+   `npm run prod -- npm run migrate:debug` (el CLI normal no imprime nada
+   contra prod, ver la nota del proyecto). Esa migración **borra las filas
+   de `marketing_reports` que haya en producción** antes de reponerlas con
+   el paso 2 — avisar antes de correrla si hay clientes viendo esos números.

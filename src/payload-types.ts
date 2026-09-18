@@ -670,7 +670,7 @@ export interface LeadExport {
   createdAt: string;
 }
 /**
- * KPIs semanales de campañas de ads por tenant (ingesta desde n8n).
+ * KPIs diarios de campañas de ads por tenant (ingesta desde n8n).
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "marketing-reports".
@@ -678,27 +678,12 @@ export interface LeadExport {
 export interface MarketingReport {
   id: number;
   tenant?: (number | null) | Tenant;
-  weekStart: string;
-  weekEnd: string;
+  date: string;
   campaign: string;
   impressions?: number | null;
-  reach?: number | null;
-  frequency?: number | null;
-  /**
-   * MXN
-   */
-  cpm?: number | null;
   clicks?: number | null;
-  /**
-   * Porcentaje, ej: 0.91
-   */
-  ctr?: number | null;
   landingPageViews?: number | null;
   leads?: number | null;
-  /**
-   * MXN
-   */
-  costPerLead?: number | null;
   /**
    * MXN
    */
@@ -1135,18 +1120,12 @@ export interface LeadExportsSelect<T extends boolean = true> {
  */
 export interface MarketingReportsSelect<T extends boolean = true> {
   tenant?: T;
-  weekStart?: T;
-  weekEnd?: T;
+  date?: T;
   campaign?: T;
   impressions?: T;
-  reach?: T;
-  frequency?: T;
-  cpm?: T;
   clicks?: T;
-  ctr?: T;
   landingPageViews?: T;
   leads?: T;
-  costPerLead?: T;
   spend?: T;
   ads?: T;
   updatedAt?: T;

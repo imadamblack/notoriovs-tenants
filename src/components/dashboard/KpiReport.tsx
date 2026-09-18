@@ -11,21 +11,20 @@ import { SINCE_LABELS, type SinceKey } from '@/utils/dashboardPeriod'
 
 export type StageKpi = { id: string; label: string; count: number; pct: number; stepPct: number | null }
 export type TrendPoint = { week: string; count: number }
+// Un renglón = una campaña sumada dentro de la ventana pedida (no un
+// Marketing Report / día suelto: ver el comentario en la ruta de KPIs).
 export type MarketingRow = {
-  id: string | number
-  campaign?: string
-  weekStart?: string
-  weekEnd?: string
-  impressions?: number
-  clicks?: number
-  ctr?: number
-  leads?: number
-  costPerLead?: number
-  spend?: number
+  campaign: string
+  impressions: number
+  clicks: number
+  ctr: number | null
+  leads: number
+  costPerLead: number | null
+  spend: number
 }
 export type MarketingTotals = { spend: number; leads: number; impressions: number; clicks: number; avgCostPerLead: number }
-// Rango REAL de semanas completas que cubren los reportes mostrados (lo
-// calcula la ruta de KPIs, no la vista). Es `null` cuando no hay ninguno.
+// Rango REAL de días que cubren los reportes mostrados (lo calcula la
+// ruta de KPIs, no la vista). Es `null` cuando no hay ninguno.
 export type MarketingRange = { start: string; end: string } | null
 
 type KpiData = {

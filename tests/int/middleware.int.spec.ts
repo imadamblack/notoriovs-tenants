@@ -55,6 +55,13 @@ describe('middleware', () => {
     expect(destination(res)).toBeNull()
   })
 
+  it('test queda reservado para preview de servidor, no es subdominio de tenant', () => {
+    const res = middleware(request('test.notoriovs.com', '/survey'))
+
+    expect(res.status).toBe(200)
+    expect(destination(res)).toBeNull()
+  })
+
   it('los archivos estáticos de /public no se reescriben por tenant', () => {
     // El apple-touch-icon del dashboard vive en /public. Reescrito a
     // /tenant-site/{sub}/apple-touch-icon-dashboard.png da 404, y entonces
