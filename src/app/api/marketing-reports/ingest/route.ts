@@ -127,7 +127,12 @@ export async function POST(req: NextRequest) {
 
     const data = {
       tenant: Number(tenant.id),
-      date: new Date(dayKey).toISOString(),
+      // Mediodía UTC, no medianoche: el panel de Payload muestra las fechas
+      // en la hora LOCAL del navegador (ver DateCell de @payloadcms/ui), y
+      // medianoche UTC cae en la tarde del día anterior para México
+      // (UTC-6). Al mediodía sobrevive esa conversión para cualquier zona
+      // horaria razonable del negocio.
+      date: new Date(`${dayKey}T12:00:00.000Z`).toISOString(),
       campaign: row.campaign,
       impressions: toNumber(row.impressions),
       clicks: toNumber(row.clicks),
