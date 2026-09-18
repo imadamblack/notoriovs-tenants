@@ -36,6 +36,14 @@ export const Leads: CollectionConfig = {
     useAsTitle: 'name',
     defaultColumns: ['name', 'tenant', 'stage', 'status', 'phone', 'createdAt'],
     description: 'Leads capturados por el quiz de cada tenant.',
+    components: {
+      // Panel para subir un CSV y dar de alta varios leads a la vez, arriba
+      // del listado. Ver /api/leads/bulk-import para el porqué de tantas
+      // verificaciones ahí: este componente solo manda el tenant seleccionado
+      // y el contenido del archivo; todo lo demás (parseo, `stage` inicial,
+      // control de acceso) pasa del lado del servidor.
+      beforeListTable: ['/components/admin/BulkLeadImport#BulkLeadImport'],
+    },
   },
   hooks: {
     // EL punto de emisión de `lead.created` (ADR 0008, decisión 4). Está aquí,
