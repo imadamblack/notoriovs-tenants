@@ -478,6 +478,10 @@ export interface Tenant {
     metaPixelId?: string | null;
     metaCapiToken?: string | null;
     googleTagId?: string | null;
+    /**
+     * ID de la cuenta publicitaria en Meta (sin el prefijo "act_"). La consulta GET /api/marketing-reports/ad-accounts se lo entrega al workflow central de n8n para que traiga los KPIs diarios de este cliente; vacío significa que ese tenant no se ingesta.
+     */
+    metaAdAccountId?: string | null;
   };
   /**
    * Etapas del Kanban de leads para este tenant, en el orden en que deben mostrarse las columnas. Cada lead guarda en Lead.stage el "id" interno (autogenerado por Payload) de la etapa en la que está, no el nombre, así que puedes renombrar una etapa o reordenarlas libremente sin romper nada. Ese id solo se pierde si BORRAS la etapa y creas una "igual" en su lugar: los leads que estaban ahí quedan huérfanos y caen en la columna "Otro" del Kanban hasta que se reasignan a mano.
@@ -1067,6 +1071,7 @@ export interface TenantsSelect<T extends boolean = true> {
         metaPixelId?: T;
         metaCapiToken?: T;
         googleTagId?: T;
+        metaAdAccountId?: T;
       };
   leadPipeline?:
     | T

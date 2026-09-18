@@ -36,6 +36,15 @@ export const integrationsTab: Tab = {
         { name: 'metaPixelId', type: 'text', label: 'Meta Pixel' },
         { name: 'metaCapiToken', type: 'text', label: 'Meta Conversions API Token' },
         { name: 'googleTagId', type: 'text', label: 'Google Tag' },
+        {
+          name: 'metaAdAccountId',
+          type: 'text',
+          label: 'Meta Ad Account ID',
+          admin: {
+            description:
+              'ID de la cuenta publicitaria en Meta (sin el prefijo "act_"). La consulta GET /api/marketing-reports/ad-accounts se lo entrega al workflow central de n8n para que traiga los KPIs diarios de este cliente; vacío significa que ese tenant no se ingesta.',
+          },
+        },
       ],
     },
   ],

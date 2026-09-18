@@ -8,6 +8,7 @@ import * as migration_20260912_035248_eventos_con_sobre from './20260912_035248_
 import * as migration_20260912_194122_borrar_webhooks_viejos from './20260912_194122_borrar_webhooks_viejos';
 import * as migration_20260918_151144_ingest_diario_marketing_reports from './20260918_151144_ingest_diario_marketing_reports';
 import * as migration_20260918_191357_marketing_reports_date_a_mediodia from './20260918_191357_marketing_reports_date_a_mediodia';
+import * as migration_20260918_213811_meta_ad_account_id_en_tenants from './20260918_213811_meta_ad_account_id_en_tenants';
 
 export const migrations = [
   {
@@ -53,11 +54,16 @@ export const migrations = [
   {
     up: migration_20260918_151144_ingest_diario_marketing_reports.up,
     down: migration_20260918_151144_ingest_diario_marketing_reports.down,
-    name: '20260918_151144_ingest_diario_marketing_reports'
+    name: '20260918_151144_ingest_diario_marketing_reports',
   },
   {
     up: migration_20260918_191357_marketing_reports_date_a_mediodia.up,
     down: migration_20260918_191357_marketing_reports_date_a_mediodia.down,
     name: '20260918_191357_marketing_reports_date_a_mediodia',
+  },
+  {
+    up: migration_20260918_213811_meta_ad_account_id_en_tenants.up,
+    down: migration_20260918_213811_meta_ad_account_id_en_tenants.down,
+    name: '20260918_213811_meta_ad_account_id_en_tenants'
   },
 ];
