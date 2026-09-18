@@ -41,12 +41,16 @@ import type { TenantLeadStage } from '@/utils/getTenant'
 //     o su valor interno; vacíos caen a "Abierto" e "Importado".
 //   - UTM Source/Medium/Campaign/Term/Content: las mismas cinco claves que
 //     guarda el quiz (ver UTM_KEYS en tracking-cookies.ts).
-//   - Una columna por pregunta del quiz de este tenant, con el mismo
-//     encabezado (`headerFromQuizStep`) y la misma validación de opciones
-//     (`normalizeAnswerValue`) que ya usan la exportación y la edición de
-//     respuestas desde el panel de detalle. Reusar `leadAnswers.ts` en vez de
-//     reinventar la validación es lo que evita que un CSV con una opción que
-//     no existe en el quiz cree una respuesta que ningún reporte sabe contar.
+//   - Una columna por pregunta del quiz de este tenant. La plantilla usa el
+//     `name` interno de la pregunta como encabezado (corto y sin acentos ni
+//     comas — más cómodo para adaptar un CSV que ya viene de otro lado), pero
+//     al subir se acepta también el título completo (`headerFromQuizStep`,
+//     el que ve el lead), por si alguien reimporta un CSV exportado desde el
+//     dashboard de cliente. La validación de las respuestas
+//     (`normalizeAnswerValue`) es la misma que ya usan la exportación y la
+//     edición desde el panel de detalle: reusar `leadAnswers.ts` en vez de
+//     reinventarla es lo que evita que un CSV con una opción que no existe en
+//     el quiz cree una respuesta que ningún reporte sabe contar.
 //
 // Deliberadamente fuera: `externalId` (es la llave de idempotencia del
 // ingest de n8n, no algo que se teclee a mano) y `answers` sueltas fuera del
@@ -127,9 +131,15 @@ function toText(value: unknown): string | undefined {
   return trimmed || undefined
 }
 
-/** Sin acentos, sin mayúsculas: para que "Teléfono" y "telefono" sean el mismo encabezado. */
-function normalizeHeader(cell: string): string {
-  return cell
+/**
+ * Sin acentos, sin mayúsculas: para que "Teléfono" y "telefono" sean el mismo
+ * encabezado. Acepta cualquier valor (no solo string): una opción de radio o
+ * select con `label`/`value` en null —dato viejo de un quiz editado a mano
+ * antes de que el campo fuera obligatorio— no debe tronar todo el import por
+ * una sola fila.
+ */
+function normalizeHeader(cell: unknown): string {
+  return String(cell ?? '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .trim()
@@ -309,7 +319,7 @@ function parseDataRow(
         if (!cellText) return
         const normalized = parseAnswerCell(column.step, cellText)
         if (!normalized.ok) {
-          errors.push(`"${headerFromQuizStep(column.step)}": ${normalized.error}`)
+          errors.push(`"${column.step.name}": ${normalized.error}`)
           return
         }
         row.answers[column.step.name] = normalized.value
@@ -408,23 +418,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Falta el CSV a importar' }, { status: 400 })
   }
 
-  const tenant = await payload.findByID({
-    collection: 'tenants',
-    id: tenantId,
-    depth: 0,
-    overrideAccess: true,
-  })
-  if (!tenant) {
-    return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
+  let pipeline: TenantLeadStage[]
+  let firstStage: string
+  let parsed: ParseResult
+  try {
+    const tenant = await payload.findByID({
+      collection: 'tenants',
+      id: tenantId,
+      depth: 0,
+      overrideAccess: true,
+    })
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 })
+    }
+
+    // Misma regla que /api/quiz-submit y /api/leads/ingest: sin una etapa
+    // explícita en el CSV, el lead nace en la primera etapa del pipeline.
+    pipeline = tenant.leadPipeline || []
+    firstStage = pipeline[0]?.id || 'nuevo'
+    const questions = quizQuestions(tenant.quizSteps || [])
+    parsed = parseHeaderAndLines(text, questions)
+  } catch (err) {
+    return NextResponse.json({ error: `No se pudo leer el tenant o su quiz: ${String(err)}` }, { status: 500 })
   }
 
-  // Misma regla que /api/quiz-submit y /api/leads/ingest: sin una etapa
-  // explícita en el CSV, el lead nace en la primera etapa del pipeline.
-  const pipeline = tenant.leadPipeline || []
-  const firstStage = pipeline[0]?.id || 'nuevo'
-  const questions = quizQuestions(tenant.quizSteps || [])
-
-  const parsed = parseHeaderAndLines(text, questions)
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 })
   }
@@ -432,8 +449,18 @@ export async function POST(req: NextRequest) {
   const results: RowResult[] = []
 
   for (let i = 0; i < parsed.dataLines.length; i++) {
-    const cells = splitLine(parsed.dataLines[i], parsed.delimiter)
-    const { row, errors } = parseDataRow(cells, parsed.columns, pipeline)
+    let row: ParsedRow
+    let errors: string[]
+    try {
+      const cells = splitLine(parsed.dataLines[i], parsed.delimiter)
+      ;({ row, errors } = parseDataRow(cells, parsed.columns, pipeline))
+    } catch (err) {
+      // Una opción de radio/select con `label` o `value` en null (dato viejo
+      // de un quiz editado antes de que el campo fuera obligatorio) no debe
+      // tumbar el import entero: se salta esa fila y siguen las demás.
+      results.push({ line: i + 1, op: 'skipped', error: String(err) })
+      continue
+    }
 
     if (errors.length) {
       results.push({ line: i + 1, op: 'skipped', error: errors.join('; ') })
@@ -513,7 +540,7 @@ export async function GET(req: NextRequest) {
     'UTM Campaign',
     'UTM Term',
     'UTM Content',
-    ...questions.map(headerFromQuizStep),
+    ...questions.map((step) => step.name),
   ]
   const example = [
     'Juana Pérez',
