@@ -12,9 +12,10 @@ reconstruir desde días y no son métricas de dueño de negocio.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** Plataforma hecha en la rama (colección, migración, endpoint de
-ingesta y dashboard). Falta el lado de n8n (pull diario a Meta en vez de
-semanal) y el backfill del histórico; ver "Notas de verificación" al final.
+**Status:** CERRADO. Plataforma y n8n en `main` y desplegados (PRs #20, #21,
+#22), migraciones aplicadas en producción. Workflow central de n8n corriendo
+diario contra `GET /api/marketing-reports/ad-accounts`, con paginación y
+filtro por prefijo de campaña. Ver "Notas de verificación" al final.
 
 - [x] Un Marketing Report es un día de una campaña de un Tenant
 - [x] La ingesta acepta varios días en una llamada y **actualiza** por
@@ -24,9 +25,10 @@ semanal) y el backfill del histórico; ver "Notas de verificación" al final.
 - [x] El dashboard calcula la ventana que pide (semana, mes, un rango) sumando días
 - [x] Las métricas derivadas se calculan **para la ventana**, no se promedian:
       CPM, CTR y costo por Lead salen de dividir los acumulados de esa ventana
-- [ ] El histórico semanal queda borrado **(hecho, ver migración)** y
-      **repuesto con días reales traídos de Meta (pendiente: depende de correr
-      el job de n8n sobre fechas viejas una vez esté cambiado)**
+- [x] El histórico semanal queda borrado (migración) y repuesto con días
+      reales traídos de Meta para al menos un tenant (`ntrs`) — extender el
+      backfill a más historia o a otros tenants queda a criterio de Fernando,
+      no bloquea el issue
 - [x] El dashboard dice con claridad qué ventana está viendo
 
 ## Por qué diario y no semanal + mensual
@@ -113,46 +115,40 @@ y las vistas `KpiReport.tsx`/`KpiMarketingSection.tsx`):
   no respondió); no toqué la base local para no arriesgar los datos de
   prueba de Fernando. Verificar en la app queda pendiente — ver abajo.
 
-**Pendiente, y de quién es**:
+**Lo que pasó después de la primera entrega** (ya en producción):
 
-1. → **Acción de Fernando (o de quien edite el workflow de n8n).** Cambiar el
-   nodo que llama a Meta Insights: pedir `time_increment=1` (un renglón por
-   día) en vez de la semana completa, y mandar cada fila al `/ingest` con
-   este contrato (reemplaza al de antes):
+- El día que Fernando probó el primer ingest real, el panel mostraba cada
+  fecha un día antes de la real (ej. el 17 se veía como "16, 6:00 PM").
+  Causa: `/ingest` guardaba el día a medianoche UTC, y el panel de Payload
+  pinta las fechas en la hora LOCAL del navegador — medianoche UTC cae en
+  la tarde del día anterior para México (UTC-6). Fix: guardar a mediodía
+  UTC en vez de medianoche (PR #21), con una migración aparte
+  (`20260918_191357_marketing_reports_date_a_mediodia`) que corrige las
+  filas que ya se habían ingestado mal.
+- El plan original era un workflow de n8n por tenant. Con 9 tenants,
+  Fernando decidió centralizar: un solo workflow programado consulta
+  `GET /api/marketing-reports/ad-accounts` (nuevo, protegido con el mismo
+  `MARKETING_REPORT_INGEST_KEY`, expone SOLO `subdomain` +
+  `tracking.metaAdAccountId` de tenants activos — nunca el resto de
+  `tracking`, que trae secretos) y loopea llamando al subworkflow
+  compartido de ingesta por cada cuenta (PR #22, agrega
+  `tracking.metaAdAccountId` a `Tenants`).
+- Esa decisión cambió el subworkflow de n8n: en vez de una campaña fija por
+  tenant, consulta la cuenta publicitaria completa
+  (`act_{account}/insights`, `level=ad`, `time_increment=1`) y agrupa por
+  `(campaña, día)` en vez de solo por día, porque ahora puede traer varias
+  campañas de un mismo tenant en la misma llamada.
+- Fernando encontró que Meta pagina las insights (25 renglones por página):
+  con una cuenta completa y varios días, se pasaba de la primera página y
+  se perdían datos en silencio, sin ningún error. Agregó un nodo que seguía
+  `paging.next` hasta agotarlo; se integró al subworkflow entre
+  `get_campaign_insights` y `set_data`.
+- Se agregó un filtro de campañas con prefijo `NTRS` en dos capas: del lado
+  de Meta (`filtering: campaign.name CONTAIN "NTRS"`, para no pagar de más
+  por datos que no se quieren) y un `startsWith` exacto dentro de
+  `set_data` (por si `CONTAIN` matcheara algo con "NTRS" a la mitad del
+  nombre).
 
-   ```json
-   {
-     "subdomain": "cliente",
-     "reports": [
-       {
-         "date_start": "2026-09-17",
-         "date_stop": "2026-09-17",
-         "campaign": "SM :: Conversión",
-         "impressions": 12345,
-         "clicks": 210,
-         "landing_page_views": 180,
-         "leads": 9,
-         "spend": "$652.05",
-         "ads": "SM :: A, SM :: B"
-       }
-     ]
-   }
-   ```
-
-   `date_stop` es opcional pero, si viene, debe ser el mismo día que
-   `date_start` (el endpoint lo rechaza si no). `reach`, `frequency`, `cpm`,
-   `ctr`, `cost_per_lead` ya no hace falta mandarlos: si el nodo los sigue
-   trayendo no pasa nada, el endpoint los ignora. La ventana móvil de 7 días
-   pisando lo que ya había es la misma idea de antes, solo que ahora una fila
-   es un día, no una semana.
-
-2. → **Acción de Fernando.** Una vez el job diario ya mande días: correrlo a
-   mano sobre el histórico viejo (Meta guarda hasta 37 meses) para reponer lo
-   que la migración borra. Sin este paso el dashboard va a mostrar "sin datos
-   de ads" hasta que empiece a acumular días nuevos.
-
-3. → **Acción de quien despliegue.** Producción se migra solo con
-   `npm run prod -- npm run migrate:debug` (el CLI normal no imprime nada
-   contra prod, ver la nota del proyecto). Esa migración **borra las filas
-   de `marketing_reports` que haya en producción** antes de reponerlas con
-   el paso 2 — avisar antes de correrla si hay clientes viendo esos números.
+Todo el lado de n8n (subworkflow + workflow central) vive en la cuenta de
+n8n de Fernando, no en este repo — los archivos que se intercambiaron están
+en el hilo de la sesión, no versionados aquí.
