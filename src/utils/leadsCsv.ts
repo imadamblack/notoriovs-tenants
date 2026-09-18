@@ -64,7 +64,7 @@ export type LeadCsvColumn = {
   value: (lead: ExportableLead) => string
 }
 
-const SOURCE_LABELS: Record<string, string> = {
+export const SOURCE_LABELS: Record<string, string> = {
   quiz: 'Quiz',
   manual: 'Manual',
   meta: 'Meta Ads',
