@@ -9,6 +9,7 @@ import * as migration_20260912_194122_borrar_webhooks_viejos from './20260912_19
 import * as migration_20260918_151144_ingest_diario_marketing_reports from './20260918_151144_ingest_diario_marketing_reports';
 import * as migration_20260918_191357_marketing_reports_date_a_mediodia from './20260918_191357_marketing_reports_date_a_mediodia';
 import * as migration_20260918_213811_meta_ad_account_id_en_tenants from './20260918_213811_meta_ad_account_id_en_tenants';
+import * as migration_20260919_215911_media_original_filename from './20260919_215911_media_original_filename';
 
 export const migrations = [
   {
@@ -64,6 +65,11 @@ export const migrations = [
   {
     up: migration_20260918_213811_meta_ad_account_id_en_tenants.up,
     down: migration_20260918_213811_meta_ad_account_id_en_tenants.down,
-    name: '20260918_213811_meta_ad_account_id_en_tenants'
+    name: '20260918_213811_meta_ad_account_id_en_tenants',
+  },
+  {
+    up: migration_20260919_215911_media_original_filename.up,
+    down: migration_20260919_215911_media_original_filename.down,
+    name: '20260919_215911_media_original_filename',
   },
 ];

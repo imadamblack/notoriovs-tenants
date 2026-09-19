@@ -9,13 +9,25 @@ toparse con el límite de longitud de pathname del store.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** Hecho en la rama, falta verlo en producción con Vercel Blob real.
+Localmente no hay `BLOB_READ_WRITE_TOKEN` (los uploads van a disco), así que no
+se puede reproducir el sufijo real de Vercel; se verificó el mecanismo con un
+script que simula el nombre acumulado directo en la base y dispara un cambio de
+focal point por la Local API — confirma que `beforeOperation` repone la base
+antes de que Payload arme el nuevo archivo. Falta migrar producción
+(`original_filename` es columna nueva) y confirmar con una imagen real que el
+nombre ya no crece.
 
-- [ ] Editar la misma imagen N veces deja el nombre con longitud estable, no creciente
-- [ ] Cada edición sigue produciendo una URL distinta (la inmutabilidad es lo que
-      permite el caché agresivo del CDN; ver issue 01)
-- [ ] El archivo anterior se sigue borrando, sin huérfanos
-- [ ] Los media ya existentes con nombres acumulados siguen resolviendo
+- [x] Editar la misma imagen N veces deja el nombre con longitud estable, no
+      creciente — verificado localmente simulando el nombre acumulado; falta
+      confirmar contra Vercel Blob real
+- [x] Cada edición sigue produciendo una URL distinta (la inmutabilidad es lo que
+      permite el caché agresivo del CDN; ver issue 01) — no se tocó
+      `addRandomSuffix`
+- [x] El archivo anterior se sigue borrando, sin huérfanos — el hook `afterChange`
+      que lo hace no cambió
+- [x] Los media ya existentes con nombres acumulados siguen resolviendo — `url`
+      no se toca, solo `filename`/`originalFilename`
 
 ## Evidencia
 
