@@ -33,7 +33,6 @@ import { Favicon as Favicon_50eb5ac68deb4a7b07f79f1df148980c } from '../../../co
 import { AdminLogo as AdminLogo_48bd4f5ed20a278ca9298ebbc521db88 } from '../../../components/AdminLogo'
 import { TenantsDashboardWidget as TenantsDashboardWidget_5c8b8c3b1b3a6911f71b34fec3f5a32b } from '../../../components/TenantsDashboardWidget'
 import { TenantSelector as TenantSelector_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
-import { VercelBlobClientUploadHandler as VercelBlobClientUploadHandler_16c82c5e25f430251a3e3ba57219ff4e } from '@payloadcms/storage-vercel-blob/client'
 import { TenantSelectionProvider as TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
@@ -74,7 +73,6 @@ export const importMap = {
   "/components/AdminLogo#AdminLogo": AdminLogo_48bd4f5ed20a278ca9298ebbc521db88,
   "/components/TenantsDashboardWidget#TenantsDashboardWidget": TenantsDashboardWidget_5c8b8c3b1b3a6911f71b34fec3f5a32b,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelector": TenantSelector_d6d5f193a167989e2ee7d14202901e62,
-  "@payloadcms/storage-vercel-blob/client#VercelBlobClientUploadHandler": VercelBlobClientUploadHandler_16c82c5e25f430251a3e3ba57219ff4e,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelectionProvider": TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }
