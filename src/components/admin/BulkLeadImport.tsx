@@ -34,6 +34,7 @@ type RowResult = {
   op: 'created' | 'skipped'
   id?: string | number
   error?: string
+  duplicateOf?: string | number
 }
 
 export const BulkLeadImport: React.FC = () => {
@@ -45,6 +46,7 @@ export const BulkLeadImport: React.FC = () => {
   const [fileName, setFileName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [downloadingSchema, setDownloadingSchema] = useState(false)
   const [results, setResults] = useState<RowResult[] | null>(null)
 
   if (!selectedTenantID) return null
@@ -67,30 +69,58 @@ export const BulkLeadImport: React.FC = () => {
     reader.readAsText(file, 'utf-8')
   }
 
-  const handleDownloadTemplate = async () => {
-    setDownloading(true)
+  const downloadCsv = async (url: string, fallbackName: string, errorMessage: string) => {
     try {
-      const res = await fetch(`/api/leads/bulk-import?tenant=${selectedTenantID}`)
+      const res = await fetch(url)
       if (!res.ok) {
         const json = await res.json().catch(() => null)
-        toast.error(json?.error || 'No se pudo generar la plantilla')
+        toast.error(json?.error || errorMessage)
         return
       }
       const blob = await res.blob()
       const disposition = res.headers.get('Content-Disposition') || ''
       const filenameMatch = disposition.match(/filename="([^"]+)"/)
-      const url = URL.createObjectURL(blob)
+      const objectUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.href = url
-      link.download = filenameMatch?.[1] || 'leads-plantilla.csv'
+      link.href = objectUrl
+      link.download = filenameMatch?.[1] || fallbackName
       document.body.appendChild(link)
       link.click()
       link.remove()
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(objectUrl)
     } catch {
       toast.error('No se pudo conectar con el servidor')
+    }
+  }
+
+  const handleDownloadTemplate = async () => {
+    setDownloading(true)
+    try {
+      await downloadCsv(
+        `/api/leads/bulk-import?tenant=${selectedTenantID}`,
+        'leads-plantilla.csv',
+        'No se pudo generar la plantilla',
+      )
     } finally {
       setDownloading(false)
+    }
+  }
+
+  // El schema no reemplaza la plantilla: la plantilla trae el encabezado
+  // listo para llenar, esto trae el mapa clave↔etiqueta de Etapa, Resultado,
+  // Origen y cada opción del quiz, para quien está acomodando un CSV que ya
+  // trae sus propios valores y necesita saber a cuál de los de este tenant
+  // corresponde cada uno.
+  const handleDownloadSchema = async () => {
+    setDownloadingSchema(true)
+    try {
+      await downloadCsv(
+        `/api/leads/bulk-import?tenant=${selectedTenantID}&format=schema`,
+        'leads-schema.csv',
+        'No se pudo generar el schema',
+      )
+    } finally {
+      setDownloadingSchema(false)
     }
   }
 
@@ -116,13 +146,13 @@ export const BulkLeadImport: React.FC = () => {
       setResults(rows)
       const created = rows.filter((row) => row.op === 'created').length
       const skipped = rows.length - created
+      const duplicates = rows.filter((row) => row.op === 'created' && row.duplicateOf).length
 
       if (created > 0) {
-        toast.success(
-          skipped > 0
-            ? `${created} lead${created === 1 ? '' : 's'} importado${created === 1 ? '' : 's'}, ${skipped} omitido${skipped === 1 ? '' : 's'}`
-            : `${created} lead${created === 1 ? '' : 's'} importado${created === 1 ? '' : 's'}`,
-        )
+        const parts = [`${created} lead${created === 1 ? '' : 's'} importado${created === 1 ? '' : 's'}`]
+        if (duplicates > 0) parts.push(`${duplicates} posible${duplicates === 1 ? '' : 's'} duplicado${duplicates === 1 ? '' : 's'}`)
+        if (skipped > 0) parts.push(`${skipped} omitido${skipped === 1 ? '' : 's'}`)
+        toast.success(parts.join(', '))
         setText('')
         setFileName(null)
         if (fileInputRef.current) fileInputRef.current.value = ''
@@ -167,16 +197,31 @@ export const BulkLeadImport: React.FC = () => {
         <div style={{ marginTop: '1rem' }}>
           <p style={{ color: 'var(--theme-elevation-500)', fontSize: '0.85rem' }}>
             Descarga el CSV de ejemplo, llénalo y súbelo de vuelta: trae ya el encabezado exacto
-            (Nombre, Teléfono, WhatsApp, Correo, Notas, Etapa, Resultado, Origen, las columnas UTM
-            y una por cada pregunta del quiz de <strong>{tenantLabel || 'este tenant'}</strong>).
-            Etapa/Resultado/Origen van por su nombre (&quot;Contactado&quot;, &quot;Ganado&quot;,
-            &quot;Meta Ads&quot;…), no por su id interno; las que dejes vacías o sin columna caen
-            en la primera etapa del pipeline, &quot;Abierto&quot; e &quot;Importado&quot;.
+            (Nombre, Teléfono, WhatsApp, Correo, Notas, Etapa, Resultado, Origen, Fecha de alta,
+            las columnas UTM y una por cada pregunta del quiz de{' '}
+            <strong>{tenantLabel || 'este tenant'}</strong>).
+            Etapa/Resultado/Origen y las opciones del quiz aceptan su nombre
+            (&quot;Contactado&quot;, &quot;Ganado&quot;, &quot;Meta Ads&quot;…) o su clave interna; las
+            que dejes vacías o sin columna caen en la primera etapa del pipeline,
+            &quot;Abierto&quot; e &quot;Importado&quot;. &quot;Fecha de alta&quot; es opcional
+            (&quot;DD/MM/AAAA&quot; o &quot;DD/MM/AAAA HH:mm&quot;) — vacía, el lead nace hoy; para
+            migrar leads históricos, escribe la fecha real. Si ya tienes un CSV propio con sus
+            propias claves, descarga el schema para saber a cuál de las de este tenant
+            corresponde cada una.
           </p>
 
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
             <Button buttonStyle="secondary" size="small" onClick={handleDownloadTemplate} disabled={downloading}>
               {downloading ? 'Generando…' : 'Descargar CSV de ejemplo'}
+            </Button>
+
+            <Button
+              buttonStyle="secondary"
+              size="small"
+              onClick={handleDownloadSchema}
+              disabled={downloadingSchema}
+            >
+              {downloadingSchema ? 'Generando…' : 'Descargar schema (clave/etiqueta)'}
             </Button>
 
             <Button buttonStyle="secondary" size="small" onClick={() => fileInputRef.current?.click()}>
@@ -207,12 +252,19 @@ export const BulkLeadImport: React.FC = () => {
                   key={row.line}
                   style={{
                     color:
-                      row.op === 'created'
-                        ? 'var(--theme-success-600)'
-                        : 'var(--theme-error-500)',
+                      row.op !== 'created'
+                        ? 'var(--theme-error-500)'
+                        : row.duplicateOf
+                          ? 'var(--theme-warning-500)'
+                          : 'var(--theme-success-600)',
                   }}
                 >
-                  Línea {row.line}: {row.op === 'created' ? 'importado' : `omitido — ${row.error}`}
+                  Línea {row.line}:{' '}
+                  {row.op === 'created'
+                    ? row.duplicateOf
+                      ? `importado — mismo teléfono/WhatsApp que el lead #${row.duplicateOf}, revisa si es duplicado`
+                      : 'importado'
+                    : `omitido — ${row.error}`}
                 </li>
               ))}
             </ul>
