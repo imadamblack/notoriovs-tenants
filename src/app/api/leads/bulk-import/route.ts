@@ -41,6 +41,11 @@ import type { TenantLeadStage } from '@/utils/getTenant'
 //     o su valor interno; vacíos caen a "Abierto" e "Importado".
 //   - UTM Source/Medium/Campaign/Term/Content: las mismas cinco claves que
 //     guarda el quiz (ver UTM_KEYS en tracking-cookies.ts).
+//   - Fecha de alta: opcional, `DD/MM/AAAA` o `DD/MM/AAAA HH:mm` (lo que
+//     escribe `formatCsvDate` al exportar) o ISO. Sin ella, Payload la pone
+//     en el momento del import — lo normal para un alta nueva; con ella, para
+//     migrar leads históricos de otro sistema sin que todos aparezcan dados
+//     de alta "hoy".
 //   - Una columna por pregunta del quiz de este tenant. La plantilla usa el
 //     `name` interno de la pregunta como encabezado (corto y sin acentos ni
 //     comas — más cómodo para adaptar un CSV que ya viene de otro lado), pero
@@ -56,6 +61,14 @@ import type { TenantLeadStage } from '@/utils/getTenant'
 // ingest de n8n, no algo que se teclee a mano) y `answers` sueltas fuera del
 // quiz (ver "Otras respuestas" en leadsCsv.ts: son huérfanas de un quiz que
 // cambió, no algo que un alta nueva deba poder inventar).
+//
+// Etapa/Resultado/Origen y las opciones de cada pregunta del quiz aceptan
+// tanto su etiqueta como su clave interna (`resolveStageId`, `resolveStatus`,
+// `resolveSource`, `resolveOptionValue`): así un CSV que ya trae el valor
+// crudo de otro sistema no falla solo por no traer la etiqueta en español. El
+// GET con `?format=schema` (en vez de la plantilla de ejemplo) devuelve ese
+// mapa completo clave↔etiqueta, para quien está acomodando un CSV que no
+// salió de aquí.
 
 const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as const
 type UtmKey = (typeof UTM_KEYS)[number]
@@ -68,7 +81,7 @@ type SourceValue = (typeof SOURCE_VALUES)[number]
 
 type FixedTextKind = 'name' | 'phone' | 'whatsapp' | 'email' | 'notes'
 
-const FIXED_HEADER_SYNONYMS: Record<string, FixedTextKind | 'stage' | 'status' | 'source'> = {
+const FIXED_HEADER_SYNONYMS: Record<string, FixedTextKind | 'stage' | 'status' | 'source' | 'createdAt'> = {
   nombre: 'name',
   name: 'name',
   telefono: 'phone',
@@ -85,6 +98,11 @@ const FIXED_HEADER_SYNONYMS: Record<string, FixedTextKind | 'stage' | 'status' |
   status: 'status',
   origen: 'source',
   source: 'source',
+  'fecha de alta': 'createdAt',
+  fecha: 'createdAt',
+  createdat: 'createdAt',
+  'created at': 'createdAt',
+  created_at: 'createdAt',
 }
 
 // Dos formas de escribir cada clave UTM ("utm_source" y "utm source"): la
@@ -101,7 +119,7 @@ const UTM_HEADER_SYNONYMS: Record<string, UtmKey> = UTM_KEYS.reduce(
 )
 
 type ColumnTarget =
-  | { kind: FixedTextKind | 'stage' | 'status' | 'source' }
+  | { kind: FixedTextKind | 'stage' | 'status' | 'source' | 'createdAt' }
   | { kind: 'utm'; utmKey: UtmKey }
   | { kind: 'answer'; step: TenantQuizStep }
 
@@ -114,6 +132,7 @@ type ParsedRow = {
   stage?: string
   status?: StatusValue
   source?: SourceValue
+  createdAt?: string
   answers: Record<string, unknown>
   utm: Record<string, string>
 }
@@ -123,6 +142,10 @@ type RowResult = {
   op: 'created' | 'skipped'
   id?: string | number
   error?: string
+  // Mismo teléfono/WhatsApp que un lead que ya existía (de antes del import o
+  // de una fila anterior de este mismo CSV). Se avisa, no se bloquea: ver
+  // `buildNumberIndex` más abajo.
+  duplicateOf?: string | number
 }
 
 function toText(value: unknown): string | undefined {
@@ -258,6 +281,62 @@ function resolveSource(cellText: string): SourceValue | undefined {
   return entry ? (entry[0] as SourceValue) : undefined
 }
 
+/**
+ * Desplazamiento (en minutos) entre UTC y `timeZone` al momento `date`. Se
+ * calcula en vez de asumirlo fijo porque, aunque México ya no tiene horario
+ * de verano en la mayor parte del país desde 2022, la franja fronteriza sí lo
+ * conserva — más simple pedirle la hora real a `Intl` que llevar esa
+ * excepción a mano.
+ */
+function timeZoneOffsetMinutes(timeZone: string, date: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value)
+  const asUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+  return (asUTC - date.getTime()) / 60000
+}
+
+/**
+ * "Fecha de alta" tal como la escribe una persona (`DD/MM/AAAA` u
+ * `DD/MM/AAAA HH:mm`, lo que produce `formatCsvDate` al exportar) o en ISO
+ * (`AAAA-MM-DD[THH:mm]`, para quien pega un CSV que ya traía esa forma de
+ * otro sistema). Interpretada en hora de Ciudad de México —la misma que usa
+ * la exportación— para que un CSV exportado y reimportado sin tocar la fecha
+ * caiga en el mismo `createdAt` con el que salió.
+ */
+function parseCreatedAt(cellText: string): Date | null {
+  const slash = cellText.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2}))?$/)
+  const iso = cellText.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?$/)
+  const match = slash
+    ? { day: +slash[1], month: +slash[2], year: +slash[3], hour: +(slash[4] ?? 0), minute: +(slash[5] ?? 0) }
+    : iso
+      ? { day: +iso[3], month: +iso[2], year: +iso[1], hour: +(iso[4] ?? 0), minute: +(iso[5] ?? 0) }
+      : null
+  if (!match) return null
+
+  const utcGuess = new Date(Date.UTC(match.year, match.month - 1, match.day, match.hour, match.minute))
+  // Un "31/02" o similar no truena Date.UTC, lo desborda al mes siguiente: se
+  // rechaza a mano comparando contra lo que se pidió.
+  if (
+    utcGuess.getUTCFullYear() !== match.year ||
+    utcGuess.getUTCMonth() !== match.month - 1 ||
+    utcGuess.getUTCDate() !== match.day
+  ) {
+    return null
+  }
+
+  const offsetMinutes = timeZoneOffsetMinutes('America/Mexico_City', utcGuess)
+  return new Date(utcGuess.getTime() - offsetMinutes * 60000)
+}
+
 function parseDataRow(
   cells: string[],
   columns: (ColumnTarget | null)[],
@@ -313,6 +392,16 @@ function parseDataRow(
           return
         }
         row.source = source
+        return
+      }
+      case 'createdAt': {
+        if (!cellText) return
+        const date = parseCreatedAt(cellText)
+        if (!date) {
+          errors.push(`"Fecha de alta": "${cellText}" no es una fecha válida (usa DD/MM/AAAA o DD/MM/AAAA HH:mm)`)
+          return
+        }
+        row.createdAt = date.toISOString()
         return
       }
       case 'answer': {
@@ -381,6 +470,83 @@ function exampleValueForStep(step: TenantQuizStep): string {
   }
 }
 
+/**
+ * El CSV de ejemplo de abajo trae UNA fila de muestra: sirve para copiar el
+ * encabezado, no para saber qué claves o etiquetas acepta cada columna
+ * restringida. Este otro CSV es el mapa completo —una fila por cada valor
+ * válido de Etapa/Resultado/Origen y por cada opción de cada pregunta del
+ * quiz, con su clave interna y su etiqueta— para quien ya tiene un CSV
+ * propio (de otro CRM, de un Excel viejo) y necesita saber a qué valor de
+ * este tenant corresponde cada uno de los suyos antes de reacomodarlo.
+ */
+function buildSchemaCsv(pipeline: TenantLeadStage[], questions: TenantQuizStep[]): string {
+  const rows: string[][] = []
+
+  for (const stage of pipeline) {
+    if (!stage.id) continue
+    rows.push(['Etapa', stage.id, stage.label])
+  }
+  for (const status of STATUS_VALUES) {
+    rows.push(['Resultado', status, statusLabel(status)])
+  }
+  for (const source of SOURCE_VALUES) {
+    rows.push(['Origen', source, SOURCE_LABELS[source] ?? source])
+  }
+  rows.push(['Fecha de alta', '', 'DD/MM/AAAA o DD/MM/AAAA HH:mm (vacío = hoy, al momento del import)'])
+  for (const step of questions) {
+    const options = step.options || []
+    if (!options.length) {
+      rows.push([step.name, '', '(texto libre, sin opciones)'])
+      continue
+    }
+    for (const option of options) {
+      rows.push([step.name, option.value, option.label])
+    }
+  }
+
+  const header = ['Columna', 'Clave', 'Etiqueta']
+  return CSV_BOM + csvRow(header) + rows.map((r) => csvRow(r)).join('')
+}
+
+/**
+ * Teléfono/WhatsApp → id del lead que ya lo tiene, para este tenant. Misma
+ * regla de duplicado que el alta manual desde el dashboard
+ * (`/api/tenant-dashboard/leads`, comparación exacta contra `phone` y
+ * `whatsapp`, sin normalizar formato): se avisa, no se bloquea, porque un CSV
+ * de importación suele traer leads históricos donde el mismo número sí puede
+ * repetirse (una empresa, una familia) y perder la fila es peor que avisar de
+ * más.
+ */
+async function buildNumberIndex(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  tenantId: number,
+): Promise<Map<string, string | number>> {
+  const existing = await payload.find({
+    collection: 'leads',
+    where: { tenant: { equals: tenantId } },
+    select: { phone: true, whatsapp: true },
+    limit: 0,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const index = new Map<string, string | number>()
+  for (const lead of existing.docs) {
+    if (lead.phone) index.set(lead.phone, lead.id)
+    if (lead.whatsapp) index.set(lead.whatsapp, lead.id)
+  }
+  return index
+}
+
+function findDuplicate(index: Map<string, string | number>, row: ParsedRow): string | number | undefined {
+  const numbers = [row.phone, row.whatsapp].filter((value): value is string => Boolean(value))
+  for (const number of numbers) {
+    const id = index.get(number)
+    if (id !== undefined) return id
+  }
+  return undefined
+}
+
 async function authorizeTenant(payload: Awaited<ReturnType<typeof getPayload>>, req: NextRequest, tenantId: number) {
   const { user } = await payload.auth({ headers: req.headers })
   if (user?.collection !== 'users') {
@@ -446,6 +612,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: 400 })
   }
 
+  const numberIndex = await buildNumberIndex(payload, tenantId)
   const results: RowResult[] = []
 
   for (let i = 0; i < parsed.dataLines.length; i++) {
@@ -472,6 +639,8 @@ export async function POST(req: NextRequest) {
       continue
     }
 
+    const duplicateOf = findDuplicate(numberIndex, row)
+
     try {
       const created = await payload.create({
         collection: 'leads',
@@ -487,11 +656,19 @@ export async function POST(req: NextRequest) {
           stage: row.stage || firstStage,
           status: row.status || 'open',
           source: row.source || 'import',
+          // Sin esta columna, Payload la pone en el momento del import (ver
+          // `upsertRow` del adaptador: solo la fija si `data.createdAt` viene
+          // vacío) — lo mismo que ya pasaba antes de aceptarla.
+          ...(row.createdAt ? { createdAt: row.createdAt } : {}),
         },
         user,
         overrideAccess: false,
       })
-      results.push({ line: i + 1, op: 'created', id: created.id })
+      results.push({ line: i + 1, op: 'created', id: created.id, duplicateOf })
+      // Para que dos filas del mismo CSV con el mismo teléfono también se
+      // avisen entre sí, no solo contra lo que ya había antes del import.
+      if (row.phone) numberIndex.set(row.phone, created.id)
+      if (row.whatsapp) numberIndex.set(row.whatsapp, created.id)
     } catch (err) {
       results.push({ line: i + 1, op: 'skipped', error: String(err) })
     }
@@ -524,6 +701,17 @@ export async function GET(req: NextRequest) {
   }
 
   const questions = quizQuestions(tenant.quizSteps || [])
+
+  if (searchParams.get('format') === 'schema') {
+    const csv = buildSchemaCsv(tenant.leadPipeline || [], questions)
+    return new NextResponse(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="leads-schema-${tenant.subdomain || tenantId}.csv"`,
+      },
+    })
+  }
+
   const firstStageLabel = tenant.leadPipeline?.[0]?.label || ''
 
   const header = [
@@ -535,6 +723,7 @@ export async function GET(req: NextRequest) {
     'Etapa',
     'Resultado',
     'Origen',
+    'Fecha de alta',
     'UTM Source',
     'UTM Medium',
     'UTM Campaign',
@@ -551,6 +740,7 @@ export async function GET(req: NextRequest) {
     firstStageLabel,
     statusLabel('open'),
     SOURCE_LABELS.import,
+    '', // Fecha de alta: vacía = hoy, al momento del import
     'facebook',
     'cpc',
     'leads-septiembre',
