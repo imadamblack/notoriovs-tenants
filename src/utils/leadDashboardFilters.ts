@@ -1,4 +1,4 @@
-import type { Where } from 'payload'
+import type { Payload, Where } from 'payload'
 import type { TenantDoc } from '@/utils/getTenant'
 import { DEFAULT_LEAD_STUCK_AFTER_DAYS } from '@/components/dashboard/leadPresentation'
 import { sinceCutoffISO } from '@/utils/dashboardPeriod'
@@ -101,6 +101,29 @@ export function buildLeadsWhere(
   }
 
   return { and }
+}
+
+/**
+ * El lead de `id`, pero solo si es de este tenant. Sin esta comprobación
+ * cualquier sesión válida de un tenant podría tocar leads de otro con solo
+ * adivinar o enumerar ids: el id viene del cliente, la pertenencia no.
+ * Compartido por el PATCH/DELETE de `leads/route.ts` y por el GET de
+ * `leads/[id]/route.ts` (issue 35, abrir un Lead por URL): las tres rutas
+ * necesitan exactamente la misma comprobación, no una copia que alguna
+ * pueda quedarse atrás.
+ */
+export async function findLeadOfTenant(payload: Payload, id: string | number, tenantId: string | number) {
+  const lead = await payload.findByID({
+    collection: 'leads',
+    id,
+    depth: 0,
+    overrideAccess: true,
+    disableErrors: true,
+  })
+
+  const leadTenantId = typeof lead?.tenant === 'object' ? (lead.tenant as { id?: unknown })?.id : lead?.tenant
+
+  return lead && String(leadTenantId) === String(tenantId) ? lead : null
 }
 
 /**

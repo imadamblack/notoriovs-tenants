@@ -30,6 +30,7 @@ vi.mock('@/utils/tenantUserAuth', () => ({
 }))
 
 const { resolveDashboardAuth, sessionCan } = await import('@/utils/requireDashboardAuth')
+const { findLeadOfTenant } = await import('@/utils/leadDashboardFilters')
 
 const ACME = { id: 1, leadPipeline: [], leadStuckAfterDays: 21 }
 
@@ -119,6 +120,44 @@ describe('autorización del dashboard', () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1))
 
     expect(await resolveDashboardAuth(onAcme)).toBeNull()
+  })
+})
+
+// `findLeadOfTenant` es la comprobación que comparten el PATCH/DELETE de
+// /api/tenant-dashboard/leads y el GET de leads/[id] (issue 35, abrir un Lead
+// por URL): un id de Lead es un número adivinable, así que "es de este
+// tenant" no puede depender de qué ruta se llame.
+describe('un Lead solo se abre por id si es de este tenant', () => {
+  const payloadWith = (lead: unknown) => ({ findByID: vi.fn().mockResolvedValue(lead) })
+
+  it('un Lead del tenant se devuelve', async () => {
+    const payload = payloadWith({ id: 42, tenant: 1 })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lead = await findLeadOfTenant(payload as any, 42, 1)
+
+    expect(lead).toEqual({ id: 42, tenant: 1 })
+  })
+
+  it('el mismo id, pero de OTRO tenant, no se devuelve', async () => {
+    const payload = payloadWith({ id: 42, tenant: 2 })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findLeadOfTenant(payload as any, 42, 1)).toBeNull()
+  })
+
+  it('también compara el tenant cuando `tenant` llega poblado (depth > 0)', async () => {
+    const payload = payloadWith({ id: 42, tenant: { id: 2 } })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findLeadOfTenant(payload as any, 42, 1)).toBeNull()
+  })
+
+  it('un Lead inexistente no se devuelve', async () => {
+    const payload = payloadWith(null)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findLeadOfTenant(payload as any, 999, 1)).toBeNull()
   })
 })
 

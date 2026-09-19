@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { requireDashboardAuth, requireDashboardTenant, sessionCan } from '@/utils/requireDashboardAuth'
-import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
+import { buildLeadsWhere, findLeadOfTenant, readLeadFilters } from '@/utils/leadDashboardFilters'
 import { getTenantBySubdomain } from '@/utils/getTenant'
 import { mergeAnswersPatch, quizQuestions, readAnswers } from '@/utils/leadAnswers'
 
@@ -185,29 +185,6 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json({ lead: created }, { status: 201 })
-}
-
-/**
- * El lead de `id`, pero solo si es de este tenant. Sin esta comprobación
- * cualquier sesión válida de un tenant podría tocar leads de otro con solo
- * adivinar o enumerar ids: el id viene del cliente, la pertenencia no.
- */
-async function findLeadOfTenant(
-  payload: Awaited<ReturnType<typeof getPayload>>,
-  id: string | number,
-  tenantId: string | number,
-) {
-  const lead = await payload.findByID({
-    collection: 'leads',
-    id,
-    depth: 0,
-    overrideAccess: true,
-    disableErrors: true,
-  })
-
-  const leadTenantId = typeof lead?.tenant === 'object' ? (lead.tenant as { id?: unknown })?.id : lead?.tenant
-
-  return lead && String(leadTenantId) === String(tenantId) ? lead : null
 }
 
 export async function PATCH(req: NextRequest) {
