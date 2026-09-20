@@ -13,17 +13,17 @@ una decisión de operación que se toma en n8n, fuera de este repo.
 
 **Blocked by:** 35 (abrir un Lead por URL)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Un Tenant User activa las notificaciones desde el Dashboard y le llegan
-- [ ] Tocar la notificación abre ese Lead en el Dashboard de su Tenant, en un toque
-- [ ] El texto del push no incluye nombre, teléfono ni email del Lead
-- [ ] Un Tenant **inactivo** no genera push, igual que no genera Avisos
-- [ ] La suscripción es por usuario y por dispositivo, y se puede apagar por tipo de aviso
-- [ ] Una suscripción muerta (permiso revocado, datos del navegador borrados) se
+- [x] Un Tenant User activa las notificaciones desde el Dashboard y le llegan
+- [x] Tocar la notificación abre ese Lead en el Dashboard de su Tenant, en un toque
+- [x] El texto del push no incluye nombre, teléfono ni email del Lead
+- [x] Un Tenant **inactivo** no genera push, igual que no genera Avisos
+- [x] La suscripción es por usuario y por dispositivo, y se puede apagar por tipo de aviso
+- [x] Una suscripción muerta (permiso revocado, datos del navegador borrados) se
       limpia sola en vez de acumular errores de envío
-- [ ] Las suscripciones de un Tenant no son visibles ni utilizables desde otro
-- [ ] En iPhone hay una pantalla que enseña a instalar el Dashboard, distinta de la de Android
+- [x] Las suscripciones de un Tenant no son visibles ni utilizables desde otro
+- [x] En iPhone hay una pantalla que enseña a instalar el Dashboard, distinta de la de Android
 
 ## El push sale de la plataforma, no del tubo de eventos
 
@@ -73,3 +73,57 @@ Meta para avisarle a un cliente de algo que pasó en su propia cuenta.
 Y el gancho sin dato es lo que convierte el aviso en tráfico al producto en vez
 de en un sustituto del producto: un mensaje que ya trae el nombre y el teléfono
 le permite al cliente atender el Lead sin abrir el Dashboard nunca.
+
+## Cómo quedó
+
+- **Envío:** `sendTenantPush` (`src/notifications/pushSend.ts`), fire-and-forget
+  con `waitUntil`, mismo contrato que `emitTenantEvent`: nunca lanza, nunca
+  bloquea la transacción del Lead. Se dispara desde el `afterChange` de
+  `Leads.ts`, junto al webhook existente — no lo reemplaza ni lo toca.
+- **Decisión que no estaba en el issue original, tomada a mitad de la
+  implementación:** el push solo dispara si `source` es `quiz`, `meta` o
+  `whatsapp`, y solo si quien creó el Lead no es un Internal User
+  (`req.user?.collection !== 'users'`, que cubre el alta desde `/admin`). Un
+  alta manual desde el Dashboard o una importación no generan push: es el
+  propio cliente o el equipo haciendo algo a propósito, avisarle de eso es
+  ruido, no un Aviso.
+- **Colección** `push-subscriptions` (`src/collections/PushSubscriptions.ts`):
+  scopeada por `tenant` + `tenantUser`, sin pasar por `multiTenantPlugin`
+  (igual que `TenantUsers`, por la misma razón). `notificationTypes` (hoy un
+  renglón: `lead-new`) permite apagar un tipo sin revocar el permiso del
+  navegador.
+- **Autolimpieza:** un envío que rechaza 404/410 borra la suscripción, sin
+  reintento (ADR 0011).
+- **Rutas:** `src/app/api/tenant-dashboard/push/subscriptions/route.ts`
+  (GET/POST/PATCH/DELETE), mismo patrón de `requireDashboardAuth` + scoping a
+  mano que el resto de `/api/tenant-dashboard/*`.
+- **PWA:** `public/manifest.webmanifest` + `public/sw.js`, nuevos — no había
+  nada antes. El `<link rel="manifest">` solo va en el layout del Dashboard,
+  no en el sitio público del tenant. Los íconos (`icon-192.png`,
+  `icon-512.png`) son un placeholder escalado del ícono de 180×180 que ya
+  existía: falta reemplazarlos con arte real.
+- **UI:** `NotificationSettingsPanel.tsx`, con rama para iOS-sin-instalar
+  (Safari no deja pedir el permiso sin eso), lista-para-activar y
+  no-soportado. Entrada "Notificaciones" en el menú de cuenta, sin gate de
+  rol: cualquier Tenant User administra su propio dispositivo.
+- **Bug encontrado y corregido en el camino:** el `notificationclick` del
+  service worker enfocaba la primera pestaña que encontrara del mismo
+  origen — si el quiz (`/survey`) estaba abierto, navegaba esa pestaña en vez
+  de la del Dashboard — y por separado no esperaba a que `navigate()`
+  terminara antes de dar el `focus()` por bueno, así que el service worker se
+  podía morir a media navegación. Las dos correcciones quedan en `public/sw.js`.
+- Verificado a mano contra la base de dev (`ntrs`): completar el quiz de
+  verdad dispara el push, el texto trae el gancho y nunca datos del Lead, y
+  tocarlo abre el Lead correcto en un toque incluso con el quiz abierto en
+  otra pestaña. La pantalla de iOS se revisó con la emulación de dispositivo
+  de Chrome (user agent de iPhone), no con Safari real — necesita un
+  dispositivo o simulador para el comportamiento real de "Agregar a inicio".
+- **Sin ejercer a mano, aunque el código lo implementa:** Tenant inactivo sin
+  push (mismo `tenant.active` que ya prueba el webhook), apagar un tipo desde
+  la UI, y la autolimpieza de una suscripción muerta de verdad (pide revocar
+  el permiso y esperar un envío fallido real).
+
+**Acción tuya antes de que esto sirva en producción:** generar un par de
+llaves VAPID nuevo para prod (no reusar el de dev) y cargarlo en Vercel; y
+correr `npm run prod -- npm run migrate:debug` para aplicar la migración
+`push_subscriptions` contra la base de producción.
