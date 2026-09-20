@@ -11,6 +11,9 @@ export const metadata: Metadata = {
     icon: dashboardFaviconHref,
     apple: '/apple-touch-icon-dashboard.png',
   },
+  // Solo el Dashboard es instalable (issue 36): el sitio público del tenant
+  // no lleva este link, así que no aparece "agregar a inicio" para el quiz.
+  manifest: '/manifest.webmanifest',
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

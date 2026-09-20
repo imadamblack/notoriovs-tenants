@@ -75,6 +75,7 @@ export interface Config {
     leads: Lead;
     'lead-exports': LeadExport;
     'marketing-reports': MarketingReport;
+    'push-subscriptions': PushSubscription;
     'payload-kv': PayloadKv;
     'payload-folders': FolderInterface;
     'payload-locked-documents': PayloadLockedDocument;
@@ -94,6 +95,7 @@ export interface Config {
     leads: LeadsSelect<false> | LeadsSelect<true>;
     'lead-exports': LeadExportsSelect<false> | LeadExportsSelect<true>;
     'marketing-reports': MarketingReportsSelect<false> | MarketingReportsSelect<true>;
+    'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -698,6 +700,38 @@ export interface MarketingReport {
   createdAt: string;
 }
 /**
+ * Dispositivos que un Tenant User dio de alta para recibir Avisos push. Se administran desde el Dashboard de Cliente, no desde aquí.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions".
+ */
+export interface PushSubscription {
+  id: number;
+  tenant: number | Tenant;
+  /**
+   * Dueño de este dispositivo. Un dispositivo es privado de quien lo dio de alta, no compartido por Tenant.
+   */
+  tenantUser: number | TenantUser;
+  /**
+   * La URL del push service del navegador (Web Push API). Es la identidad natural del dispositivo: si vuelve a suscribirse con el mismo endpoint, esta fila se actualiza en vez de duplicarse.
+   */
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  /**
+   * Para distinguir dispositivos de un mismo usuario en una lista futura. Hoy solo se guarda.
+   */
+  userAgent?: string | null;
+  /**
+   * Apagar un tipo aquí NO revoca el permiso del navegador: la suscripción sigue viva para los tipos que queden prendidos.
+   */
+  notificationTypes?: 'lead-new'[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -748,6 +782,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'marketing-reports';
         value: number | MarketingReport;
+      } | null)
+    | ({
+        relationTo: 'push-subscriptions';
+        value: number | PushSubscription;
       } | null)
     | ({
         relationTo: 'payload-folders';
@@ -1135,6 +1173,25 @@ export interface MarketingReportsSelect<T extends boolean = true> {
   leads?: T;
   spend?: T;
   ads?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions_select".
+ */
+export interface PushSubscriptionsSelect<T extends boolean = true> {
+  tenant?: T;
+  tenantUser?: T;
+  endpoint?: T;
+  keys?:
+    | T
+    | {
+        p256dh?: T;
+        auth?: T;
+      };
+  userAgent?: T;
+  notificationTypes?: T;
   updatedAt?: T;
   createdAt?: T;
 }

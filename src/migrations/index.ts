@@ -10,6 +10,7 @@ import * as migration_20260918_151144_ingest_diario_marketing_reports from './20
 import * as migration_20260918_191357_marketing_reports_date_a_mediodia from './20260918_191357_marketing_reports_date_a_mediodia';
 import * as migration_20260918_213811_meta_ad_account_id_en_tenants from './20260918_213811_meta_ad_account_id_en_tenants';
 import * as migration_20260919_215911_media_original_filename from './20260919_215911_media_original_filename';
+import * as migration_20260919_232839_push_subscriptions from './20260919_232839_push_subscriptions';
 
 export const migrations = [
   {
@@ -71,5 +72,10 @@ export const migrations = [
     up: migration_20260919_215911_media_original_filename.up,
     down: migration_20260919_215911_media_original_filename.down,
     name: '20260919_215911_media_original_filename',
+  },
+  {
+    up: migration_20260919_232839_push_subscriptions.up,
+    down: migration_20260919_232839_push_subscriptions.down,
+    name: '20260919_232839_push_subscriptions'
   },
 ];

@@ -9,6 +9,7 @@ import EmptyState from '@/components/dashboard/ui/atoms/EmptyState'
 import KpiReport from '@/components/dashboard/KpiReport'
 import DashboardNav from '@/components/dashboard/ui/organisms/DashboardNav'
 import TeamPanel from '@/components/dashboard/TeamPanel'
+import NotificationSettingsPanel from '@/components/dashboard/NotificationSettingsPanel'
 import NewLeadPanel from '@/components/dashboard/NewLeadPanel'
 import { DEFAULT_SINCE_KEY, type SinceKey } from '@/utils/dashboardPeriod'
 import type { DashboardPermissions } from '@/access/tenantUserPermissions'
@@ -129,6 +130,7 @@ export default function DashboardApp({
   const pushedLeadRef = useRef(false)
   const leadRequestRef = useRef(0)
   const [teamOpen, setTeamOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [updateEvent, setUpdateEvent] = useState<LeadUpdateEvent | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -358,6 +360,7 @@ export default function DashboardApp({
         onTabChange={setTab}
         onLogout={handleLogout}
         onManageUsers={permissions.canManageUsers ? () => setTeamOpen(true) : undefined}
+        onManageNotifications={() => setNotificationsOpen(true)}
       />
 
       <main className="flex-1 overflow-auto min-h-0">
@@ -385,6 +388,10 @@ export default function DashboardApp({
 
       {teamOpen && (
         <TeamPanel accountEmail={accountEmail} onClose={() => setTeamOpen(false)} />
+      )}
+
+      {notificationsOpen && (
+        <NotificationSettingsPanel onClose={() => setNotificationsOpen(false)} />
       )}
 
       {newLeadOpen && (

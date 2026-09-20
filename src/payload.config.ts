@@ -13,6 +13,7 @@ import { Media } from './collections/Media'
 import { Tenants } from './collections/Tenants'
 import { Leads } from './collections/Leads'
 import { LeadExports } from './collections/LeadExports'
+import { PushSubscriptions } from './collections/PushSubscriptions'
 import { MarketingReports } from './collections/MarketingReports'
 // `Config` se importa como tipo desde el archivo generado (payload-types.ts)
 // para darle tipado fuerte al plugin (multiTenantPlugin<Config>(...)); no
@@ -47,7 +48,7 @@ export default buildConfig({
       beforeDashboard: ['/components/TenantsDashboardWidget#TenantsDashboardWidget'],
     },
   },
-  collections: [Users, TenantUsers, Media, Tenants, Leads, LeadExports, MarketingReports],
+  collections: [Users, TenantUsers, Media, Tenants, Leads, LeadExports, MarketingReports, PushSubscriptions],
   // Correo transaccional (recuperación de contraseña e invitaciones). Sin
   // `SENDGRID_API_KEY` esto queda en `undefined` y Payload usa su adaptador de
   // consola, que imprime el correo en la terminal en vez de mandarlo: es lo
