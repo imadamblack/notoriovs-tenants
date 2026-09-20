@@ -178,6 +178,23 @@ export default function DashboardApp({
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
+  // Tocar la notificación push (issue 36) navega vía `client.navigate()` en
+  // el service worker, no vía `popstate` ni el `pushState` propio de esta
+  // página — así que ninguno de los dos efectos de arriba se entera del
+  // `?lead=` nuevo si WebKit trae la PWA al frente sin remontar React de
+  // verdad. Releer la URL al volver a primer plano cubre ese caso; recargar
+  // los KPIs de paso cubre al mismo tiempo un lead creado por el quiz u otra
+  // fuente externa mientras la app estaba en background.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      setLeadIdParam(new URLSearchParams(window.location.search).get('lead'))
+      loadKpis()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [loadKpis])
+
   // Trae un Lead suelto por id (issue 35): a diferencia de `onCardClick`, que
   // ya recibe el objeto completo de una tarjeta en memoria, `?lead=123` en la
   // URL puede nombrar uno que el Kanban nunca pidió (otra página, otro

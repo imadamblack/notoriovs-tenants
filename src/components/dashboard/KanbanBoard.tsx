@@ -232,6 +232,41 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
     loadList(1)
   }, [view, loadList])
 
+  // Un lead creado por el quiz u otra fuente externa mientras el Dashboard ya
+  // está montado no llega por ningún otro camino: no hay polling ni SWR, y
+  // `updateEvent` solo reconcilia cambios hechos desde esta misma sesión. En
+  // iOS además está el caso del push (issue 36): tocar la notificación trae
+  // la PWA al frente, pero si el navegador no remonta React de verdad
+  // (`client.navigate()` en el service worker no se comporta igual en
+  // WebKit), el `useEffect` de montaje de arriba nunca vuelve a correr.
+  // Escuchar cuándo la pestaña/app vuelve a primer plano y repetir la carga
+  // ahí cubre ambos casos sin depender de que la navegación del SW remonte
+  // nada. `pageshow` con `persisted` cubre además la restauración desde el
+  // back-forward cache de Safari (swipe para volver).
+  useEffect(() => {
+    const refresh = () => {
+      loadCounts()
+      if (view === 'kanban') {
+        for (const stage of pipeline) loadColumn(stage.id, 1)
+        if (showOtherColumn) loadColumn('__other__', 1)
+      } else {
+        loadList(1)
+      }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) refresh()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', onPageShow)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pageshow', onPageShow)
+    }
+  }, [view, pipeline, showOtherColumn, loadCounts, loadColumn, loadList])
+
   // Reconcilia un cambio de lead (drag&drop o guardado desde el panel de
   // detalle) contra el estado local, sin volver a pedirle nada al servidor.
   useEffect(() => {
