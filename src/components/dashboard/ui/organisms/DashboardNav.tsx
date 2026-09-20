@@ -7,6 +7,7 @@ import IconMonitoring from "@/components/dashboard/ui/atoms/icons/IconMonitoring
 import IconAccount from "@/components/dashboard/ui/atoms/icons/IconAccount";
 import IconLogout from "@/components/dashboard/ui/atoms/icons/IconLogout";
 import IconPlus from "@/components/dashboard/ui/atoms/icons/IconPlus";
+import IconBell from "@/components/dashboard/ui/atoms/icons/IconBell";
 
 type DashboardNavProps = {
   companyName?: string | null
@@ -22,6 +23,8 @@ type DashboardNavProps = {
    * tenerlo — el mismo criterio que el borrado de leads.
    */
   onManageUsers?: () => void
+  /** Abre el panel de Notificaciones. Siempre presente: cada Tenant User administra su propio dispositivo, sin permiso especial. */
+  onManageNotifications: () => void
 }
 
 // El logout dejó de ser un botón suelto que cerraba la sesión de un clic: ahí
@@ -30,7 +33,7 @@ type DashboardNavProps = {
 // útil el menú: con dos poblaciones de usuarios y una sesión que dura 30 días,
 // "¿con qué cuenta estoy viendo esto?" es una pregunta real— y de ahí cuelga
 // "Cerrar sesión".
-export default function DashboardNav({companyName, accountEmail, tab, onTabChange, onLogout, onManageUsers}: DashboardNavProps) {
+export default function DashboardNav({companyName, accountEmail, tab, onTabChange, onLogout, onManageUsers, onManageNotifications}: DashboardNavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const accountRef = useRef<HTMLDivElement>(null)
 
@@ -117,6 +120,21 @@ export default function DashboardNav({companyName, accountEmail, tab, onTabChang
                   Usuarios
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                className="w-full !rounded-lg flex items-center gap-2 !justify-start text-left"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onManageNotifications()
+                }}
+              >
+                <span className="w-4 h-4 inline-flex items-center">
+                  <IconBell />
+                </span>
+                Notificaciones
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

@@ -30,6 +30,9 @@ vi.mock('@/utils/tenantUserAuth', () => ({
 }))
 
 const { resolveDashboardAuth, sessionCan } = await import('@/utils/requireDashboardAuth')
+const { findLeadOfTenant } = await import('@/utils/leadDashboardFilters')
+const { findSubscriptionOfTenant } = await import('@/utils/pushSubscriptionDashboardFilters')
+const { PushSubscriptions } = await import('@/collections/PushSubscriptions')
 
 const ACME = { id: 1, leadPipeline: [], leadStuckAfterDays: 21 }
 
@@ -122,6 +125,87 @@ describe('autorización del dashboard', () => {
   })
 })
 
+// `findLeadOfTenant` es la comprobación que comparten el PATCH/DELETE de
+// /api/tenant-dashboard/leads y el GET de leads/[id] (issue 35, abrir un Lead
+// por URL): un id de Lead es un número adivinable, así que "es de este
+// tenant" no puede depender de qué ruta se llame.
+describe('un Lead solo se abre por id si es de este tenant', () => {
+  const payloadWith = (lead: unknown) => ({ findByID: vi.fn().mockResolvedValue(lead) })
+
+  it('un Lead del tenant se devuelve', async () => {
+    const payload = payloadWith({ id: 42, tenant: 1 })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lead = await findLeadOfTenant(payload as any, 42, 1)
+
+    expect(lead).toEqual({ id: 42, tenant: 1 })
+  })
+
+  it('el mismo id, pero de OTRO tenant, no se devuelve', async () => {
+    const payload = payloadWith({ id: 42, tenant: 2 })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findLeadOfTenant(payload as any, 42, 1)).toBeNull()
+  })
+
+  it('también compara el tenant cuando `tenant` llega poblado (depth > 0)', async () => {
+    const payload = payloadWith({ id: 42, tenant: { id: 2 } })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findLeadOfTenant(payload as any, 42, 1)).toBeNull()
+  })
+
+  it('un Lead inexistente no se devuelve', async () => {
+    const payload = payloadWith(null)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findLeadOfTenant(payload as any, 999, 1)).toBeNull()
+  })
+})
+
+// `findSubscriptionOfTenant` es la misma comprobación que `findLeadOfTenant`,
+// con una de más: un dispositivo de push es de una PERSONA, no de todo el
+// tenant (issue 36). Un `owner` no administra las suscripciones de un
+// `member` con solo saber su id.
+describe('una suscripción de push solo se toca si es de este tenant y este usuario', () => {
+  const payloadWith = (subscription: unknown) => ({ findByID: vi.fn().mockResolvedValue(subscription) })
+
+  it('una suscripción de este tenant y este usuario se devuelve', async () => {
+    const payload = payloadWith({ id: 5, tenant: 1, tenantUser: 7 })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findSubscriptionOfTenant(payload as any, 5, 1, 7)).toEqual({ id: 5, tenant: 1, tenantUser: 7 })
+  })
+
+  it('el mismo tenant, pero de OTRO Tenant User, no se devuelve', async () => {
+    const payload = payloadWith({ id: 5, tenant: 1, tenantUser: 9 })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findSubscriptionOfTenant(payload as any, 5, 1, 7)).toBeNull()
+  })
+
+  it('el mismo id, pero de OTRO tenant, no se devuelve', async () => {
+    const payload = payloadWith({ id: 5, tenant: 2, tenantUser: 7 })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findSubscriptionOfTenant(payload as any, 5, 1, 7)).toBeNull()
+  })
+
+  it('también compara cuando `tenant`/`tenantUser` llegan poblados (depth > 0)', async () => {
+    const payload = payloadWith({ id: 5, tenant: { id: 2 }, tenantUser: { id: 7 } })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findSubscriptionOfTenant(payload as any, 5, 1, 7)).toBeNull()
+  })
+
+  it('una suscripción inexistente no se devuelve', async () => {
+    const payload = payloadWith(null)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await findSubscriptionOfTenant(payload as any, 999, 1, 7)).toBeNull()
+  })
+})
+
 describe('la colección de Tenant Users', () => {
   const asUser = (collection: string | null) =>
     ({ req: { user: collection ? { id: 1, collection } : null } }) as unknown as Parameters<Access>[0]
@@ -195,6 +279,27 @@ describe('la colección de Tenant Users', () => {
       required: true,
       hasMany: false,
     })
+  })
+})
+
+// Igual que Tenant Users: solo el equipo interno ve suscripciones de push
+// desde /admin (para depurar), acotado a sus Tenants asignados. Un Tenant
+// User nunca llega aquí — las rutas de /api/tenant-dashboard/push/* usan la
+// Local API con `overrideAccess: true`.
+describe('la colección de Suscripciones de Push', () => {
+  it('solo el equipo interno las administra', () => {
+    for (const operation of ['read', 'create', 'update', 'delete'] as const) {
+      const access = PushSubscriptions.access?.[operation] as Access
+      expect(access(asSuperadmin()), `${operation} para un superadmin`).toBe(true)
+      expect(access(asAccountManager([])), `${operation} sin clientes asignados`).toBe(false)
+    }
+  })
+
+  it('un account manager solo alcanza las suscripciones de sus clientes', () => {
+    for (const operation of ['read', 'update', 'delete'] as const) {
+      const access = PushSubscriptions.access?.[operation] as Access
+      expect(access(asAccountManager([7])), operation).toEqual({ tenant: { in: [7] } })
+    }
   })
 })
 

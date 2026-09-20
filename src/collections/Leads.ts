@@ -1,6 +1,17 @@
 import type { CollectionConfig } from 'payload'
 import { isInternalUser } from '@/access/isInternalUser'
 import { emitTenantEventById, leadEventData } from '@/events/tenantEvents'
+import { sendTenantPush } from '@/notifications/pushSend'
+
+// Fuentes que disparan el push interno (issue 36, ADR 0011): el quiz y las
+// que entran por una fuente externa (Meta/WhatsApp, vía
+// POST /api/leads/ingest). Un alta manual desde el Dashboard ('manual') o
+// una importación ('import') las hizo el propio cliente o el equipo a
+// propósito — avisarle de algo que él mismo acaba de hacer es ruido, no un
+// Aviso. Es distinto del webhook a n8n (`emitTenantEventById` abajo), que
+// sigue disparando para los 5 `source` sin este filtro: `lead.created` y su
+// cuerpo no se tocan, solo el push interno gana esta condición extra.
+const PUSH_ELIGIBLE_SOURCES = new Set(['quiz', 'meta', 'whatsapp'])
 
 // Leads generados por el quiz de cada tenant. Antes solo se reenviaban a un
 // webhook de n8n (ver /api/quiz-submit); ahora además se guardan aquí para
@@ -78,6 +89,25 @@ export const Leads: CollectionConfig = {
           payload: req.payload,
           req,
         })
+
+        // El push interno, aparte del webhook de arriba (ADR 0011). Un alta
+        // desde el panel de Payload no la distingue ningún `source` por sí
+        // solo —queda en su default 'quiz' si nadie lo cambia—, así que se
+        // excluye aparte comprobando que quien creó el Lead no sea un
+        // Internal User.
+        if (req.user?.collection !== 'users' && PUSH_ELIGIBLE_SOURCES.has(doc.source)) {
+          sendTenantPush({
+            tenantId,
+            type: 'lead-new',
+            payload: req.payload,
+            req,
+            buildMessage: () => ({
+              title: 'Nuevo lead',
+              body: `Llegó un lead nuevo desde ${sourceLabel(doc.source)}.`,
+              url: `/dashboard?lead=${doc.id}`,
+            }),
+          })
+        }
       },
     ],
   },
@@ -208,4 +238,18 @@ export const Leads: CollectionConfig = {
     { fields: ['tenant', 'externalId'] }, // buscar el lead ya ingresado al reintentar (ver /api/leads/ingest)
   ],
   timestamps: true,
+}
+
+/** Texto legible del `source` para el cuerpo del push — solo los 3 que activan uno. */
+function sourceLabel(source: unknown): string {
+  switch (source) {
+    case 'quiz':
+      return 'el quiz'
+    case 'meta':
+      return 'Meta Ads'
+    case 'whatsapp':
+      return 'WhatsApp'
+    default:
+      return 'una fuente externa'
+  }
 }
