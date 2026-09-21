@@ -380,7 +380,13 @@ export default function DashboardApp({
         onManageNotifications={() => setNotificationsOpen(true)}
       />
 
-      <main className="flex-1 overflow-auto min-h-0">
+      {/* Solo scroll vertical: el horizontal es cosa de cada sección que lo
+          necesita (las columnas del Kanban, la tabla de Marketing), con su
+          propio `overflow-x-auto`. Si `main` también permite overflow-x, un
+          desborde de un par de píxeles en cualquier sección (como el resumen
+          de KPIs con varias tarjetas en una fila) se vuelve un scroll
+          horizontal de toda la página. */}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
         {tab === 'kanban' ? (
           <KanbanBoard
             pipeline={pipeline}
