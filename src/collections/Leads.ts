@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { isInternalUser } from '@/access/isInternalUser'
 import { emitTenantEventById, leadEventData } from '@/events/tenantEvents'
 import { sendTenantPush } from '@/notifications/pushSend'
+import { scopeBulkToSelectedTenant } from './scopeBulkToSelectedTenant'
 
 // Fuentes que disparan el push interno (issue 36, ADR 0011): el quiz y las
 // que entran por una fuente externa (Meta/WhatsApp, vía
@@ -57,6 +58,8 @@ export const Leads: CollectionConfig = {
     },
   },
   hooks: {
+    // "Select all" + Edit/Delete del panel: que no se salga del tenant elegido.
+    beforeOperation: [scopeBulkToSelectedTenant],
     // EL punto de emisión de `lead.created` (ADR 0008, decisión 4). Está aquí,
     // en la colección, y no en cada ruta que crea Leads, porque un Lead entra
     // hoy por cuatro puertas —el quiz, el alta a mano del cliente, el ingest de

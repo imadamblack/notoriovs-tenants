@@ -120,3 +120,58 @@ describe('la API de Payload tampoco le deja escribir a un Tenant User', () => {
     expect(await (collection.access[operation] as Access)(asTenantUser())).toBe(false)
   })
 })
+
+// El "Select all (N)" del panel manda su PATCH/DELETE sin el filtro del
+// selector de tenant (Payload solo lo aplica al pintar la tabla), y a un
+// superadmin el control de acceso no lo recorta. Así se editaron los 1065
+// leads de todos los clientes creyendo tocar los 512 de uno. El candado es un
+// `beforeOperation` que le agrega el tenant de la cookie al `where`.
+describe('editar o borrar en bulto desde el panel no se sale del tenant elegido', () => {
+  const bulk = async (
+    slug: string,
+    operation: 'update' | 'delete',
+    { cookie, overrideAccess = false, id }: { cookie?: string; overrideAccess?: boolean; id?: number } = {},
+  ) => {
+    const collection = builtConfig.collections.find((c) => c.slug === slug)!
+    const where = { id: { not_equals: '' } }
+    let args = { where, ...(id === undefined ? {} : { id }) } as Record<string, unknown>
+    for (const hook of collection.hooks?.beforeOperation ?? []) {
+      args =
+        ((await hook({
+          args,
+          collection,
+          context: {},
+          operation,
+          overrideAccess,
+          req: {
+            headers: new Headers(cookie ? { cookie } : {}),
+            payload: { db: { defaultIDType: 'number' } },
+            user: { id: 1, collection: 'users', role: 'superadmin' },
+          },
+        } as never)) as Record<string, unknown>) ?? args
+    }
+    return args
+  }
+
+  it.each([
+    ['leads', 'update'],
+    ['leads', 'delete'],
+    ['marketing-reports', 'update'],
+    ['marketing-reports', 'delete'],
+  ] as const)('%s: %s en bulto queda acotado al tenant de la cookie', async (slug, operation) => {
+    const args = await bulk(slug, operation, { cookie: 'payload-tenant=7' })
+    expect(args.where).toEqual({ and: [{ id: { not_equals: '' } }, { tenant: { equals: 7 } }] })
+  })
+
+  it('sin tenant elegido ("todos") el bulto toca lo mismo que muestra la tabla: todo', async () => {
+    expect((await bulk('leads', 'update')).where).toEqual({ id: { not_equals: '' } })
+  })
+
+  it('no toca las rutas propias (overrideAccess) ni la edición de un solo lead', async () => {
+    const cookie = 'payload-tenant=7'
+    expect((await bulk('leads', 'delete', { cookie, overrideAccess: true })).where).toEqual({
+      id: { not_equals: '' },
+    })
+    expect((await bulk('leads', 'update', { cookie, id: 5 })).where).toEqual({ id: { not_equals: '' } })
+  })
+})
