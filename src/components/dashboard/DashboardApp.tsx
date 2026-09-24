@@ -13,6 +13,7 @@ import NotificationSettingsPanel from '@/components/dashboard/NotificationSettin
 import NewLeadPanel from '@/components/dashboard/NewLeadPanel'
 import { DEFAULT_SINCE_KEY, type SinceKey } from '@/utils/dashboardPeriod'
 import type { DashboardPermissions } from '@/access/tenantUserPermissions'
+import type { BulkLeadPatch } from '@/components/dashboard/BulkLeadEditPanel'
 
 export type PipelineStage = { id: string; label: string; isWon?: boolean | null; isLost?: boolean | null }
 
@@ -304,6 +305,32 @@ export default function DashboardApp({
     [loadKpis],
   )
 
+  // Edición en bulto desde la Lista (etapa o resultado de varios leads). La
+  // ruta solo toca leads de este tenant, y los KPIs se vuelven a pedir igual
+  // que con un cambio individual.
+  const bulkUpdateLeads = useCallback(
+    async (ids: (string | number)[], patch: BulkLeadPatch): Promise<{ leads: Lead[]; error?: string }> => {
+      try {
+        const res = await fetch('/api/tenant-dashboard/leads/bulk', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids, ...patch }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) return { leads: [], error: data.error || 'No se pudieron actualizar los leads' }
+
+        loadKpis()
+        const leads = (data.leads || []) as Lead[]
+        // Los que sí se guardaron se muestran igual; los que no, se avisan.
+        if (data.failed) return { leads, error: `${data.failed} leads no se pudieron actualizar` }
+        return { leads }
+      } catch {
+        return { leads: [], error: 'No se pudieron actualizar los leads' }
+      }
+    },
+    [loadKpis],
+  )
+
   // Alta a mano de un lead (issue 13). Vive aquí y no en el panel por la
   // misma razón que `updateLead`: es quien conoce el `updateEvent` con el
   // que el Kanban mete la tarjeta nueva sin recargar, y los KPIs que hay
@@ -394,6 +421,7 @@ export default function DashboardApp({
             onCardClick={openLead}
             onCreateLead={() => setNewLeadOpen(true)}
             onStageChange={(lead, stage) => updateLead(lead, { stage })}
+            onBulkUpdate={bulkUpdateLeads}
             updateEvent={updateEvent}
             sinceKey={sinceKey}
             onSinceChange={setSinceKey}

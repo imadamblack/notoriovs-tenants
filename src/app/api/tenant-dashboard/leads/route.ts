@@ -5,6 +5,7 @@ import { requireDashboardAuth, requireDashboardTenant, sessionCan } from '@/util
 import { buildLeadsWhere, findLeadOfTenant, readLeadFilters } from '@/utils/leadDashboardFilters'
 import { getTenantBySubdomain } from '@/utils/getTenant'
 import { mergeAnswersPatch, quizQuestions, readAnswers } from '@/utils/leadAnswers'
+import { resolveStageAndStatus } from '@/utils/leadStageStatus'
 
 // Todas las rutas bajo /api/tenant-dashboard/* usan la Local API de Payload
 // con `overrideAccess: true` (Leads.access exige `req.user`, que aquí nunca
@@ -220,28 +221,11 @@ export async function PATCH(req: NextRequest) {
     if (field in body) data[field] = body[field]
   }
 
-  if ('stage' in data) {
-    const matchedStage = tenant.leadPipeline?.find((stage) => stage.id === data.stage)
-    if (tenant.leadPipeline?.length && !matchedStage) {
-      return NextResponse.json({ error: 'Etapa inválida para este tenant' }, { status: 400 })
-    }
-
-    // Auto-sincroniza `status` con la etapa a la que se movió el lead
-    // (esto es lo que hace que arrastrar una tarjeta a la columna "Ganado"
-    // en el Kanban marque el lead como ganado), salvo que este mismo
-    // request ya traiga un `status` explícito: eso pasa cuando se guarda
-    // desde el panel de detalle, donde el usuario ve y controla los dos
-    // campos ("Etapa" y "Resultado") a la vez y no queremos pisar lo que
-    // eligió a propósito.
-    if (!('status' in data)) {
-      data.status = matchedStage?.isWon ? 'won' : matchedStage?.isLost ? 'lost' : 'open'
-    }
-  }
-
-  const ALLOWED_STATUSES = new Set(['open', 'won', 'lost', 'disqualified'])
-  if ('status' in data && !ALLOWED_STATUSES.has(data.status)) {
-    return NextResponse.json({ error: 'Status inválido' }, { status: 400 })
-  }
+  // Etapa válida para este tenant y el `status` que le toca (ver
+  // `resolveStageAndStatus`, compartido con la edición en bulto).
+  const resolved = resolveStageAndStatus(tenant, data)
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
+  Object.assign(data, resolved.data)
 
   // Las respuestas del quiz son campos del lead como cualquier otro: si el
   // lead se equivocó al contestar, quien lo atiende lo corrige aquí (issue

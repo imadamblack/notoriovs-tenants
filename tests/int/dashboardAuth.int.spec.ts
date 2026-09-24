@@ -30,7 +30,10 @@ vi.mock('@/utils/tenantUserAuth', () => ({
 }))
 
 const { resolveDashboardAuth, sessionCan } = await import('@/utils/requireDashboardAuth')
-const { findLeadOfTenant } = await import('@/utils/leadDashboardFilters')
+const { findLeadOfTenant, buildBulkLeadsWhere, readBulkLeadIds, MAX_BULK_LEADS } = await import(
+  '@/utils/leadDashboardFilters'
+)
+const { resolveStageAndStatus } = await import('@/utils/leadStageStatus')
 const { findSubscriptionOfTenant } = await import('@/utils/pushSubscriptionDashboardFilters')
 const { PushSubscriptions } = await import('@/collections/PushSubscriptions')
 
@@ -160,6 +163,34 @@ describe('un Lead solo se abre por id si es de este tenant', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(await findLeadOfTenant(payload as any, 999, 1)).toBeNull()
+  })
+})
+
+// La edición en bulto de la Lista (leads/bulk) es `findLeadOfTenant` para
+// varios ids a la vez: los ids vienen del navegador, el tenant de la sesión.
+describe('editar leads en bulto solo toca los de este tenant', () => {
+  it('el tenant de la sesión va siempre dentro del where, junto a los ids', () => {
+    expect(buildBulkLeadsWhere(1, [42, 43])).toEqual({
+      and: [{ tenant: { equals: 1 } }, { id: { in: [42, 43] } }],
+    })
+  })
+
+  it('sin ids, o con demasiados, no hay edición', () => {
+    expect(readBulkLeadIds([])).toBeNull()
+    expect(readBulkLeadIds('42')).toBeNull()
+    expect(readBulkLeadIds({ id: { not_equals: '' } })).toBeNull()
+    expect(readBulkLeadIds(Array.from({ length: MAX_BULK_LEADS + 1 }, (_, i) => i + 1))).toBeNull()
+    expect(readBulkLeadIds([42, '42', 42, null, { id: 1 }])).toEqual([42, '42'])
+  })
+
+  // Lo que dejó el incidente de "Select all" en Payload: leads de un cliente
+  // apuntando a una etapa del pipeline de OTRO.
+  it('una etapa del pipeline de otro tenant se rechaza', () => {
+    const acme = { leadPipeline: [{ id: 'acme-nuevo', label: 'Nuevo' }] }
+    expect(resolveStageAndStatus(acme, { stage: 'otro-tenant-cotizado' })).toEqual({
+      ok: false,
+      error: 'Etapa inválida para este tenant',
+    })
   })
 })
 

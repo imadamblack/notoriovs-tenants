@@ -126,6 +126,32 @@ export async function findLeadOfTenant(payload: Payload, id: string | number, te
   return lead && String(leadTenantId) === String(tenantId) ? lead : null
 }
 
+/** Tope de leads por edición en bulto: la Lista carga de 50 en 50. */
+export const MAX_BULK_LEADS = 500
+
+/**
+ * Los ids de una edición en bulto del dashboard, ya limpios, o `null` si no
+ * sirven (vacío, no es arreglo, o más de `MAX_BULK_LEADS`).
+ */
+export function readBulkLeadIds(raw: unknown): (string | number)[] | null {
+  if (!Array.isArray(raw)) return null
+  const ids = [
+    ...new Set(raw.filter((id) => (typeof id === 'string' && id.trim()) || typeof id === 'number')),
+  ] as (string | number)[]
+  if (!ids.length || ids.length > MAX_BULK_LEADS) return null
+  return ids
+}
+
+/**
+ * El `where` de una edición en bulto: los ids que mandó el navegador, pero
+ * SOLO los de este tenant. Es la versión en bulto de `findLeadOfTenant`: los
+ * ids vienen del cliente y son adivinables, la pertenencia la pone la sesión.
+ * Un id de otro tenant no falla, simplemente no entra al `where`.
+ */
+export function buildBulkLeadsWhere(tenantId: string | number, ids: (string | number)[]): Where {
+  return { and: [{ tenant: { equals: tenantId } }, { id: { in: ids } }] }
+}
+
 /**
  * Los filtros activos en palabras, para el registro de exportaciones: lo que
  * hay que poder leer meses después para saber qué se llevó alguien.
