@@ -38,6 +38,7 @@ declaradas en el mismo lugar del middleware.
 - [ ] La sesión interna no se puede reusar para otro Tenant: llevarse el token o la cookie al host de otro cliente no entra
 - [ ] Un Tenant User no gana nada con esto: sus permisos y su alcance quedan igual que hoy
 - [ ] Salir devuelve al panel y no deja viva la sesión del dashboard
+- [ ] Si el issue 38 ya existe: estando dentro, ve el filtro por Responsable y asigna como un `owner`. Un Internal User nunca es Responsable (solo lo son Tenant Users), así que la opción "Yo" del filtro no le aparece
 
 ## Notas
 

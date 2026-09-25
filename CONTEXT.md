@@ -71,6 +71,15 @@ un envío sin duplicar al Lead. Un reintento actualiza sus datos de contacto,
 pero nunca le devuelve el Stage ni el Status — eso es del cliente desde que
 tocó el Kanban.
 
+## Responsable
+
+La persona del Tenant que atiende un Lead: un Tenant User de ese mismo Tenant,
+Owner o Member, o nadie ("sin asignar"). Uno a la vez. Es una etiqueta de
+trabajo, no un permiso: no cambia quién ve el Lead.
+
+No confundir con el **Owner**, que es un rol del Tenant User, no una relación
+con un Lead. "El dueño del lead" es ambiguo: hay que decir Responsable.
+
 ## Pipeline
 
 La lista ordenada de Stages que un Tenant definió para su Kanban. Vive en el
