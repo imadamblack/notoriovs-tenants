@@ -562,7 +562,11 @@ export interface FolderInterface {
 export interface TenantUser {
   id: number;
   /**
-   * Un Propietario gestiona los usuarios y la facturación de su empresa y puede borrar leads. Un Miembro trabaja los leads y ve los KPIs completos, gasto en anuncios incluido, pero no borra leads ni administra usuarios.
+   * Cómo aparece en el Dashboard de Cliente al asignarle leads. Si se deja vacío, se usa el email.
+   */
+  name?: string | null;
+  /**
+   * Un Propietario gestiona los usuarios y la facturación de su empresa, puede borrar leads y se los asigna a cualquiera de su equipo. Un Miembro trabaja los leads y ve los KPIs completos, gasto en anuncios incluido; puede tomar para sí un lead sin asignar o soltar los suyos, pero no borra leads, no se los asigna a otros ni administra usuarios.
    */
   role: 'owner' | 'member';
   /**
@@ -606,9 +610,13 @@ export interface Lead {
    */
   stage: string;
   /**
-   * Resultado del lead, independiente de la etapa en la que esté. Se actualiza solo al mover la etapa hacia una marcada como "Ganado"/"Perdido" en el pipeline del tenant; también se puede fijar a mano (ej. "Descalificado") desde el panel de detalle del lead.
+   * Estado del lead (abierto, ganado, perdido o descalificado), independiente de la etapa en la que esté. Se actualiza solo al mover la etapa hacia una marcada como "Ganado"/"Perdido" en el pipeline del tenant; también se puede fijar a mano (ej. "Descalificado") desde el panel de detalle del lead.
    */
   status: 'open' | 'won' | 'lost' | 'disqualified';
+  /**
+   * Usuario de Cliente que atiende este lead. Solo puede ser alguien del mismo tenant; vacío es "Sin asignar".
+   */
+  assignee?: (number | null) | TenantUser;
   source?: ('quiz' | 'manual' | 'meta' | 'whatsapp' | 'import') | null;
   /**
    * Id que trae el lead en el sistema donde nació (el id del lead en Meta, por ejemplo). Es lo único que permite que n8n reintente el mismo envío sin duplicar el lead: al reingresar, un lead con el mismo id dentro del mismo tenant se actualiza en vez de crearse otra vez. Los leads del quiz no lo llevan.
@@ -877,6 +885,7 @@ export interface UsersSelect<T extends boolean = true> {
  * via the `definition` "tenant-users_select".
  */
 export interface TenantUsersSelect<T extends boolean = true> {
+  name?: T;
   role?: T;
   tenant?: T;
   updatedAt?: T;
@@ -1137,6 +1146,7 @@ export interface LeadsSelect<T extends boolean = true> {
   email?: T;
   stage?: T;
   status?: T;
+  assignee?: T;
   source?: T;
   externalId?: T;
   notes?: T;

@@ -37,7 +37,7 @@ import type { TenantLeadStage } from '@/utils/getTenant'
 //   - Etapa: por etiqueta del pipeline de este tenant (no el id interno, que
 //     nadie llenando un Excel conoce). Vacía o ausente, cae a la primera
 //     etapa — igual que el quiz y el ingest de n8n.
-//   - Resultado y Origen: por su etiqueta (Abierto/Ganado/… , Quiz/Manual/…)
+//   - Estado y Origen: por su etiqueta (Abierto/Ganado/… , Quiz/Manual/…)
 //     o su valor interno; vacíos caen a "Abierto" e "Importado".
 //   - UTM Source/Medium/Campaign/Term/Content: las mismas cinco claves que
 //     guarda el quiz (ver UTM_KEYS en tracking-cookies.ts).
@@ -62,7 +62,7 @@ import type { TenantLeadStage } from '@/utils/getTenant'
 // quiz (ver "Otras respuestas" en leadsCsv.ts: son huérfanas de un quiz que
 // cambió, no algo que un alta nueva deba poder inventar).
 //
-// Etapa/Resultado/Origen y las opciones de cada pregunta del quiz aceptan
+// Etapa/Estado/Origen y las opciones de cada pregunta del quiz aceptan
 // tanto su etiqueta como su clave interna (`resolveStageId`, `resolveStatus`,
 // `resolveSource`, `resolveOptionValue`): así un CSV que ya trae el valor
 // crudo de otro sistema no falla solo por no traer la etiqueta en español. El
@@ -94,6 +94,7 @@ const FIXED_HEADER_SYNONYMS: Record<string, FixedTextKind | 'stage' | 'status' |
   notes: 'notes',
   etapa: 'stage',
   stage: 'stage',
+  estado: 'status',
   resultado: 'status',
   status: 'status',
   origen: 'source',
@@ -378,7 +379,7 @@ function parseDataRow(
         if (!cellText) return
         const status = resolveStatus(cellText)
         if (!status) {
-          errors.push(`"Resultado": "${cellText}" no es un resultado válido`)
+          errors.push(`"Estado": "${cellText}" no es un estado válido`)
           return
         }
         row.status = status
@@ -474,7 +475,7 @@ function exampleValueForStep(step: TenantQuizStep): string {
  * El CSV de ejemplo de abajo trae UNA fila de muestra: sirve para copiar el
  * encabezado, no para saber qué claves o etiquetas acepta cada columna
  * restringida. Este otro CSV es el mapa completo —una fila por cada valor
- * válido de Etapa/Resultado/Origen y por cada opción de cada pregunta del
+ * válido de Etapa/Estado/Origen y por cada opción de cada pregunta del
  * quiz, con su clave interna y su etiqueta— para quien ya tiene un CSV
  * propio (de otro CRM, de un Excel viejo) y necesita saber a qué valor de
  * este tenant corresponde cada uno de los suyos antes de reacomodarlo.
@@ -487,7 +488,7 @@ function buildSchemaCsv(pipeline: TenantLeadStage[], questions: TenantQuizStep[]
     rows.push(['Etapa', stage.id, stage.label])
   }
   for (const status of STATUS_VALUES) {
-    rows.push(['Resultado', status, statusLabel(status)])
+    rows.push(['Estado', status, statusLabel(status)])
   }
   for (const source of SOURCE_VALUES) {
     rows.push(['Origen', source, SOURCE_LABELS[source] ?? source])
@@ -678,7 +679,7 @@ export async function POST(req: NextRequest) {
 }
 
 // Plantilla de muestra: mismos encabezados que espera el POST de arriba
-// (campos fijos + Etapa/Resultado/Origen/UTM + una columna por pregunta del
+// (campos fijos + Etapa/Estado/Origen/UTM + una columna por pregunta del
 // quiz de ESTE tenant), con una fila de ejemplo. Bajarla y volver a subirla
 // debe funcionar sin tocarle nada, que es la prueba de que ambos lados leen
 // el mismo formato.
@@ -721,7 +722,7 @@ export async function GET(req: NextRequest) {
     'Correo',
     'Notas',
     'Etapa',
-    'Resultado',
+    'Estado',
     'Origen',
     'Fecha de alta',
     'UTM Source',

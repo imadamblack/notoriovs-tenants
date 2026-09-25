@@ -12,6 +12,7 @@ import {
   leadCsvFilename,
   type ExportableLead,
 } from '@/utils/leadsCsv'
+import { listTenantMembers } from '@/utils/tenantMembers'
 
 // Descarga en CSV de los Leads que el Tenant User está viendo (issue 14).
 //
@@ -48,12 +49,17 @@ export async function GET(req: NextRequest) {
   const tenant = await getTenantBySubdomain(subdomain, 'dashboardQuiz')
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const filters = readLeadFilters(req.nextUrl.searchParams)
+  const filters = readLeadFilters(req.nextUrl.searchParams, session.userId)
   // La etapa se descarta: en el Kanban están abiertas todas las columnas a
   // la vez, así que "lo que estoy viendo" es el tablero completo.
   const where = buildLeadsWhere(tenant, { ...filters, stage: undefined })
 
   const payload = await getPayload({ config })
+
+  // Las personas del Tenant: nombran la columna "Responsable" del archivo y
+  // el filtro por Responsable en el registro de la exportación.
+  const members = await listTenantMembers(payload, tenant.id)
+  const memberName = (id: string) => members.find((member) => String(member.id) === id)?.label
 
   // Se cuenta antes de escribir nada porque el registro de la exportación
   // necesita el número, y esperar a terminar el archivo para escribirlo
@@ -67,14 +73,14 @@ export async function GET(req: NextRequest) {
       exportedBy: session.userId as number,
       exportedByEmail: session.email,
       leadCount: totalDocs,
-      filtersLabel: describeLeadFilters(filters),
+      filtersLabel: describeLeadFilters(filters, memberName),
       filters,
     },
     depth: 0,
     overrideAccess: true,
   })
 
-  const columns = buildLeadCsvColumns(tenant.leadPipeline || [], tenant.quizSteps || [])
+  const columns = buildLeadCsvColumns(tenant.leadPipeline || [], tenant.quizSteps || [], members)
   const encoder = new TextEncoder()
 
   const body = new ReadableStream<Uint8Array>({

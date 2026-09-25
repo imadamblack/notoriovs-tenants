@@ -33,6 +33,20 @@
     background-position: right 1rem center;
     background-size: 1.6rem 1.6rem;
   }
+
+  // form.scss (el quiz) esconde TODA casilla y radio del sitio (`display:
+  // none`) porque dibuja los suyos con la `label` de al lado. En el dashboard
+  // son casillas nativas, y además la regla de `input` de abajo les daría
+  // `w-full` y padding. Va aquí y no en el bloque `:where()`, que no suma
+  // especificidad y empataría con la de form.scss.
+  input[type=checkbox], input[type=radio] {
+    display: inline-block;
+    width: 1.6rem; // 16px: la raíz del sitio está a 10px
+    height: 1.6rem;
+    padding: 0;
+    flex-shrink: 0;
+    accent-color: var(--dashboard-color-primary);
+  }
 }
 
 :where(.dashboard-root) {

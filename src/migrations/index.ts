@@ -11,6 +11,7 @@ import * as migration_20260918_191357_marketing_reports_date_a_mediodia from './
 import * as migration_20260918_213811_meta_ad_account_id_en_tenants from './20260918_213811_meta_ad_account_id_en_tenants';
 import * as migration_20260919_215911_media_original_filename from './20260919_215911_media_original_filename';
 import * as migration_20260919_232839_push_subscriptions from './20260919_232839_push_subscriptions';
+import * as migration_20260925_005421_responsable_de_lead from './20260925_005421_responsable_de_lead';
 
 export const migrations = [
   {
@@ -76,6 +77,11 @@ export const migrations = [
   {
     up: migration_20260919_232839_push_subscriptions.up,
     down: migration_20260919_232839_push_subscriptions.down,
-    name: '20260919_232839_push_subscriptions'
+    name: '20260919_232839_push_subscriptions',
+  },
+  {
+    up: migration_20260925_005421_responsable_de_lead.up,
+    down: migration_20260925_005421_responsable_de_lead.down,
+    name: '20260925_005421_responsable_de_lead'
   },
 ];

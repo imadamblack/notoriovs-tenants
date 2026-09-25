@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isInternalUser } from '@/access/isInternalUser'
+import { scopeBulkToSelectedTenant } from './scopeBulkToSelectedTenant'
 
 // Un Marketing Report es UN DÍA de una campaña de un tenant (issue #19: antes
 // era una semana). Semana, mes o cualquier otro rango se calculan en
@@ -27,6 +28,10 @@ export const MarketingReports: CollectionConfig = {
     useAsTitle: 'campaign',
     defaultColumns: ['tenant', 'campaign', 'date', 'leads', 'spend'],
     description: 'KPIs diarios de campañas de ads por tenant (ingesta desde n8n).',
+  },
+  hooks: {
+    // Igual que en Leads: "Select all" + Edit/Delete no se sale del tenant elegido.
+    beforeOperation: [scopeBulkToSelectedTenant],
   },
   access: {
     // Internos, no "cualquiera autenticado": ver la nota en `isInternalUser`.

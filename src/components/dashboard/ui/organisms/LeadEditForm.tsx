@@ -36,7 +36,7 @@ export default function LeadEditForm({ values, pipeline, onChange, onStageChange
       </Select>
 
       <Select
-        label="Resultado"
+        label="Estado"
         value={values.status}
         onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange({ status: e.target.value as Lead['status'] })}
       >

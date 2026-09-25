@@ -36,12 +36,14 @@ type LeadCardProps = {
   lead: Lead
   pending?: boolean
   stuckAfterDays?: number | null
+  /** Nombre del Responsable, o `null` si el lead está sin asignar. */
+  assigneeLabel?: string | null
   onClick: () => void
   onDragStart: () => void
   onDragEnd: () => void
 }
 
-export default function LeadCard({ lead, pending, stuckAfterDays, onClick, onDragStart, onDragEnd }: LeadCardProps) {
+export default function LeadCard({ lead, pending, stuckAfterDays, assigneeLabel, onClick, onDragStart, onDragEnd }: LeadCardProps) {
   const days = daysIdle(lead)
   const thresholds = idleThresholds(stuckAfterDays)
   const badge = lead.status !== 'open' ? { label: statusLabel(lead.status), tone: statusTone(lead.status) } : null
@@ -69,7 +71,16 @@ export default function LeadCard({ lead, pending, stuckAfterDays, onClick, onDra
           <Avatar name={lead.name} />
           {date && <span className="text-[10px] text-neutral-500">{date}</span>}
         </div>
-        {badgeIdle && <Badge label={badgeIdle.label} tone={badgeIdle.tone} />}
+        <div className="flex items-center gap-1.5">
+          {badgeIdle && <Badge label={badgeIdle.label} tone={badgeIdle.tone} />}
+          {/* Iniciales del Responsable (issue 38). El nombre completo va en el
+              `title`: en una tarjeta de 280px no cabe. */}
+          {assigneeLabel && (
+            <span title={`Responsable: ${assigneeLabel}`} aria-label={`Responsable: ${assigneeLabel}`}>
+              <Avatar name={assigneeLabel} />
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )

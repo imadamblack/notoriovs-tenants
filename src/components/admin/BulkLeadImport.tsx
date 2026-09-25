@@ -107,7 +107,7 @@ export const BulkLeadImport: React.FC = () => {
   }
 
   // El schema no reemplaza la plantilla: la plantilla trae el encabezado
-  // listo para llenar, esto trae el mapa clave↔etiqueta de Etapa, Resultado,
+  // listo para llenar, esto trae el mapa clave↔etiqueta de Etapa, Estado,
   // Origen y cada opción del quiz, para quien está acomodando un CSV que ya
   // trae sus propios valores y necesita saber a cuál de los de este tenant
   // corresponde cada uno.
@@ -197,10 +197,10 @@ export const BulkLeadImport: React.FC = () => {
         <div style={{ marginTop: '1rem' }}>
           <p style={{ color: 'var(--theme-elevation-500)', fontSize: '0.85rem' }}>
             Descarga el CSV de ejemplo, llénalo y súbelo de vuelta: trae ya el encabezado exacto
-            (Nombre, Teléfono, WhatsApp, Correo, Notas, Etapa, Resultado, Origen, Fecha de alta,
+            (Nombre, Teléfono, WhatsApp, Correo, Notas, Etapa, Estado, Origen, Fecha de alta,
             las columnas UTM y una por cada pregunta del quiz de{' '}
             <strong>{tenantLabel || 'este tenant'}</strong>).
-            Etapa/Resultado/Origen y las opciones del quiz aceptan su nombre
+            Etapa/Estado/Origen y las opciones del quiz aceptan su nombre
             (&quot;Contactado&quot;, &quot;Ganado&quot;, &quot;Meta Ads&quot;…) o su clave interna; las
             que dejes vacías o sin columna caen en la primera etapa del pipeline,
             &quot;Abierto&quot; e &quot;Importado&quot;. &quot;Fecha de alta&quot; es opcional

@@ -38,10 +38,12 @@ de los Internal Users, no un Internal User con menos permisos.
 Tiene uno de dos roles, que valen **solo dentro de su Tenant**:
 
 - **Owner** — todo lo de su empresa: además de los Leads y los KPIs, gestiona a
-  los usuarios de su Tenant y su facturación, y puede borrar Leads.
+  los usuarios de su Tenant y su facturación, puede borrar Leads y reparte
+  Leads a cualquiera de su equipo (el Responsable).
 - **Member** — trabaja los Leads (incluido marcarlos como descalificados) y ve
-  los KPIs completos, gasto en anuncios y costo por Lead incluidos. No borra
-  Leads ni gestiona usuarios.
+  los KPIs completos, gasto en anuncios y costo por Lead incluidos. Puede tomar
+  para sí un Lead sin Responsable o soltar los suyos, pero no le asigna Leads a
+  otros. No borra Leads ni gestiona usuarios.
 
 Cuando alguien dice "admin" hay que preguntar cuál: un Superadmin del equipo, o
 el Owner de un Tenant. Son cosas distintas.
@@ -60,6 +62,9 @@ suelen confundirse:
   descalificado. Es el mismo conjunto de cuatro valores para todos los Tenants,
   y por eso es lo único con lo que se puede comparar conversión entre Tenants.
 
+En la interfaz, el Status se llama **Estado** (antes decía "Resultado"; el
+importador de CSV acepta todavía ese encabezado).
+
 Un Lead puede estar "ganado" (Status) sentado en cualquier Stage. Mover un Lead
 de Stage puede *sugerir* un Status, pero no son el mismo dato.
 
@@ -70,6 +75,15 @@ origen (el del lead en Meta, por ejemplo): es lo único que permite reintentar
 un envío sin duplicar al Lead. Un reintento actualiza sus datos de contacto,
 pero nunca le devuelve el Stage ni el Status — eso es del cliente desde que
 tocó el Kanban.
+
+## Responsable
+
+La persona del Tenant que atiende un Lead: un Tenant User de ese mismo Tenant,
+Owner o Member, o nadie ("sin asignar"). Uno a la vez. Es una etiqueta de
+trabajo, no un permiso: no cambia quién ve el Lead.
+
+No confundir con el **Owner**, que es un rol del Tenant User, no una relación
+con un Lead. "El dueño del lead" es ambiguo: hay que decir Responsable.
 
 ## Pipeline
 

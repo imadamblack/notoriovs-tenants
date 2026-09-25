@@ -1,6 +1,7 @@
 import type { TenantLeadStage } from '@/utils/getTenant'
 import type { TenantQuizStep } from '@/utils/tenantQuiz'
 import { statusLabel } from '@/components/dashboard/leadPresentation'
+import type { TenantMember } from '@/utils/tenantMembers'
 
 // Armado del CSV que un Tenant User descarga desde el dashboard (issue 14).
 //
@@ -54,6 +55,8 @@ export type ExportableLead = {
   status: 'open' | 'won' | 'lost' | 'disqualified'
   source?: string | null
   notes?: string | null
+  /** El Tenant User Responsable: id (depth 0) o el documento, o nadie. */
+  assignee?: number | string | { id: number | string } | null
   answers?: Record<string, unknown> | null
   createdAt?: string | null
   updatedAt?: string | null
@@ -173,8 +176,15 @@ export function formatCsvDate(raw?: string | null): string {
 export function buildLeadCsvColumns(
   pipeline: TenantLeadStage[],
   quizSteps: TenantQuizStep[],
+  /** Las personas del Tenant, para la columna "Responsable" (issue 38). */
+  members: TenantMember[] = [],
 ): LeadCsvColumn[] {
   const stageLabels = new Map(pipeline.filter((s) => s.id).map((s) => [s.id as string, s.label]))
+  const memberLabels = new Map(members.map((member) => [String(member.id), member.label]))
+  const assigneeLabel = (lead: ExportableLead) => {
+    const id = lead.assignee && typeof lead.assignee === 'object' ? lead.assignee.id : lead.assignee
+    return id === null || id === undefined ? '' : memberLabels.get(String(id)) ?? ''
+  }
   const questions = quizSteps.filter(
     (step) => !NON_QUESTION_STEP_TYPES.has(step.type) && Boolean(step.name),
   )
@@ -188,7 +198,9 @@ export function buildLeadCsvColumns(
     // Una etapa que ya no existe en el pipeline (renombrada, borrada) es la
     // misma columna "Otro" que muestra el Kanban.
     { header: 'Etapa', value: (lead) => stageLabels.get(lead.stage) ?? 'Otro' },
-    { header: 'Resultado', value: (lead) => statusLabel(lead.status) },
+    { header: 'Estado', value: (lead) => statusLabel(lead.status) },
+    // Vacía es "Sin asignar".
+    { header: 'Responsable', value: assigneeLabel },
     { header: 'Origen', value: (lead) => (lead.source ? SOURCE_LABELS[lead.source] ?? lead.source : '') },
     { header: 'Fecha de alta', value: (lead) => formatCsvDate(lead.createdAt) },
     { header: 'Última actualización', value: (lead) => formatCsvDate(lead.updatedAt) },

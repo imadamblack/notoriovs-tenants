@@ -5,6 +5,7 @@ import type {Lead, LeadUpdateEvent, PipelineStage} from '@/components/dashboard/
 import Select from '@/components/dashboard/ui/atoms/Select'
 import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
 import IconFilter from '@/components/dashboard/ui/atoms/icons/IconFilter'
+import IconUser from '@/components/dashboard/ui/atoms/icons/IconUser'
 import IconPlus from '@/components/dashboard/ui/atoms/icons/IconPlus'
 import IconDownload from '@/components/dashboard/ui/atoms/icons/IconDownload'
 import Button from '@/components/dashboard/ui/atoms/Button'
@@ -15,6 +16,8 @@ import ViewToggle, {type BoardView} from '@/components/dashboard/ui/molecules/Vi
 import BoardScrollIndicator from '@/components/dashboard/ui/molecules/BoardScrollIndicator'
 import StageColumn from '@/components/dashboard/ui/organisms/StageColumn'
 import LeadListTable from '@/components/dashboard/ui/organisms/LeadListTable'
+import BulkLeadEditPanel, {type BulkLeadPatch} from '@/components/dashboard/BulkLeadEditPanel'
+import type {TenantMember} from '@/utils/tenantMembers'
 
 type KanbanBoardProps = {
   pipeline: PipelineStage[]
@@ -23,6 +26,13 @@ type KanbanBoardProps = {
   /** Abre el alta a mano de un lead (ver NewLeadPanel). */
   onCreateLead: () => void
   onStageChange: (lead: Lead, stage: string) => Promise<Lead | null>
+  /** Edición en bulto desde la Lista; regresa los leads ya guardados, o un error. */
+  onBulkUpdate: (ids: (string | number)[], patch: BulkLeadPatch) => Promise<{leads: Lead[]; error?: string}>
+  /** Las personas del Tenant: filtro por Responsable, iniciales y edición en bulto. */
+  members: TenantMember[]
+  viewerId: string | number
+  /** Si la sesión reparte leads a cualquiera o solo toma/suelta los propios. */
+  canAssignLeads: boolean
   updateEvent: LeadUpdateEvent | null
   // El periodo lo controla DashboardApp: es el mismo filtro que usan los
   // KPIs, no una copia local de esta vista (ver PeriodFilter).
@@ -52,6 +62,11 @@ const STATUS_FILTER_LABELS: Record<StatusFilterKey, string> = {
   lost: 'Perdidos',
   disqualified: 'Descalificados',
 }
+
+// Filtro por Responsable (issue 38): 'all' no manda parámetro; 'me' y 'none'
+// los resuelve el servidor (ver leadDashboardFilters.ts); cualquier otro valor
+// es el id de una persona del Tenant.
+const ASSIGNEE_FILTER_ALL = 'all'
 
 // Cuántas tarjetas/filas trae cada página. El Kanban pide de a poco por
 // columna; la Lista pide un poco más porque es una tabla de "cargar más".
@@ -86,12 +101,13 @@ const emptyColumn: ColumnState = {
 // es lo que hace viable un tenant con miles de leads sin traer todo a la vez
 // (ver `handleColumnScroll`/`handleListScroll`: cargan la siguiente página
 // al acercarse al fondo del contenedor, sin botón).
-export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCreateLead, onStageChange, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
+export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCreateLead, onStageChange, onBulkUpdate, members, viewerId, canAssignLeads, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
   const [view, setView] = useState<BoardView>('kanban')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(ASSIGNEE_FILTER_ALL)
 
   const [columnData, setColumnData] = useState<Record<string, ColumnState>>({})
   const [stageCounts, setStageCounts] = useState<Record<string, number>>({})
@@ -104,6 +120,10 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
   const [listHasNextPage, setListHasNextPage] = useState(false)
   const [listLoading, setListLoading] = useState(false)
   const [listLoadingMore, setListLoadingMore] = useState(false)
+  // Filas marcadas en la Lista para editar en bulto (ids en texto), junto con
+  // la consulta sobre la que se marcaron (ver `selectedIds` abajo).
+  const [selection, setSelection] = useState<{key: string; ids: Set<string>}>({key: '', ids: new Set()})
+  const [bulkPanelOpen, setBulkPanelOpen] = useState(false)
 
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -140,9 +160,10 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (sinceKey !== 'all') params.set('since', sinceKey)
       if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (assigneeFilter !== ASSIGNEE_FILTER_ALL) params.set('assignee', assigneeFilter)
       return params
     },
-    [sortKey, debouncedSearch, sinceKey, statusFilter],
+    [sortKey, debouncedSearch, sinceKey, statusFilter, assigneeFilter],
   )
 
   const loadColumn = useCallback(
@@ -187,13 +208,29 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (sinceKey !== 'all') params.set('since', sinceKey)
     if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (assigneeFilter !== ASSIGNEE_FILTER_ALL) params.set('assignee', assigneeFilter)
     const res = await fetch(`/api/tenant-dashboard/leads/counts?${params}`)
     if (!res.ok) return
     const data = await res.json()
     setStageCounts(data.counts || {})
     setOtherCount(data.other || 0)
     setTotalCount(data.total || 0)
-  }, [debouncedSearch, sinceKey, statusFilter])
+  }, [debouncedSearch, sinceKey, statusFilter, assigneeFilter])
+
+  // "Yo" arriba, luego "Sin asignar" y luego el resto del equipo: el caso de
+  // todos los días es buscar los propios. La propia sesión no se repite abajo.
+  const assigneeOptions = useMemo(
+    () => [
+      {value: ASSIGNEE_FILTER_ALL, label: 'Todos'},
+      {value: 'me', label: 'Yo'},
+      {value: 'none', label: 'Sin asignar'},
+      ...members
+        .filter((member) => String(member.id) !== String(viewerId))
+        .map((member) => ({value: String(member.id), label: member.label})),
+    ],
+    [members, viewerId],
+  )
+  const assigneeFilterLabel = assigneeOptions.find((o) => o.value === assigneeFilter)?.label ?? 'Todos'
 
   const loadList = useCallback(
     async (page: number) => {
@@ -231,6 +268,68 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
     if (view !== 'list') return
     loadList(1)
   }, [view, loadList])
+
+  // Cambiar de filtro, búsqueda, orden o vista vuelve a cargar la Lista desde
+  // cero: una selección hecha sobre la lista anterior ya no es lo que se ve,
+  // así que deja de contar en cuanto cambia la consulta.
+  const selectionKey = `${view}?${buildParams({}).toString()}`
+  const selectedIds = useMemo(
+    () => (selection.key === selectionKey ? selection.ids : new Set<string>()),
+    [selection, selectionKey],
+  )
+  const setSelectedIds = useCallback(
+    (update: Set<string> | ((prev: Set<string>) => Set<string>)) =>
+      setSelection((prev) => {
+        const current = prev.key === selectionKey ? prev.ids : new Set<string>()
+        return {key: selectionKey, ids: typeof update === 'function' ? update(current) : update}
+      }),
+    [selectionKey],
+  )
+
+  const toggleLead = useCallback((lead: Lead) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      const id = String(lead.id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [setSelectedIds])
+
+  const toggleAllLoaded = useCallback(() => {
+    setSelectedIds((prev) =>
+      listLeads.length && listLeads.every((l) => prev.has(String(l.id)))
+        ? new Set()
+        : new Set(listLeads.map((l) => String(l.id))),
+    )
+  }, [listLeads, setSelectedIds])
+
+  const selectedLeads = useMemo(
+    () => listLeads.filter((l) => selectedIds.has(String(l.id))),
+    [listLeads, selectedIds],
+  )
+
+  // Aplica el cambio y reemplaza las filas en su lugar (sin recargar la
+  // Lista, para no perder el scroll). Los conteos del Kanban se vuelven a
+  // pedir; las columnas se recargan solas al volver a esa vista.
+  const handleBulkApply = useCallback(
+    async (patch: BulkLeadPatch): Promise<string | null> => {
+      const ids = selectedLeads.map((l) => l.id)
+      const result = await onBulkUpdate(ids, patch)
+
+      const byId = new Map(result.leads.map((l) => [String(l.id), l]))
+      setListLeads((leads) => leads.map((l) => byId.get(String(l.id)) ?? l))
+      if (result.leads.length) loadCounts()
+      if (result.error) {
+        // Se queda marcado solo lo que falló, para poder reintentarlo.
+        setSelectedIds((prev) => new Set([...prev].filter((id) => !byId.has(id))))
+        return result.error
+      }
+      setSelectedIds(new Set())
+      return null
+    },
+    [selectedLeads, setSelectedIds, onBulkUpdate, loadCounts],
+  )
 
   // Un lead creado por el quiz u otra fuente externa mientras el Dashboard ya
   // está montado no llega por ningún otro camino: no hay polling ni SWR, y
@@ -482,9 +581,25 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
       <div className="px-5 py-3 border-b border-neutral-600 flex items-center justify-between gap-4 flex-wrap">
         <div className="hidden md:flex items-center gap-4">
           <ViewToggle value={view} onChange={setView}/>
-          <div className="flex items-center gap-2 text-neutral-400 -ft-3">
-            {visibleTotal} leads
-          </div>
+          {view === 'list' && selectedLeads.length > 0 ? (
+            // Con filas marcadas, el contador se vuelve la entrada a la
+            // edición en bulto (ver BulkLeadEditPanel).
+            <div className="flex items-center gap-4">
+              <span className="text-neutral-200 -ft-3 mr-4">
+                {selectedLeads.length} {selectedLeads.length === 1 ? 'seleccionado' : 'seleccionados'}
+              </span>
+              <Button variant="glass" className="-ft-3" onClick={() => setBulkPanelOpen(true)}>
+                Editar
+              </Button>
+              <Button variant="ghost" className="-ft-3" onClick={() => setSelectedIds(new Set())}>
+                Quitar selección
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-neutral-400 -ft-3">
+              {visibleTotal} leads
+            </div>
+          )}
           {exportError && <span className="-ft-3 text-red-400">{exportError}</span>}
         </div>
 
@@ -521,7 +636,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
               disabledTitle='Filtro de tiempo desactivado con "Estancados"'
             />
 
-            <div className="relative h-12 w-12 rounded-full shrink-0" title={`Status: ${STATUS_FILTER_LABELS[statusFilter]}`}>
+            <div className="relative h-12 w-12 rounded-full shrink-0" title={`Estado: ${STATUS_FILTER_LABELS[statusFilter]}`}>
               <Select
                 id="status-select"
                 value={statusFilter}
@@ -530,7 +645,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
                   setStatusFilter(next)
                   if (next === 'stuck') onSinceChange('all')
                 }}
-                aria-label="Filtrar leads por status"
+                aria-label="Filtrar leads por estado"
                 className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
               >
                 {Object.entries(STATUS_FILTER_LABELS).map(([key, label]) => (
@@ -545,6 +660,33 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
               >
                 <span className="w-8 h-8">
                   <IconFilter/>
+                </span>
+              </div>
+            </div>
+
+            <div
+              className={`relative h-12 w-12 rounded-full shrink-0 ${assigneeFilter !== ASSIGNEE_FILTER_ALL ? 'bg-neutral-700' : ''}`}
+              title={`Responsable: ${assigneeFilterLabel}`}
+            >
+              <Select
+                id="assignee-select"
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                aria-label="Filtrar leads por responsable"
+                className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+              >
+                {assigneeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center rounded-full text-neutral-400 peer-hover:text-neutral-200"
+              >
+                <span className="w-7 h-7">
+                  <IconUser/>
                 </span>
               </div>
             </div>
@@ -621,6 +763,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
                   isDragOver={dragOverKey === col.id}
                   pendingLeadId={pendingLeadId}
                   stuckAfterDays={stuckAfterDays}
+                  members={members}
                   scrollRef={(el) => {
                     columnScrollRefs.current[col.id] = el
                   }}
@@ -652,16 +795,32 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
           </div>
         </div>
       ) : (
-        <div ref={listScrollRef} onScroll={handleListScroll} className="flex-grow overflow-y-auto p-4 min-h-0">
+        <div ref={listScrollRef} onScroll={handleListScroll} className="flex-grow overflow-y-auto px-4 pb-8 min-h-0">
           <LeadListTable
             leads={listLeads}
+            selectedIds={selectedIds}
+            onToggleLead={toggleLead}
+            onToggleAll={toggleAllLoaded}
             pipeline={pipeline}
+            members={members}
             stuckAfterDays={stuckAfterDays}
             onRowClick={onCardClick}
             loading={listLoading}
             loadingMore={listLoadingMore}
           />
         </div>
+      )}
+
+      {bulkPanelOpen && selectedLeads.length > 0 && (
+        <BulkLeadEditPanel
+          leads={selectedLeads}
+          pipeline={pipeline}
+          members={members}
+          viewerId={viewerId}
+          canAssignLeads={canAssignLeads}
+          onClose={() => setBulkPanelOpen(false)}
+          onApply={handleBulkApply}
+        />
       )}
     </div>
   )
