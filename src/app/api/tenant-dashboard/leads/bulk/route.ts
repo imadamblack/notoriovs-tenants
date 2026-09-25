@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest) {
   if ('stage' in (body || {})) data.stage = body.stage
   if ('status' in (body || {})) data.status = body.status
   if (!('stage' in data) && !('status' in data)) {
-    return NextResponse.json({ error: 'Falta la etapa o el resultado' }, { status: 400 })
+    return NextResponse.json({ error: 'Falta la etapa o el estado' }, { status: 400 })
   }
 
   const resolved = resolveStageAndStatus(auth.tenant, data)

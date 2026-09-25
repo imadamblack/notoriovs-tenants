@@ -606,7 +606,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
               disabledTitle='Filtro de tiempo desactivado con "Estancados"'
             />
 
-            <div className="relative h-12 w-12 rounded-full shrink-0" title={`Status: ${STATUS_FILTER_LABELS[statusFilter]}`}>
+            <div className="relative h-12 w-12 rounded-full shrink-0" title={`Estado: ${STATUS_FILTER_LABELS[statusFilter]}`}>
               <Select
                 id="status-select"
                 value={statusFilter}
@@ -615,7 +615,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
                   setStatusFilter(next)
                   if (next === 'stuck') onSinceChange('all')
                 }}
-                aria-label="Filtrar leads por status"
+                aria-label="Filtrar leads por estado"
                 className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
               >
                 {Object.entries(STATUS_FILTER_LABELS).map(([key, label]) => (

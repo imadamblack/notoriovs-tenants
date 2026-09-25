@@ -60,6 +60,9 @@ suelen confundirse:
   descalificado. Es el mismo conjunto de cuatro valores para todos los Tenants,
   y por eso es lo único con lo que se puede comparar conversión entre Tenants.
 
+En la interfaz, el Status se llama **Estado** (antes decía "Resultado"; el
+importador de CSV acepta todavía ese encabezado).
+
 Un Lead puede estar "ganado" (Status) sentado en cualquier Stage. Mover un Lead
 de Stage puede *sugerir* un Status, pero no son el mismo dato.
 

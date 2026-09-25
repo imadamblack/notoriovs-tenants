@@ -72,7 +72,7 @@ export default function LeadListTable({
     { key: 'stage', header: 'Etapa', render: (lead) => stageLabel(lead.stage) },
     {
       key: 'status',
-      header: 'Status',
+      header: 'Estado',
       // Mismo badge que ya usa la tarjeta del Kanban (leadBadge): para un
       // lead abierto muestra los días sin actividad (con el mismo tono de
       // "Estancado" si aplica), no solo un texto plano "Abierto".

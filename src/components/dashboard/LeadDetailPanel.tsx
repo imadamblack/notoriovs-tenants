@@ -289,7 +289,7 @@ export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDa
 
               {/* Borrar vive aquí abajo, separado y en dos pasos: es lo único
                   de este panel que no se puede deshacer. Para sacar un lead de
-                  los números sin perderlo está "Descalificado" en Resultado. */}
+                  los números sin perderlo está "Descalificado" en Estado. */}
               {onDelete && (
                 <div className="border-t border-neutral-700 pt-4">
                   {confirmingDelete ? (

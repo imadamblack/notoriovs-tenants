@@ -45,8 +45,8 @@ export default function LeadQuickEditRow({
           <Select
             value={status}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => onStatusChange(e.target.value as Lead['status'])}
-            title="Cambiar status"
-            aria-label="Cambiar status"
+            title="Cambiar estado"
+            aria-label="Cambiar estado"
             className="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           >
             {STATUS_VALUES.map((value) => (

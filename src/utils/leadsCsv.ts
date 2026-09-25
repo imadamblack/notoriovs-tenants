@@ -188,7 +188,7 @@ export function buildLeadCsvColumns(
     // Una etapa que ya no existe en el pipeline (renombrada, borrada) es la
     // misma columna "Otro" que muestra el Kanban.
     { header: 'Etapa', value: (lead) => stageLabels.get(lead.stage) ?? 'Otro' },
-    { header: 'Resultado', value: (lead) => statusLabel(lead.status) },
+    { header: 'Estado', value: (lead) => statusLabel(lead.status) },
     { header: 'Origen', value: (lead) => (lead.source ? SOURCE_LABELS[lead.source] ?? lead.source : '') },
     { header: 'Fecha de alta', value: (lead) => formatCsvDate(lead.createdAt) },
     { header: 'Última actualización', value: (lead) => formatCsvDate(lead.updatedAt) },

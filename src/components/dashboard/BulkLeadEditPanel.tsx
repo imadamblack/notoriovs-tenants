@@ -104,7 +104,7 @@ export default function BulkLeadEditPanel({ leads, pipeline, onClose, onApply }:
           </Select>
 
           <Select
-            label="Resultado"
+            label="Estado"
             value={status}
             onChange={(e) => {
               setStatus(e.target.value as Lead['status'] | '')

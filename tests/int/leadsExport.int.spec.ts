@@ -187,7 +187,7 @@ describe('exportación de leads a CSV', () => {
     const cells = row.split(';')
     expect(cells[0]).toBe('Ana Martínez')
     expect(cells[headers.indexOf('Etapa')]).toBe('Nuevo')
-    expect(cells[headers.indexOf('Resultado')]).toBe('Abierto')
+    expect(cells[headers.indexOf('Estado')]).toBe('Abierto')
     // La respuesta se guarda por `value` ("3+"); en la hoja va la etiqueta
     // que el lead vio en pantalla.
     expect(cells[headers.indexOf('¿Cuántas recámaras buscas?')]).toBe('Tres o más')

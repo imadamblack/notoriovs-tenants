@@ -606,7 +606,7 @@ export interface Lead {
    */
   stage: string;
   /**
-   * Resultado del lead, independiente de la etapa en la que esté. Se actualiza solo al mover la etapa hacia una marcada como "Ganado"/"Perdido" en el pipeline del tenant; también se puede fijar a mano (ej. "Descalificado") desde el panel de detalle del lead.
+   * Estado del lead (abierto, ganado, perdido o descalificado), independiente de la etapa en la que esté. Se actualiza solo al mover la etapa hacia una marcada como "Ganado"/"Perdido" en el pipeline del tenant; también se puede fijar a mano (ej. "Descalificado") desde el panel de detalle del lead.
    */
   status: 'open' | 'won' | 'lost' | 'disqualified';
   source?: ('quiz' | 'manual' | 'meta' | 'whatsapp' | 'import') | null;
