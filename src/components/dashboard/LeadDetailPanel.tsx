@@ -14,6 +14,8 @@ import LeadAnswersList from '@/components/dashboard/ui/organisms/LeadAnswersList
 import LeadAnswersFields from '@/components/dashboard/ui/organisms/LeadAnswersFields'
 import {editableAnswers} from '@/components/dashboard/leadAnswersView'
 import LeadEditForm from '@/components/dashboard/ui/organisms/LeadEditForm'
+import LeadAssigneeControl from '@/components/dashboard/ui/organisms/LeadAssigneeControl'
+import type {TenantMember} from '@/utils/tenantMembers'
 
 type LeadDetailPanelProps = {
   lead: Lead
@@ -21,6 +23,10 @@ type LeadDetailPanelProps = {
   /** Las preguntas del quiz del tenant, para mostrar y editar sus respuestas. */
   questions: QuizQuestion[]
   stuckAfterDays?: number | null
+  /** Las personas del Tenant, para el Responsable. */
+  members: TenantMember[]
+  viewerId: string | number
+  canAssignLeads: boolean
   onClose: () => void
   onSave: (patch: Partial<Lead>) => Promise<boolean>
   /**
@@ -59,7 +65,7 @@ function buildFormFromLead(lead: Lead): LeadForm {
   }
 }
 
-export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDays, onClose, onSave, onDelete}: LeadDetailPanelProps) {
+export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDays, members, viewerId, canAssignLeads, onClose, onSave, onDelete}: LeadDetailPanelProps) {
   const [mode, setMode] = useState<'read' | 'write'>('read')
   const [form, setForm] = useState<LeadForm>(() => buildFormFromLead(lead))
   const [saving, setSaving] = useState(false)
@@ -193,6 +199,14 @@ export default function LeadDetailPanel({lead, pipeline, questions, stuckAfterDa
               status={form.status}
               onStageChange={handleQuickStageChange}
               onStatusChange={handleQuickStatusChange}
+            />
+
+            <LeadAssigneeControl
+              lead={lead}
+              members={members}
+              viewerId={viewerId}
+              canAssignLeads={canAssignLeads}
+              onSave={onSave}
             />
 
             <div className="flex my-6">

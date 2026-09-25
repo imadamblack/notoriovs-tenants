@@ -7,10 +7,12 @@ import { Leads } from '@/collections/Leads'
 import { MarketingReports } from '@/collections/MarketingReports'
 import { Tenants } from '@/collections/Tenants'
 import {
+  canChangeAssignee,
   normalizeTenantUserRole,
   roleCan,
   TENANT_USER_MANAGEMENT_ENABLED,
 } from '@/access/tenantUserPermissions'
+import { assertAssigneeInLeadTenant } from '@/collections/leadAssignee'
 
 // Este archivo prueba la capa de autorización del Dashboard de Cliente sin
 // base de datos: qué sesión abre qué tenant. Lo que se resuelve contra
@@ -30,9 +32,8 @@ vi.mock('@/utils/tenantUserAuth', () => ({
 }))
 
 const { resolveDashboardAuth, sessionCan } = await import('@/utils/requireDashboardAuth')
-const { findLeadOfTenant, buildBulkLeadsWhere, readBulkLeadIds, MAX_BULK_LEADS } = await import(
-  '@/utils/leadDashboardFilters'
-)
+const { findLeadOfTenant, buildBulkLeadsWhere, buildLeadsWhere, readBulkLeadIds, readLeadFilters, MAX_BULK_LEADS } =
+  await import('@/utils/leadDashboardFilters')
 const { resolveStageAndStatus } = await import('@/utils/leadStageStatus')
 const { findSubscriptionOfTenant } = await import('@/utils/pushSubscriptionDashboardFilters')
 const { PushSubscriptions } = await import('@/collections/PushSubscriptions')
@@ -447,5 +448,89 @@ describe('qué puede hacer cada rol dentro del dashboard', () => {
 
     expect(auth?.session.role).toBe('member')
     expect(auth && sessionCan(auth.session, 'leads:delete')).toBe(false)
+  })
+})
+
+// El Responsable de un Lead (issue 38). Dos reglas distintas: a quién se le
+// puede asignar (solo a alguien del mismo Tenant: aislamiento) y quién puede
+// cambiarlo (un `member` solo toma o suelta los propios: autorización).
+describe('el Responsable de un Lead', () => {
+  const ACME_ID = 1
+  const OTHER_ID = 2
+
+  /** Un `req` de Payload cuyo único Tenant User es `memberId`, del Tenant `memberTenant`. */
+  const reqWithMember = (memberId: number, memberTenant: number) => ({
+    context: {},
+    payload: {
+      findByID: vi.fn(async ({ id }: { id: number }) =>
+        String(id) === String(memberId) ? { id: memberId, tenant: memberTenant } : null,
+      ),
+    },
+  })
+
+  const runHook = (args: { data: Record<string, unknown>; originalDoc?: Record<string, unknown>; req: unknown }) =>
+    assertAssigneeInLeadTenant(args as unknown as Parameters<typeof assertAssigneeInLeadTenant>[0])
+
+  it('se puede asignar a alguien del mismo Tenant, o a nadie', async () => {
+    const req = reqWithMember(5, ACME_ID)
+
+    await expect(runHook({ data: { assignee: 5 }, originalDoc: { tenant: ACME_ID }, req })).resolves.toBeTruthy()
+    await expect(runHook({ data: { assignee: null }, originalDoc: { tenant: ACME_ID }, req })).resolves.toBeTruthy()
+  })
+
+  // Este hook vive en la colección, así que corre también para la Local API y
+  // el panel de Payload: no hay una ruta que se lo pueda saltar.
+  it('asignarle un Lead a alguien de OTRO Tenant se rechaza, venga de donde venga', async () => {
+    const req = reqWithMember(5, OTHER_ID)
+
+    await expect(runHook({ data: { assignee: 5 }, originalDoc: { tenant: ACME_ID }, req })).rejects.toThrow()
+    expect(Leads.hooks?.beforeChange).toContain(assertAssigneeInLeadTenant)
+  })
+
+  it('un id que no es de ningún Tenant User tampoco pasa', async () => {
+    const req = reqWithMember(5, ACME_ID)
+
+    await expect(runHook({ data: { assignee: 999 }, originalDoc: { tenant: ACME_ID }, req })).rejects.toThrow()
+  })
+
+  it('mover un Lead a otro Tenant sin quitarle el Responsable se rechaza', async () => {
+    const req = reqWithMember(5, ACME_ID)
+
+    await expect(
+      runHook({ data: { tenant: OTHER_ID }, originalDoc: { tenant: ACME_ID, assignee: 5 }, req }),
+    ).rejects.toThrow()
+  })
+
+  it('un owner reparte leads a cualquiera', () => {
+    expect(canChangeAssignee('owner', 7, null, 8)).toBe(true)
+    expect(canChangeAssignee('owner', 7, 8, 9)).toBe(true)
+    expect(canChangeAssignee('owner', 7, 8, null)).toBe(true)
+  })
+
+  it('un member toma un lead sin asignar para sí, y suelta los suyos', () => {
+    expect(canChangeAssignee('member', 7, null, 7)).toBe(true)
+    expect(canChangeAssignee('member', 7, 7, null)).toBe(true)
+  })
+
+  it('un member no le asigna leads a otro ni toca los de otro', () => {
+    expect(canChangeAssignee('member', 7, null, 8)).toBe(false)
+    expect(canChangeAssignee('member', 7, 8, 7)).toBe(false)
+    expect(canChangeAssignee('member', 7, 8, null)).toBe(false)
+    expect(canChangeAssignee('member', 7, 7, 8)).toBe(false)
+  })
+
+  it('dejar el Responsable como estaba no es cambiarlo', () => {
+    expect(canChangeAssignee('member', 7, 8, 8)).toBe(true)
+  })
+
+  // "Yo" sale de la sesión, no de la URL; y cualquier filtro por persona va
+  // detrás del tenant del host, así que un id de otro cliente no abre nada.
+  it('el filtro por Responsable queda detrás del tenant, y "yo" es la sesión', () => {
+    const filters = readLeadFilters(new URLSearchParams('assignee=me'), 7)
+    const where = buildLeadsWhere(ACME, filters)
+
+    expect(where.and?.[0]).toEqual({ tenant: { equals: ACME.id } })
+    expect(where.and).toContainEqual({ assignee: { equals: 7 } })
+    expect(readLeadFilters(new URLSearchParams('assignee=1 or 1=1')).assignee).toBeUndefined()
   })
 })

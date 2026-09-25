@@ -2,10 +2,14 @@ import type { Lead, PipelineStage } from '@/components/dashboard/DashboardApp'
 import DataTable, { type DataTableColumn } from '@/components/dashboard/ui/molecules/DataTable'
 import Badge from '@/components/dashboard/ui/atoms/Badge'
 import { leadBadge, formatLeadDate } from '@/components/dashboard/leadPresentation'
+import { assigneeLabelOf } from '@/components/dashboard/leadAssignee'
+import type { TenantMember } from '@/utils/tenantMembers'
 
 type LeadListTableProps = {
   leads: Lead[]
   pipeline: PipelineStage[]
+  /** Las personas del Tenant, para la columna "Responsable". */
+  members: TenantMember[]
   stuckAfterDays?: number | null
   onRowClick: (lead: Lead) => void
   loading: boolean
@@ -23,6 +27,7 @@ const CHECKBOX_CLASS = 'cursor-pointer align-middle'
 export default function LeadListTable({
   leads,
   pipeline,
+  members,
   stuckAfterDays,
   onRowClick,
   loading,
@@ -80,6 +85,11 @@ export default function LeadListTable({
         const badge = leadBadge(lead, stuckAfterDays)
         return badge ? <Badge label={badge.label} tone={badge.tone} /> : <span className="text-[10px] text-neutral-500">—</span>
       },
+    },
+    {
+      key: 'assignee',
+      header: 'Responsable',
+      render: (lead) => assigneeLabelOf(lead, members) || <span className="text-neutral-500">Sin asignar</span>,
     },
     { key: 'createdAt', header: 'Creado', render: (lead) => formatLeadDate(lead.createdAt) || '—' },
   ]

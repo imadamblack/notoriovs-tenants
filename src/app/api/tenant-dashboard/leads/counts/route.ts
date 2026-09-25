@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import type { Where } from 'payload'
 import config from '@payload-config'
-import { requireDashboardTenant } from '@/utils/requireDashboardAuth'
+import { requireDashboardAuth } from '@/utils/requireDashboardAuth'
 import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
 
 // Conteo de leads por etapa del pipeline, para los badges de cantidad del
@@ -13,16 +13,17 @@ import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
 // así que es barato incluso con miles de leads por tenant (los índices
 // `tenant+stage` / `tenant+status` de Leads.ts ya cubren esta consulta).
 export async function GET(req: NextRequest) {
-  const tenant = await requireDashboardTenant(req)
-  if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const auth = await requireDashboardAuth(req)
+  if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const { tenant, session } = auth
 
   const payload = await getPayload({ config })
 
   // Mismos filtros de status ("Estancados/Abiertos/Ganados/Perdidos/
-  // Descalificados"), tiempo y búsqueda que .../leads, para que el número
+  // Descalificados"), tiempo, búsqueda y Responsable que .../leads, para que el número
   // en el badge de cada columna sea el mismo conjunto de leads que esa
   // columna termina mostrando. La etapa no: aquí se cuenta una por una.
-  const filters = readLeadFilters(req.nextUrl.searchParams)
+  const filters = readLeadFilters(req.nextUrl.searchParams, session.userId)
   const baseAnd = (buildLeadsWhere(tenant, { ...filters, stage: undefined }).and ?? []) as Where[]
 
   const pipeline = tenant.leadPipeline || []

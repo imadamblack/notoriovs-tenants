@@ -59,15 +59,41 @@ export type LeadFilters = {
   status?: string
   since?: string
   search?: string
+  /**
+   * Responsable (issue 38): `none` ("Sin asignar") o el id de un Tenant User.
+   * El "Yo" del toolbar ya llega traducido al id de la sesión (ver
+   * `readLeadFilters`), así que el registro de una exportación dice a quién
+   * se filtró y no solo "yo".
+   */
+  assignee?: string
 }
 
-export function readLeadFilters(params: URLSearchParams): LeadFilters {
+/** Lo que el toolbar manda en `?assignee=`: "Yo", "Sin asignar" o una persona. */
+export const ASSIGNEE_ME = 'me'
+export const ASSIGNEE_NONE = 'none'
+
+/**
+ * Lee los filtros de la URL. `viewerId` es el Tenant User de la sesión, para
+ * traducir `assignee=me`: sale de la sesión, no de lo que diga el navegador.
+ */
+export function readLeadFilters(params: URLSearchParams, viewerId?: string | number): LeadFilters {
   return {
     stage: params.get('stage')?.trim() || undefined,
     status: params.get('status')?.trim() || undefined,
     since: params.get('since')?.trim() || undefined,
     search: params.get('search')?.trim() || undefined,
+    assignee: readAssigneeFilter(params.get('assignee'), viewerId),
   }
+}
+
+function readAssigneeFilter(raw: string | null, viewerId?: string | number): string | undefined {
+  const value = raw?.trim()
+  if (!value) return undefined
+  if (value === ASSIGNEE_ME) return viewerId === undefined ? undefined : String(viewerId)
+  if (value === ASSIGNEE_NONE) return ASSIGNEE_NONE
+  // Solo ids con forma de id: cualquier otra cosa llegaría a Postgres como un
+  // valor que no se puede convertir a entero y tronaría la consulta entera.
+  return /^\d+$/.test(value) ? value : undefined
 }
 
 /**
@@ -98,6 +124,15 @@ export function buildLeadsWhere(
 
   if (filters.search) {
     and.push({ or: SEARCH_FIELDS.map((field) => ({ [field]: { contains: filters.search } })) })
+  }
+
+  // Un id de una persona de otro Tenant no abre nada: el `tenant` de arriba
+  // ya deja fuera cualquier Lead que no sea de este cliente, así que ese
+  // filtro simplemente no encuentra nada.
+  if (filters.assignee === ASSIGNEE_NONE) {
+    and.push({ assignee: { exists: false } })
+  } else if (filters.assignee) {
+    and.push({ assignee: { equals: Number(filters.assignee) } })
   }
 
   return { and }
@@ -153,14 +188,34 @@ export function buildBulkLeadsWhere(tenantId: string | number, ids: (string | nu
 }
 
 /**
+ * Lee el Responsable que manda el navegador: `null` es "Sin asignar", un
+ * número (o un texto de dígitos) es un Tenant User. `undefined` si el valor no
+ * sirve para nada de eso.
+ */
+export function readAssigneeValue(raw: unknown): number | null | undefined {
+  if (raw === null || raw === '') return null
+  if (typeof raw === 'number' && Number.isInteger(raw) && raw > 0) return raw
+  if (typeof raw === 'string' && /^\d+$/.test(raw)) return Number(raw)
+  return undefined
+}
+
+/**
  * Los filtros activos en palabras, para el registro de exportaciones: lo que
  * hay que poder leer meses después para saber qué se llevó alguien.
  */
-export function describeLeadFilters(filters: LeadFilters): string {
+export function describeLeadFilters(
+  filters: LeadFilters,
+  /** Nombre de una persona del Tenant por su id, para el filtro por Responsable. */
+  memberName: (id: string) => string | undefined = () => undefined,
+): string {
   const parts: string[] = []
   if (filters.status) parts.push(`status: ${filters.status}`)
   if (filters.since) parts.push(`periodo: ${filters.since}`)
   if (filters.search) parts.push(`búsqueda: "${filters.search}"`)
   if (filters.stage) parts.push(`etapa: ${filters.stage}`)
+  if (filters.assignee === ASSIGNEE_NONE) parts.push('responsable: sin asignar')
+  else if (filters.assignee) {
+    parts.push(`responsable: ${memberName(filters.assignee) ?? `usuario ${filters.assignee}`}`)
+  }
   return parts.length ? parts.join(', ') : 'sin filtros (todos los leads)'
 }

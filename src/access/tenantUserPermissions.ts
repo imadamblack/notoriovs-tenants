@@ -26,6 +26,12 @@ export type DashboardPermission =
   | 'leads:update'
   /** Borrar un Lead de la base. Distinto de descalificarlo: esto no se puede deshacer. */
   | 'leads:delete'
+  /**
+   * Poner o quitar al Responsable de cualquier Lead, a cualquier persona del
+   * Tenant. Sin este permiso solo se puede tomar un Lead sin asignar para uno
+   * mismo o soltar uno propio (ver `canChangeAssignee`).
+   */
+  | 'leads:assign'
   /** Ver los KPIs, gasto en anuncios y costo por lead incluidos. */
   | 'kpis:read'
   /** Invitar, cambiar de rol y remover Usuarios de Cliente del propio tenant. */
@@ -60,6 +66,7 @@ const PERMISSIONS: Record<TenantUserRole, ReadonlySet<DashboardPermission>> = {
     'leads:read',
     'leads:update',
     'leads:delete',
+    'leads:assign',
     'kpis:read',
     ...(TENANT_USER_MANAGEMENT_ENABLED ? (['users:manage'] as const) : []),
     'billing:manage',
@@ -88,13 +95,53 @@ export function roleCan(role: TenantUserRole, permission: DashboardPermission): 
 export type DashboardPermissions = {
   canDeleteLeads: boolean
   canManageUsers: boolean
+  /** Asignar Leads a cualquiera. Sin él, solo tomar o soltar los propios. */
+  canAssignLeads: boolean
 }
 
 export function permissionsForRole(role: TenantUserRole): DashboardPermissions {
   return {
     canDeleteLeads: roleCan(role, 'leads:delete'),
     canManageUsers: roleCan(role, 'users:manage'),
+    canAssignLeads: roleCan(role, 'leads:assign'),
   }
+}
+
+type AssigneeId = string | number | null | undefined
+
+function sameAssignee(a: AssigneeId, b: AssigneeId): boolean {
+  if (a === null || a === undefined) return b === null || b === undefined
+  return b !== null && b !== undefined && String(a) === String(b)
+}
+
+/**
+ * ¿Puede esta sesión cambiar el Responsable de un Lead de `current` a `next`?
+ *
+ * Quien tiene `leads:assign` (un `owner`) reparte a cualquiera. Los demás
+ * trabajan sus propios Leads sin pasarle trabajo a nadie ni quitárselo: solo
+ * pueden **tomar** uno sin asignar para sí mismos o **soltar** uno que ya es
+ * suyo. Un Lead de otra persona no se toca.
+ *
+ * Dejarlo igual siempre se puede: el formulario del Lead manda todos sus
+ * campos al guardar, y un `member` que edita el teléfono de un Lead ajeno no
+ * está reasignando nada.
+ *
+ * Que `next` sea alguien de ESTE Tenant no se decide aquí: eso es aislamiento
+ * entre tenants y lo impone la colección (`assertAssigneeInLeadTenant`).
+ */
+export function canChangeAssignee(
+  role: TenantUserRole,
+  viewerId: string | number,
+  current: AssigneeId,
+  next: AssigneeId,
+): boolean {
+  if (sameAssignee(current, next)) return true
+  if (roleCan(role, 'leads:assign')) return true
+
+  const isViewer = (value: AssigneeId) => sameAssignee(value, viewerId)
+  const isNobody = (value: AssigneeId) => value === null || value === undefined
+
+  return (isNobody(current) && isViewer(next)) || (isViewer(current) && isNobody(next))
 }
 
 export const tenantUserRoleField: Field = {
@@ -107,6 +154,6 @@ export const tenantUserRoleField: Field = {
   index: true,
   admin: {
     description:
-      'Un Propietario gestiona los usuarios y la facturación de su empresa y puede borrar leads. Un Miembro trabaja los leads y ve los KPIs completos, gasto en anuncios incluido, pero no borra leads ni administra usuarios.',
+      'Un Propietario gestiona los usuarios y la facturación de su empresa, puede borrar leads y se los asigna a cualquiera de su equipo. Un Miembro trabaja los leads y ve los KPIs completos, gasto en anuncios incluido; puede tomar para sí un lead sin asignar o soltar los suyos, pero no borra leads, no se los asigna a otros ni administra usuarios.',
   },
 }

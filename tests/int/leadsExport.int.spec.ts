@@ -16,6 +16,7 @@ const getTenantUserSession = vi.fn()
 const find = vi.fn()
 const count = vi.fn()
 const create = vi.fn()
+const listTenantMembers = vi.fn()
 
 vi.mock('@/utils/getTenant', () => ({
   getTenantBySubdomain: (...args: unknown[]) => getTenantBySubdomain(...args),
@@ -23,6 +24,12 @@ vi.mock('@/utils/getTenant', () => ({
 
 vi.mock('@/utils/tenantUserAuth', () => ({
   getTenantUserSession: (...args: unknown[]) => getTenantUserSession(...args),
+}))
+
+// Las personas del Tenant (columna "Responsable") se leen con su propia
+// consulta; aquí se fijan para que `find` quede solo para los leads.
+vi.mock('@/utils/tenantMembers', () => ({
+  listTenantMembers: (...args: unknown[]) => listTenantMembers(...args),
 }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -78,6 +85,7 @@ const LEAD = {
   status: 'open',
   source: 'quiz',
   notes: 'Habló el martes',
+  assignee: 5,
   answers: { nombre: 'Ana Martínez', recamaras: '3+', presupuesto: '2 millones', obsoleta: 'sí' },
   createdAt: '2026-09-01T15:30:00.000Z',
   updatedAt: '2026-09-02T15:30:00.000Z',
@@ -90,6 +98,7 @@ beforeEach(() => {
   count.mockResolvedValue({ totalDocs: 1 })
   create.mockResolvedValue({ id: 99 })
   find.mockResolvedValue(pageOf([LEAD]))
+  listTenantMembers.mockResolvedValue([{ id: 5, label: 'Luis Pérez' }])
 })
 
 describe('exportación de leads a CSV', () => {
@@ -188,6 +197,7 @@ describe('exportación de leads a CSV', () => {
     expect(cells[0]).toBe('Ana Martínez')
     expect(cells[headers.indexOf('Etapa')]).toBe('Nuevo')
     expect(cells[headers.indexOf('Estado')]).toBe('Abierto')
+    expect(cells[headers.indexOf('Responsable')]).toBe('Luis Pérez')
     // La respuesta se guarda por `value` ("3+"); en la hoja va la etiqueta
     // que el lead vio en pantalla.
     expect(cells[headers.indexOf('¿Cuántas recámaras buscas?')]).toBe('Tres o más')

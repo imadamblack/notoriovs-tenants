@@ -14,6 +14,7 @@ import NewLeadPanel from '@/components/dashboard/NewLeadPanel'
 import { DEFAULT_SINCE_KEY, type SinceKey } from '@/utils/dashboardPeriod'
 import type { DashboardPermissions } from '@/access/tenantUserPermissions'
 import type { BulkLeadPatch } from '@/components/dashboard/BulkLeadEditPanel'
+import type { TenantMember } from '@/utils/tenantMembers'
 
 export type PipelineStage = { id: string; label: string; isWon?: boolean | null; isLost?: boolean | null }
 
@@ -42,6 +43,8 @@ export type Lead = {
   status: 'open' | 'won' | 'lost' | 'disqualified'
   source?: string | null
   notes?: string | null
+  /** El Tenant User Responsable (issue 38): su id, o `null` si está sin asignar. */
+  assignee?: number | string | { id: number | string } | null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answers?: Record<string, any> | null
   createdAt?: string
@@ -85,6 +88,10 @@ type DashboardAppProps = {
   accountEmail: string
   /** Lo que el rol de esta sesión permite. Resuelto en el servidor, ver `sessionPermissions`. */
   permissions: DashboardPermissions
+  /** El Tenant User de la sesión: el "Yo" del filtro por Responsable. */
+  viewerId: string | number
+  /** Las personas del Tenant a las que se les puede asignar un Lead. */
+  members: TenantMember[]
   pipeline: PipelineStage[]
   stuckAfterDays?: number | null
   questions: QuizQuestion[]
@@ -101,6 +108,8 @@ export default function DashboardApp({
   companyName,
   accountEmail,
   permissions,
+  viewerId,
+  members,
   pipeline,
   stuckAfterDays,
   questions,
@@ -305,7 +314,7 @@ export default function DashboardApp({
     [loadKpis],
   )
 
-  // Edición en bulto desde la Lista (etapa o resultado de varios leads). La
+  // Edición en bulto desde la Lista (etapa, estado o responsable de varios leads). La
   // ruta solo toca leads de este tenant, y los KPIs se vuelven a pedir igual
   // que con un cambio individual.
   const bulkUpdateLeads = useCallback(
@@ -323,6 +332,14 @@ export default function DashboardApp({
         const leads = (data.leads || []) as Lead[]
         // Los que sí se guardaron se muestran igual; los que no, se avisan.
         if (data.failed) return { leads, error: `${data.failed} leads no se pudieron actualizar` }
+        // Un `member` que toma leads de alguien más no falla: esos leads se
+        // quedan como estaban (ver la ruta). Se dice cuántos y por qué.
+        if (data.skipped) {
+          return {
+            leads,
+            error: `${data.skipped} ${data.skipped === 1 ? 'lead no cambió' : 'leads no cambiaron'} de responsable: solo puedes tomar leads sin asignar o soltar los tuyos`,
+          }
+        }
         return { leads }
       } catch {
         return { leads: [], error: 'No se pudieron actualizar los leads' }
@@ -422,6 +439,9 @@ export default function DashboardApp({
             onCreateLead={() => setNewLeadOpen(true)}
             onStageChange={(lead, stage) => updateLead(lead, { stage })}
             onBulkUpdate={bulkUpdateLeads}
+            members={members}
+            viewerId={viewerId}
+            canAssignLeads={permissions.canAssignLeads}
             updateEvent={updateEvent}
             sinceKey={sinceKey}
             onSinceChange={setSinceKey}
@@ -488,6 +508,9 @@ export default function DashboardApp({
           stuckAfterDays={stuckAfterDays}
           onClose={closeLead}
           questions={questions}
+          members={members}
+          viewerId={viewerId}
+          canAssignLeads={permissions.canAssignLeads}
           onSave={async (patch) => Boolean(await updateLead(selectedLead, patch))}
           onDelete={permissions.canDeleteLeads ? () => deleteLead(selectedLead) : undefined}
         />

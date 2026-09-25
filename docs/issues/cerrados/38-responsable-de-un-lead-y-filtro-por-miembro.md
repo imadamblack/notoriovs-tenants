@@ -14,21 +14,21 @@ Tenant, igual que hoy (CONTEXT.md → Tenant User).
 Internal User dentro del Dashboard ve el filtro y asigna exactamente como un
 Owner — el criterio quedó agregado allá.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Los Tenant Users tienen un campo **nombre** opcional, editable desde el panel. Donde se muestra una persona, se muestra su nombre y, si no tiene, su email
-- [ ] Un Lead tiene cero o un Responsable. Todo Lead nace "Sin asignar", entre por la puerta que entre (quiz, alta manual, ingest, importación, panel)
-- [ ] El Responsable solo puede ser un Tenant User **del mismo Tenant que el Lead**. El servidor lo rechaza venga de donde venga (rutas del dashboard, edición en bulto, panel de Payload)
-- [ ] Un Owner asigna, reasigna o quita el Responsable de cualquier Lead, a cualquier persona de su Tenant
-- [ ] Un Member solo puede **tomar** un Lead sin asignar para sí mismo o **soltar** uno que tiene él. No puede asignarle a otro ni quitarle un Lead a otro
-- [ ] El equipo interno asigna desde el panel de Payload; el selector solo ofrece Tenant Users del Tenant de ese Lead
-- [ ] Se ve y se cambia en el panel de detalle del Lead
-- [ ] La tarjeta del Kanban muestra las iniciales del Responsable
-- [ ] La edición en bulto de la Lista permite asignar varios Leads a la vez, con las mismas reglas por rol (un Member solo tomar/soltar para sí)
-- [ ] Filtro por Responsable con una sola opción a la vez: **Todos / Yo / Sin asignar / cada persona del Tenant**. Lo tienen todos los roles
-- [ ] El filtro aplica al Kanban (incluidos sus conteos por columna), a la Lista y a la Exportación de Leads. **No** a los KPIs
-- [ ] El CSV de la Exportación lleva una columna "Responsable" (nombre, o email si no tiene), y el registro de la Exportación guarda el filtro usado
-- [ ] Si un Tenant User se borra o se cambia de Tenant, sus Leads vuelven a "Sin asignar"
+- [x] Los Tenant Users tienen un campo **nombre** opcional, editable desde el panel. Donde se muestra una persona, se muestra su nombre y, si no tiene, su email
+- [x] Un Lead tiene cero o un Responsable. Todo Lead nace "Sin asignar", entre por la puerta que entre (quiz, alta manual, ingest, importación, panel)
+- [x] El Responsable solo puede ser un Tenant User **del mismo Tenant que el Lead**. El servidor lo rechaza venga de donde venga (rutas del dashboard, edición en bulto, panel de Payload)
+- [x] Un Owner asigna, reasigna o quita el Responsable de cualquier Lead, a cualquier persona de su Tenant
+- [x] Un Member solo puede **tomar** un Lead sin asignar para sí mismo o **soltar** uno que tiene él. No puede asignarle a otro ni quitarle un Lead a otro
+- [x] El equipo interno asigna desde el panel de Payload; el selector solo ofrece Tenant Users del Tenant de ese Lead
+- [x] Se ve y se cambia en el panel de detalle del Lead
+- [x] La tarjeta del Kanban muestra las iniciales del Responsable
+- [x] La edición en bulto de la Lista permite asignar varios Leads a la vez, con las mismas reglas por rol (un Member solo tomar/soltar para sí)
+- [x] Filtro por Responsable con una sola opción a la vez: **Todos / Yo / Sin asignar / cada persona del Tenant**. Lo tienen todos los roles
+- [x] El filtro aplica al Kanban (incluidos sus conteos por columna), a la Lista y a la Exportación de Leads. **No** a los KPIs
+- [x] El CSV de la Exportación lleva una columna "Responsable" (nombre, o email si no tiene), y el registro de la Exportación guarda el filtro usado
+- [x] Si un Tenant User se borra o se cambia de Tenant, sus Leads vuelven a "Sin asignar"
 
 ## Fuera de alcance (decidido)
 

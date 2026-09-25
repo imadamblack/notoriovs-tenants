@@ -6,33 +6,51 @@ import Button from '@/components/dashboard/ui/atoms/Button'
 import Select from '@/components/dashboard/ui/atoms/Select'
 import IconChevronLeft from '@/components/dashboard/ui/atoms/icons/IconChevronLeft'
 import { statusLabel } from '@/components/dashboard/leadPresentation'
+import type { TenantMember } from '@/utils/tenantMembers'
 
 const STATUS_VALUES: Lead['status'][] = ['open', 'won', 'lost', 'disqualified']
 
 /** Cuántos nombres se listan antes de resumir el resto como "y N más". */
 const NAMES_SHOWN = 8
 
-export type BulkLeadPatch = { stage?: string; status?: Lead['status'] }
+/** `assignee: null` es "Sin asignar"; ausente es "sin cambio". */
+export type BulkLeadPatch = { stage?: string; status?: Lead['status']; assignee?: number | string | null }
+
+/** El valor "Sin asignar" del selector de Responsable ('' ya es "Sin cambio"). */
+const UNASSIGNED = 'none'
 
 type BulkLeadEditPanelProps = {
   /** Los leads marcados en la Lista, en el orden en que se ven. */
   leads: Lead[]
   pipeline: PipelineStage[]
+  members: TenantMember[]
+  viewerId: string | number
+  /** Sin este permiso, el Responsable solo se toma para uno mismo o se suelta. */
+  canAssignLeads: boolean
   onClose: () => void
   /** Aplica el cambio; regresa un mensaje de error, o `null` si salió bien. */
   onApply: (patch: BulkLeadPatch) => Promise<string | null>
 }
 
-// Editar varios leads a la vez (etapa o resultado), desde la Lista. Mismo
+// Editar varios leads a la vez (etapa, estado o responsable), desde la Lista. Mismo
 // panel lateral que el detalle de un lead y que "Nuevo Lead".
 //
-// Elegir una etapa o un resultado NO aplica nada: hace falta el botón, que
+// Elegir una etapa, un estado o un responsable NO aplica nada: hace falta el botón, que
 // dice cuántos leads va a tocar, y arriba están sus nombres. Después de lo que
 // pasó con "Select all" en Payload, qué se va a editar tiene que estar a la
 // vista antes de guardar, no después.
-export default function BulkLeadEditPanel({ leads, pipeline, onClose, onApply }: BulkLeadEditPanelProps) {
+export default function BulkLeadEditPanel({
+  leads,
+  pipeline,
+  members,
+  viewerId,
+  canAssignLeads,
+  onClose,
+  onApply,
+}: BulkLeadEditPanelProps) {
   const [stage, setStage] = useState('')
   const [status, setStatus] = useState<Lead['status'] | ''>('')
+  const [assignee, setAssignee] = useState('')
   const [applying, setApplying] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,6 +70,7 @@ export default function BulkLeadEditPanel({ leads, pipeline, onClose, onApply }:
     const patch: BulkLeadPatch = {}
     if (stage) patch.stage = stage
     if (status) patch.status = status
+    if (assignee) patch.assignee = assignee === UNASSIGNED ? null : assignee
     setApplying(true)
     setError(null)
     const failure = await onApply(patch)
@@ -119,6 +138,37 @@ export default function BulkLeadEditPanel({ leads, pipeline, onClose, onApply }:
               </option>
             ))}
           </Select>
+
+          {/* Un `owner` reparte a cualquiera; un `member` solo toma para sí los
+              que no tienen responsable o suelta los suyos (issue 38). Los que
+              no se pueden cambiar se quedan como estaban y se avisa cuántos. */}
+          <Select
+            label="Responsable"
+            value={assignee}
+            onChange={(e) => {
+              setAssignee(e.target.value)
+              setError(null)
+            }}
+            disabled={applying}
+          >
+            <option value="">Sin cambio</option>
+            {canAssignLeads ? (
+              <>
+                <option value={UNASSIGNED}>Sin asignar</option>
+                {members.map((member) => (
+                  <option key={member.id} value={String(member.id)}>
+                    {member.label}
+                    {String(member.id) === String(viewerId) ? ' (yo)' : ''}
+                  </option>
+                ))}
+              </>
+            ) : (
+              <>
+                <option value={String(viewerId)}>Tomarlos (yo)</option>
+                <option value={UNASSIGNED}>Soltar los míos</option>
+              </>
+            )}
+          </Select>
         </div>
 
         {error && <p className="-ft-3 text-red-400">{error}</p>}
@@ -130,7 +180,7 @@ export default function BulkLeadEditPanel({ leads, pipeline, onClose, onApply }:
           <Button
             variant="primary"
             onClick={handleApply}
-            disabled={applying || (!stage && !status)}
+            disabled={applying || (!stage && !status && !assignee)}
             className="flex-1"
           >
             {applying ? 'Aplicando…' : `Aplicar a ${count} ${leadsWord}`}

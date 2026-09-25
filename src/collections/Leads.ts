@@ -3,6 +3,7 @@ import { isInternalUser } from '@/access/isInternalUser'
 import { emitTenantEventById, leadEventData } from '@/events/tenantEvents'
 import { sendTenantPush } from '@/notifications/pushSend'
 import { scopeBulkToSelectedTenant } from './scopeBulkToSelectedTenant'
+import { assertAssigneeInLeadTenant } from './leadAssignee'
 
 // Fuentes que disparan el push interno (issue 36, ADR 0011): el quiz y las
 // que entran por una fuente externa (Meta/WhatsApp, vía
@@ -60,6 +61,8 @@ export const Leads: CollectionConfig = {
   hooks: {
     // "Select all" + Edit/Delete del panel: que no se salga del tenant elegido.
     beforeOperation: [scopeBulkToSelectedTenant],
+    // El Responsable solo puede ser alguien del Tenant del Lead (issue 38).
+    beforeChange: [assertAssigneeInLeadTenant],
     // EL punto de emisión de `lead.created` (ADR 0008, decisión 4). Está aquí,
     // en la colección, y no en cada ruta que crea Leads, porque un Lead entra
     // hoy por cuatro puertas —el quiz, el alta a mano del cliente, el ingest de
@@ -174,6 +177,26 @@ export const Leads: CollectionConfig = {
       },
     },
     {
+      // Quién del equipo del cliente atiende este Lead (issue 38). Es una
+      // etiqueta de trabajo, no un permiso: no cambia quién ve el Lead.
+      // `filterOptions` solo ordena el selector del panel; la regla de que
+      // sea del mismo Tenant la impone `assertAssigneeInLeadTenant`.
+      name: 'assignee',
+      type: 'relationship',
+      relationTo: 'tenant-users',
+      hasMany: false,
+      index: true,
+      label: 'Responsable',
+      filterOptions: ({ data }) => {
+        const tenantId = data?.tenant && typeof data.tenant === 'object' ? data.tenant.id : data?.tenant
+        return tenantId ? { tenant: { equals: tenantId } } : false
+      },
+      admin: {
+        description:
+          'Usuario de Cliente que atiende este lead. Solo puede ser alguien del mismo tenant; vacío es "Sin asignar".',
+      },
+    },
+    {
       name: 'source',
       type: 'select',
       defaultValue: 'quiz',
@@ -240,6 +263,7 @@ export const Leads: CollectionConfig = {
     { fields: ['tenant', 'status'] }, // contar abiertos/ganados/perdidos/descalificados para KPIs
     { fields: ['tenant', 'createdAt'] }, // listado / tendencia por fecha
     { fields: ['tenant', 'externalId'] }, // buscar el lead ya ingresado al reintentar (ver /api/leads/ingest)
+    { fields: ['tenant', 'assignee'] }, // filtro por Responsable del dashboard (issue 38)
   ],
   timestamps: true,
 }

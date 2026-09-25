@@ -5,6 +5,7 @@ import type {Lead, LeadUpdateEvent, PipelineStage} from '@/components/dashboard/
 import Select from '@/components/dashboard/ui/atoms/Select'
 import IconSort from '@/components/dashboard/ui/atoms/icons/IconSort'
 import IconFilter from '@/components/dashboard/ui/atoms/icons/IconFilter'
+import IconUser from '@/components/dashboard/ui/atoms/icons/IconUser'
 import IconPlus from '@/components/dashboard/ui/atoms/icons/IconPlus'
 import IconDownload from '@/components/dashboard/ui/atoms/icons/IconDownload'
 import Button from '@/components/dashboard/ui/atoms/Button'
@@ -16,6 +17,7 @@ import BoardScrollIndicator from '@/components/dashboard/ui/molecules/BoardScrol
 import StageColumn from '@/components/dashboard/ui/organisms/StageColumn'
 import LeadListTable from '@/components/dashboard/ui/organisms/LeadListTable'
 import BulkLeadEditPanel, {type BulkLeadPatch} from '@/components/dashboard/BulkLeadEditPanel'
+import type {TenantMember} from '@/utils/tenantMembers'
 
 type KanbanBoardProps = {
   pipeline: PipelineStage[]
@@ -26,6 +28,11 @@ type KanbanBoardProps = {
   onStageChange: (lead: Lead, stage: string) => Promise<Lead | null>
   /** Edición en bulto desde la Lista; regresa los leads ya guardados, o un error. */
   onBulkUpdate: (ids: (string | number)[], patch: BulkLeadPatch) => Promise<{leads: Lead[]; error?: string}>
+  /** Las personas del Tenant: filtro por Responsable, iniciales y edición en bulto. */
+  members: TenantMember[]
+  viewerId: string | number
+  /** Si la sesión reparte leads a cualquiera o solo toma/suelta los propios. */
+  canAssignLeads: boolean
   updateEvent: LeadUpdateEvent | null
   // El periodo lo controla DashboardApp: es el mismo filtro que usan los
   // KPIs, no una copia local de esta vista (ver PeriodFilter).
@@ -55,6 +62,11 @@ const STATUS_FILTER_LABELS: Record<StatusFilterKey, string> = {
   lost: 'Perdidos',
   disqualified: 'Descalificados',
 }
+
+// Filtro por Responsable (issue 38): 'all' no manda parámetro; 'me' y 'none'
+// los resuelve el servidor (ver leadDashboardFilters.ts); cualquier otro valor
+// es el id de una persona del Tenant.
+const ASSIGNEE_FILTER_ALL = 'all'
 
 // Cuántas tarjetas/filas trae cada página. El Kanban pide de a poco por
 // columna; la Lista pide un poco más porque es una tabla de "cargar más".
@@ -89,12 +101,13 @@ const emptyColumn: ColumnState = {
 // es lo que hace viable un tenant con miles de leads sin traer todo a la vez
 // (ver `handleColumnScroll`/`handleListScroll`: cargan la siguiente página
 // al acercarse al fondo del contenedor, sin botón).
-export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCreateLead, onStageChange, onBulkUpdate, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
+export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCreateLead, onStageChange, onBulkUpdate, members, viewerId, canAssignLeads, updateEvent, sinceKey, onSinceChange}: KanbanBoardProps) {
   const [view, setView] = useState<BoardView>('kanban')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(ASSIGNEE_FILTER_ALL)
 
   const [columnData, setColumnData] = useState<Record<string, ColumnState>>({})
   const [stageCounts, setStageCounts] = useState<Record<string, number>>({})
@@ -147,9 +160,10 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (sinceKey !== 'all') params.set('since', sinceKey)
       if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (assigneeFilter !== ASSIGNEE_FILTER_ALL) params.set('assignee', assigneeFilter)
       return params
     },
-    [sortKey, debouncedSearch, sinceKey, statusFilter],
+    [sortKey, debouncedSearch, sinceKey, statusFilter, assigneeFilter],
   )
 
   const loadColumn = useCallback(
@@ -194,13 +208,29 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (sinceKey !== 'all') params.set('since', sinceKey)
     if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (assigneeFilter !== ASSIGNEE_FILTER_ALL) params.set('assignee', assigneeFilter)
     const res = await fetch(`/api/tenant-dashboard/leads/counts?${params}`)
     if (!res.ok) return
     const data = await res.json()
     setStageCounts(data.counts || {})
     setOtherCount(data.other || 0)
     setTotalCount(data.total || 0)
-  }, [debouncedSearch, sinceKey, statusFilter])
+  }, [debouncedSearch, sinceKey, statusFilter, assigneeFilter])
+
+  // "Yo" arriba, luego "Sin asignar" y luego el resto del equipo: el caso de
+  // todos los días es buscar los propios. La propia sesión no se repite abajo.
+  const assigneeOptions = useMemo(
+    () => [
+      {value: ASSIGNEE_FILTER_ALL, label: 'Todos'},
+      {value: 'me', label: 'Yo'},
+      {value: 'none', label: 'Sin asignar'},
+      ...members
+        .filter((member) => String(member.id) !== String(viewerId))
+        .map((member) => ({value: String(member.id), label: member.label})),
+    ],
+    [members, viewerId],
+  )
+  const assigneeFilterLabel = assigneeOptions.find((o) => o.value === assigneeFilter)?.label ?? 'Todos'
 
   const loadList = useCallback(
     async (page: number) => {
@@ -633,6 +663,33 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
                 </span>
               </div>
             </div>
+
+            <div
+              className={`relative h-12 w-12 rounded-full shrink-0 ${assigneeFilter !== ASSIGNEE_FILTER_ALL ? 'bg-neutral-700' : ''}`}
+              title={`Responsable: ${assigneeFilterLabel}`}
+            >
+              <Select
+                id="assignee-select"
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                aria-label="Filtrar leads por responsable"
+                className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+              >
+                {assigneeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 isolate flex items-center justify-center rounded-full text-neutral-400 peer-hover:text-neutral-200"
+              >
+                <span className="w-7 h-7">
+                  <IconUser/>
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -706,6 +763,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
                   isDragOver={dragOverKey === col.id}
                   pendingLeadId={pendingLeadId}
                   stuckAfterDays={stuckAfterDays}
+                  members={members}
                   scrollRef={(el) => {
                     columnScrollRefs.current[col.id] = el
                   }}
@@ -744,6 +802,7 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
             onToggleLead={toggleLead}
             onToggleAll={toggleAllLoaded}
             pipeline={pipeline}
+            members={members}
             stuckAfterDays={stuckAfterDays}
             onRowClick={onCardClick}
             loading={listLoading}
@@ -756,6 +815,9 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
         <BulkLeadEditPanel
           leads={selectedLeads}
           pipeline={pipeline}
+          members={members}
+          viewerId={viewerId}
+          canAssignLeads={canAssignLeads}
           onClose={() => setBulkPanelOpen(false)}
           onApply={handleBulkApply}
         />

@@ -5,6 +5,8 @@ import type { Lead } from '@/components/dashboard/DashboardApp'
 import LeadCard from '@/components/dashboard/ui/organisms/LeadCard'
 import Badge from '@/components/dashboard/ui/atoms/Badge'
 import EmptyState from '@/components/dashboard/ui/atoms/EmptyState'
+import type { TenantMember } from '@/utils/tenantMembers'
+import { assigneeLabelOf } from '@/components/dashboard/leadAssignee'
 
 type StageColumnProps = {
   label: string
@@ -16,6 +18,8 @@ type StageColumnProps = {
   isDragOver: boolean
   pendingLeadId: string | null
   stuckAfterDays?: number | null
+  /** Las personas del Tenant, para las iniciales del Responsable en cada tarjeta. */
+  members: TenantMember[]
   scrollRef: (el: HTMLDivElement | null) => void
   onScroll: (e: UIEvent<HTMLDivElement>) => void
   onDragOver: (e: DragEvent<HTMLDivElement>) => void
@@ -37,6 +41,7 @@ export default function StageColumn({
   isDragOver,
   pendingLeadId,
   stuckAfterDays,
+  members,
   scrollRef,
   onScroll,
   onDragOver,
@@ -69,6 +74,7 @@ export default function StageColumn({
             lead={lead}
             pending={pendingLeadId === String(lead.id)}
             stuckAfterDays={stuckAfterDays}
+            assigneeLabel={assigneeLabelOf(lead, members)}
             onClick={() => onCardClick(lead)}
             onDragStart={() => onCardDragStart(lead)}
             onDragEnd={onCardDragEnd}

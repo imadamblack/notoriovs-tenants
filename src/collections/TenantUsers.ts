@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { Forbidden } from 'payload'
 import { assignedTenantIds, internalScopedToAssignedTenants, isSuperadminUser } from '@/access/internalRoles'
 import { tenantUserRoleField } from '@/access/tenantUserPermissions'
+import { releaseLeadsOnTenantChange } from './leadAssignee'
 
 // Población de auth del lado del cliente: quien entra al Dashboard de Cliente
 // de SU tenant. Es una colección aparte de `users` (el equipo de Notoriovs),
@@ -39,7 +40,7 @@ export const TenantUsers: CollectionConfig = {
   },
   admin: {
     useAsTitle: 'email',
-    defaultColumns: ['email', 'tenant', 'updatedAt'],
+    defaultColumns: ['email', 'name', 'tenant', 'updatedAt'],
     description:
       'Personas del lado del cliente que entran al Dashboard de Cliente de su tenant. No tienen acceso a este panel.',
   },
@@ -101,8 +102,21 @@ export const TenantUsers: CollectionConfig = {
         return data
       },
     ],
+    // Cambiar a alguien de Tenant le suelta los Leads del anterior (issue 38).
+    afterChange: [releaseLeadsOnTenantChange],
   },
   fields: [
+    {
+      // Opcional: es como se le nombra en el Dashboard (filtro por
+      // Responsable, iniciales en el Kanban, columna del CSV). Sin nombre se
+      // muestra su email, que siempre existe.
+      name: 'name',
+      type: 'text',
+      label: 'Nombre',
+      admin: {
+        description: 'Cómo aparece en el Dashboard de Cliente al asignarle leads. Si se deja vacío, se usa el email.',
+      },
+    },
     tenantUserRoleField,
     {
       name: 'tenant',

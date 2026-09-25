@@ -1,4 +1,6 @@
 import { headers } from 'next/headers'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 import { notFound } from 'next/navigation'
 import { getTenantBySubdomain, tenantHasDashboard } from '@/utils/getTenant'
 import { resolveDashboardAuth, sessionPermissions } from '@/utils/requireDashboardAuth'
@@ -9,6 +11,7 @@ import { quizQuestions } from '@/utils/leadAnswers'
 import { headerFromQuizStep } from '@/utils/leadsCsv'
 import type { TenantQuizStep } from '@/utils/tenantQuiz'
 import type { QuizQuestion } from '@/components/dashboard/DashboardApp'
+import { listTenantMembers } from '@/utils/tenantMembers'
 
 /**
  * Las preguntas del quiz recortadas a lo que usa el panel de detalle: cómo se
@@ -65,11 +68,20 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
     return <DashboardLogin subdomain={subdomain} companyName={companyName} />
   }
 
+  // Las personas del Tenant (issue 38), para el filtro por Responsable y para
+  // asignar. Se cargan hasta aquí, con la sesión ya validada: la pantalla de
+  // login no tiene por qué saber quién trabaja en el cliente.
+  const members = await listTenantMembers(await getPayload({ config }), tenant.id)
+
   return (
     <DashboardApp
       companyName={companyName}
       // Con quién está firmada la sesión, para el menú de cuenta.
       accountEmail={auth.session.email}
+      // Quién es "Yo" en el filtro por Responsable y a quién se asigna al
+      // tomar un Lead. Las rutas no confían en esto: vuelven a leer la sesión.
+      viewerId={auth.session.userId}
+      members={members}
       // Qué puede hacer este rol, ya resuelto en el servidor. La interfaz lo
       // usa para no ofrecer botones que la API va a rechazar; quien decide de
       // verdad es cada ruta, que vuelve a preguntar por su cuenta.
