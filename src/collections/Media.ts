@@ -46,6 +46,19 @@ export const Media: CollectionConfig = {
       async ({ args, operation }) => {
         if (operation !== 'update') return args
 
+        // El plugin de Vercel Blob (`@payloadcms/plugin-cloud-storage`), después
+        // de subir el archivo, dispara ESTE MISMO patrón —'update' sin
+        // `req.file`— para guardar el nombre real (con el sufijo que le agregó
+        // Vercel) en un update interno desde su propio `afterChange`. Marca ese
+        // update con `req.context.skipCloudStorage` (lo limpia al terminar).
+        // Sin este chequeo, este hook no distinguía esa llamada interna de un
+        // crop/focal-point hecho a mano, y le devolvía el nombre SIN sufijo
+        // (el que se guardó como `originalFilename` en la subida original,
+        // antes de que Vercel lo sufijara) — el archivo quedaba subido
+        // correctamente al blob, pero el documento apuntaba a un nombre que
+        // nunca existió ahí: 200 en la respuesta, 404 al ver la imagen.
+        if (args.req.context?.skipCloudStorage) return args
+
         // El tipo de `args` es la unión de todas las operaciones posibles; en
         // 'update' siempre trae `id` y `data`.
         const updateArgs = args as { data?: Record<string, unknown>; id?: number | string }
@@ -72,7 +85,14 @@ export const Media: CollectionConfig = {
     // próxima re-subida. Se hace después de que Payload arma el nombre, así que
     // en la propia subida original ya queda sin sufijos.
     beforeChange: [
-      ({ data }) => {
+      ({ data, req }) => {
+        // Mismo caso que en `beforeOperation`: el update interno del plugin de
+        // cloud storage (marcado con `skipCloudStorage`) trae el filename REAL,
+        // con el sufijo de Vercel. Si este hook corriera ahí, pisaría
+        // `originalFilename` con ese nombre sufijado, y la próxima re-subida
+        // volvería a acumular sufijos (justo lo que el issue 22 evitaba).
+        if (req?.context?.skipCloudStorage) return data
+
         if (data?.filename) {
           data.originalFilename = data.filename
         }
