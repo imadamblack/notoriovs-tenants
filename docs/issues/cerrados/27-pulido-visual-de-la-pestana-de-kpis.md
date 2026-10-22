@@ -9,9 +9,7 @@ desde el 06.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** Hecho en la rama, **falta verlo en el dashboard real**. Lint y
-`tsc` limpios; el layout se revisó en un render aislado con las mismas clases,
-pero nadie lo ha abierto con datos de un tenant de verdad.
+**Status:** done — validado en el dashboard real (escritorio y móvil) el 2026-10-22.
 
 ## Notas del cliente
 
@@ -99,7 +97,7 @@ encimen (la última siempre sale).
 
 ## Falta
 
-- [ ] Abrir la pestaña de KPIs de un tenant real y confirmar el resultado
+- [x] Abrir la pestaña de KPIs de un tenant real y confirmar el resultado
       (los conteos del embudo ya se cuadraron contra la base de dev: 59 / 15 /
       8 / 2 para `ntrs`, que es justo lo que pidió el cliente)
-- [ ] Revisarla en móvil (es donde el `flex-col` cambia comportamiento)
+- [x] Revisarla en móvil (es donde el `flex-col` cambia comportamiento)

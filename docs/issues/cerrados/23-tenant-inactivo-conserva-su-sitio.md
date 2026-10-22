@@ -14,7 +14,7 @@ webhooks, solo la semántica del campo que ya existe.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** hecho y verificado en `dev`, plataforma y n8n. Falta desplegar.
+**Status:** done — verificado en `dev`, plataforma y n8n; en producción desde el merge de `dev` a `main` (PR #28/#29, octubre 2026).
 
 - [x] Un Tenant inactivo sigue sirviendo landing, quiz, gracias, no elegible y aviso de privacidad
 - [x] Un Tenant inactivo sigue capturando Leads desde su quiz
