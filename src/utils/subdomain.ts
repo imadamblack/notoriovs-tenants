@@ -41,3 +41,10 @@ export function getSubdomainFromHost(host: string, rootDomain: string): string {
 export function getSubdomainFromHeaders(headers: Headers): string {
   return getSubdomainFromHost(headers.get('host') || '', ROOT_DOMAIN)
 }
+
+/**
+ * Lo que responden las rutas sin credencial del dashboard (login, recuperar
+ * contraseña) cuando se llaman desde un host que no es de ningún Tenant.
+ */
+export const NO_TENANT_HOST =
+  'Esta dirección no es la del dashboard de ningún negocio. Entra desde la dirección de tu propio dashboard.'

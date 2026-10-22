@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantBySubdomain } from '@/utils/getTenant'
+import { getSubdomainFromHeaders, NO_TENANT_HOST } from '@/utils/subdomain'
 import { loginTenantUser } from '@/utils/tenantUserAuth'
 import { setTenantSessionCookie } from '@/utils/tenantSessionCookie'
 
@@ -10,11 +11,14 @@ import { setTenantSessionCookie } from '@/utils/tenantSessionCookie'
 // La cookie es httpOnly y host-only en el subdominio del tenant, así que la
 // sesión de un cliente nunca viaja al host de otro.
 //
-// El `subdomain` llega en el cuerpo y NO del host, a diferencia del resto de
-// /api/tenant-dashboard/*. Es deliberado: aquí todavía no hay credencial que
-// diga de qué Tenant es quien llama, y dejarlo así mantiene abierta una entrada
-// única de login (una sola pantalla en un host compartido). No lo "arregles"
-// sin leer el ADR 0007 — la decisión y su precio están ahí.
+// El Tenant sale del `Host`, como en todo /api/tenant-dashboard/* (ADR 0002).
+// Un `subdomain` en el cuerpo se ignora. Las tres rutas sin credencial (login,
+// forgot-password, reset-password) fueron la excepción hasta el issue 34; el
+// porqué de cerrarla está en las actualizaciones del ADR 0007.
+//
+// Un host que no es de ningún Tenant (el del panel, el dominio raíz) se rechaza
+// antes de mirar credenciales: ahí una sesión no tendría dashboard que abrir, y
+// antes quedaba la cookie puesta con una pantalla que no explicaba nada.
 
 /** Mismo mensaje para credenciales malas, usuario inexistente y cuenta bloqueada. */
 const BAD_CREDENTIALS = 'Email o contraseña incorrectos'
@@ -28,12 +32,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  const subdomain = typeof body?.subdomain === 'string' ? body.subdomain.toLowerCase() : ''
   const password = typeof body?.password === 'string' ? body.password : ''
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
 
-  if (!subdomain || !email || !password) {
-    return NextResponse.json({ error: 'Falta subdomain, email o password' }, { status: 400 })
+  if (!email || !password) {
+    return NextResponse.json({ error: 'Falta email o password' }, { status: 400 })
+  }
+
+  const subdomain = getSubdomainFromHeaders(req.headers)
+  if (!subdomain) {
+    return NextResponse.json({ error: NO_TENANT_HOST }, { status: 400 })
   }
 
   // El tenant sale del host, nunca del usuario: quien se autentica bien pero

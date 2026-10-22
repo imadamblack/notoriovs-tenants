@@ -10,7 +10,9 @@ una sesión válida sin destino.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done — validado en local el 2026-10-22 (`ntrs.localhost:3000/dashboard`
+entra; `localhost:3000/tenant-site/ntrs/dashboard` rechaza con el mensaje nuevo
+y sin dejar sesión). Falta desplegar.
 
 ## Por qué
 
@@ -35,13 +37,13 @@ Decidido el 11/09/2026; anotado en la sección de actualizaciones del ADR 0007.
 Si algún día se quiere la entrada única, reabrir esto cuesta lo mismo que
 cerrarlo hoy.
 
-- [ ] `login`, `forgot-password` y `reset-password` derivan el Tenant del host
+- [x] `login`, `forgot-password` y `reset-password` derivan el Tenant del host
       y ya no leen `subdomain` del cuerpo
-- [ ] Un host sin Tenant (el del panel, el dominio raíz) rechaza el login con un
+- [x] Un host sin Tenant (el del panel, el dominio raíz) rechaza el login con un
       mensaje claro, y **no** deja cookie
-- [ ] El cliente deja de mandar `subdomain` en esas tres llamadas
-- [ ] El correo de recuperación sigue llegando con el enlace al host correcto
-- [ ] La regla "el Tenant sale del host" queda sin excepciones en todo
+- [x] El cliente deja de mandar `subdomain` en esas tres llamadas
+- [x] El correo de recuperación sigue llegando con el enlace al host correcto
+- [x] La regla "el Tenant sale del host" queda sin excepciones en todo
       `/api/tenant-dashboard/*`
 
 ## Pruebas

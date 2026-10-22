@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantBySubdomain } from '@/utils/getTenant'
+import { getSubdomainFromHeaders, NO_TENANT_HOST } from '@/utils/subdomain'
 import { MIN_PASSWORD_LENGTH, resetPasswordWithToken } from '@/utils/tenantUserAccount'
 import { setTenantSessionCookie } from '@/utils/tenantSessionCookie'
 
@@ -7,16 +8,15 @@ import { setTenantSessionCookie } from '@/utils/tenantSessionCookie'
 // igual para recuperar la propia y para aceptar una invitación — son el mismo
 // token.
 //
-// El tenant sale del subdominio que manda la pantalla, y el módulo comprueba
+// El tenant sale del host desde el que se abrió el enlace, y el módulo comprueba
 // que el dueño del token pertenezca a ÉL antes de tocar nada: un enlace
 // legítimo del cliente A canjeado contra el cliente B no sirve, no cambia
 // ninguna contraseña y no abre ninguna sesión.
 //
-// El `subdomain` llega en el cuerpo y NO del host, a diferencia del resto de
-// /api/tenant-dashboard/*. Es deliberado: aquí todavía no hay credencial que
-// diga de qué Tenant es quien llama, y dejarlo así mantiene abierta una entrada
-// única de login (una sola pantalla en un host compartido). No lo "arregles"
-// sin leer el ADR 0007 — la decisión y su precio están ahí.
+// El Tenant sale del `Host`, como en todo /api/tenant-dashboard/* (ADR 0002).
+// Un `subdomain` en el cuerpo se ignora. Las tres rutas sin credencial (login,
+// forgot-password, reset-password) fueron la excepción hasta el issue 34; el
+// porqué de cerrarla está en las actualizaciones del ADR 0007.
 
 const INVALID_TOKEN =
   'Este enlace ya no sirve: venció o ya se usó. Pide uno nuevo desde "¿Olvidaste tu contraseña?".'
@@ -30,12 +30,16 @@ export async function POST(req: NextRequest) {
   }
 
   const data = (body ?? {}) as Record<string, unknown>
-  const subdomain = typeof data.subdomain === 'string' ? data.subdomain.toLowerCase() : ''
   const token = typeof data.token === 'string' ? data.token.trim() : ''
   const password = typeof data.password === 'string' ? data.password : ''
 
-  if (!subdomain || !token || !password) {
-    return NextResponse.json({ error: 'Falta subdomain, token o password' }, { status: 400 })
+  if (!token || !password) {
+    return NextResponse.json({ error: 'Falta token o password' }, { status: 400 })
+  }
+
+  const subdomain = getSubdomainFromHeaders(req.headers)
+  if (!subdomain) {
+    return NextResponse.json({ error: NO_TENANT_HOST }, { status: 400 })
   }
 
   const tenant = await getTenantBySubdomain(subdomain, 'dashboardIdentity')

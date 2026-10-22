@@ -7,7 +7,6 @@ import Button from '@/components/dashboard/ui/atoms/Button'
 import BrandHeading from '@/components/dashboard/ui/molecules/BrandHeading'
 
 type SetPasswordScreenProps = {
-  subdomain: string
   companyName?: string | null
   token: string
 }
@@ -15,7 +14,7 @@ type SetPasswordScreenProps = {
 /** El mismo mínimo que exige el servidor; aquí solo evita un viaje de ida y vuelta. */
 const MIN_LENGTH = 8
 
-export default function SetPasswordScreen({ subdomain, companyName, token }: SetPasswordScreenProps) {
+export default function SetPasswordScreen({ companyName, token }: SetPasswordScreenProps) {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -40,7 +39,7 @@ export default function SetPasswordScreen({ subdomain, companyName, token }: Set
       const res = await fetch('/api/tenant-dashboard/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain, token, password }),
+        body: JSON.stringify({ token, password }),
       })
 
       if (!res.ok) {
