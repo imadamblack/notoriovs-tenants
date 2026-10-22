@@ -65,7 +65,7 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
   const auth = await resolveDashboardAuth(requestHeaders)
 
   if (!auth) {
-    return <DashboardLogin subdomain={subdomain} companyName={companyName} />
+    return <DashboardLogin companyName={companyName} />
   }
 
   // Las personas del Tenant (issue 38), para el filtro por Responsable y para

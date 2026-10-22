@@ -6,7 +6,6 @@ import LoginForm from '@/components/dashboard/ui/organisms/LoginForm'
 import ForgotPasswordForm from '@/components/dashboard/ui/organisms/ForgotPasswordForm'
 
 type DashboardLoginProps = {
-  subdomain: string
   companyName?: string | null
 }
 
@@ -14,7 +13,7 @@ type DashboardLoginProps = {
 // Es una sola pantalla y no dos rutas porque el segundo estado es una salida
 // del primero, y una ruta aparte perdería el nombre del cliente que ya está
 // en pantalla.
-export default function DashboardLogin({subdomain, companyName}: DashboardLoginProps) {
+export default function DashboardLogin({companyName}: DashboardLoginProps) {
   const router = useRouter()
   const [mode, setMode] = useState<'login' | 'forgot'>('login')
   const [email, setEmail] = useState('')
@@ -38,7 +37,7 @@ export default function DashboardLogin({subdomain, companyName}: DashboardLoginP
       const res = await fetch('/api/tenant-dashboard/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({subdomain, email, password}),
+        body: JSON.stringify({email, password}),
       })
 
       if (!res.ok) {
@@ -64,7 +63,7 @@ export default function DashboardLogin({subdomain, companyName}: DashboardLoginP
       const res = await fetch('/api/tenant-dashboard/forgot-password', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({subdomain, email}),
+        body: JSON.stringify({email}),
       })
       const data = await res.json().catch(() => ({}))
 

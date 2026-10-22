@@ -67,6 +67,13 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
+# Contra producción nunca se empuja esquema. Un guion suelto que levante
+# Payload sin `PAYLOAD_MIGRATING` (una reparación de datos, por ejemplo) corre
+# en modo desarrollo, y ahí el push alinea el esquema por su cuenta y deja la
+# marca `dev` en `payload_migrations` — que tumba el siguiente despliegue
+# (pasó el 2026-10-06 al reparar los Media de Don Cachuchas).
+export PAYLOAD_SCHEMA_PUSH=false
+
 host="$(node -e 'process.stdout.write(new URL(process.env.DATABASE_URL).host)')"
 
 echo "─────────────────────────────────────────────"

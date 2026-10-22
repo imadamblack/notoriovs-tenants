@@ -22,6 +22,9 @@ import { assertAssigneeInLeadTenant } from '@/collections/leadAssignee'
 // cliente y los de otro.
 const getTenantBySubdomain = vi.fn()
 const getTenantUserSession = vi.fn()
+const loginTenantUser = vi.fn()
+const requestPasswordReset = vi.fn()
+const resetPasswordWithToken = vi.fn()
 
 vi.mock('@/utils/getTenant', () => ({
   getTenantBySubdomain: (...args: unknown[]) => getTenantBySubdomain(...args),
@@ -29,6 +32,20 @@ vi.mock('@/utils/getTenant', () => ({
 
 vi.mock('@/utils/tenantUserAuth', () => ({
   getTenantUserSession: (...args: unknown[]) => getTenantUserSession(...args),
+  loginTenantUser: (...args: unknown[]) => loginTenantUser(...args),
+}))
+
+vi.mock('@/utils/tenantUserAccount', () => ({
+  MIN_PASSWORD_LENGTH: 8,
+  requestPasswordReset: (...args: unknown[]) => requestPasswordReset(...args),
+  resetPasswordWithToken: (...args: unknown[]) => resetPasswordWithToken(...args),
+}))
+
+// La cookie real pide la config de Payload para su vida útil; aquí basta con
+// que se ponga o no se ponga.
+vi.mock('@/utils/tenantSessionCookie', () => ({
+  setTenantSessionCookie: async (res: { cookies: { set: (n: string, v: string) => void } }, token: string) =>
+    res.cookies.set('notoriovs-tenant-token', token),
 }))
 
 const { resolveDashboardAuth, sessionCan } = await import('@/utils/requireDashboardAuth')
@@ -37,6 +54,10 @@ const { findLeadOfTenant, buildBulkLeadsWhere, buildLeadsWhere, readBulkLeadIds,
 const { resolveStageAndStatus } = await import('@/utils/leadStageStatus')
 const { findSubscriptionOfTenant } = await import('@/utils/pushSubscriptionDashboardFilters')
 const { PushSubscriptions } = await import('@/collections/PushSubscriptions')
+const { POST: login } = await import('@/app/api/tenant-dashboard/login/route')
+const { POST: forgotPassword } = await import('@/app/api/tenant-dashboard/forgot-password/route')
+const { POST: resetPassword } = await import('@/app/api/tenant-dashboard/reset-password/route')
+const { NextRequest } = await import('next/server')
 
 const ACME = { id: 1, leadPipeline: [], leadStuckAfterDays: 21 }
 
@@ -126,6 +147,93 @@ describe('autorización del dashboard', () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1))
 
     expect(await resolveDashboardAuth(onAcme)).toBeNull()
+  })
+})
+
+/** Un POST JSON a una ruta del dashboard, desde `host`. */
+const postFrom = (host: string, body: unknown) =>
+  new NextRequest('http://' + host + '/api/tenant-dashboard/x', {
+    method: 'POST',
+    headers: { host, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+const sessionCookie = (res: Response) => res.headers.get('set-cookie') ?? ''
+
+// Issue 34: las tres rutas sin credencial dejaron de leer el `subdomain` del
+// cuerpo. Antes eran la excepción a "el Tenant sale del host", y desde el host
+// del panel se podía entrar a un cliente y quedarse con una cookie sin destino.
+describe('el login también saca el tenant del host', () => {
+  const credentials = { email: 'cliente@acme.com', password: 'secreta-123' }
+
+  beforeEach(() => {
+    loginTenantUser.mockResolvedValue({ token: 'jwt', session: { tenantId: 1 } })
+  })
+
+  it('desde el host de su tenant, un Tenant User entra y queda la cookie', async () => {
+    const res = await login(postFrom('acme.localhost:3000', credentials))
+
+    expect(res.status).toBe(200)
+    expect(getTenantBySubdomain).toHaveBeenCalledWith('acme', 'dashboardIdentity')
+    expect(sessionCookie(res)).toContain('notoriovs-tenant-token=jwt')
+  })
+
+  it('desde un host sin tenant no entra y no deja cookie, aunque el cuerpo nombre uno', async () => {
+    for (const host of ['localhost:3000', 'admin.localhost:3000']) {
+      const res = await login(postFrom(host, { ...credentials, subdomain: 'acme' }))
+
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/dashboard/)
+      expect(sessionCookie(res)).toBe('')
+    }
+    expect(getTenantBySubdomain).not.toHaveBeenCalled()
+    expect(loginTenantUser).not.toHaveBeenCalled()
+  })
+
+  it('un `subdomain` en el cuerpo se ignora: manda el host', async () => {
+    const res = await login(postFrom('acme.localhost:3000', { ...credentials, subdomain: 'otro' }))
+
+    expect(res.status).toBe(200)
+    expect(getTenantBySubdomain).toHaveBeenCalledWith('acme', 'dashboardIdentity')
+    expect(getTenantBySubdomain).not.toHaveBeenCalledWith('otro', expect.anything())
+  })
+
+  it('una cuenta de otro tenant no entra por el host de este', async () => {
+    loginTenantUser.mockResolvedValue({ token: 'jwt', session: { tenantId: 2 } })
+
+    const res = await login(postFrom('acme.localhost:3000', credentials))
+
+    expect(res.status).toBe(401)
+    expect(sessionCookie(res)).toBe('')
+  })
+
+  it('el correo de recuperación se arma con el subdominio del host, no el del cuerpo', async () => {
+    const res = await forgotPassword(postFrom('acme.localhost:3000', { email: 'a@acme.com', subdomain: 'otro' }))
+
+    expect(res.status).toBe(200)
+    expect(requestPasswordReset).toHaveBeenCalledWith(expect.objectContaining({ id: 1, subdomain: 'acme' }), 'a@acme.com')
+
+    const fromPanel = await forgotPassword(postFrom('localhost:3000', { email: 'a@acme.com', subdomain: 'acme' }))
+    expect(fromPanel.status).toBe(400)
+    expect(requestPasswordReset).toHaveBeenCalledTimes(1)
+  })
+
+  it('canjear un enlace desde un host sin tenant no cambia nada ni deja cookie', async () => {
+    resetPasswordWithToken.mockResolvedValue({ ok: true, login: { token: 'jwt' } })
+
+    const res = await resetPassword(
+      postFrom('localhost:3000', { token: 't', password: 'secreta-123', subdomain: 'acme' }),
+    )
+
+    expect(res.status).toBe(400)
+    expect(resetPasswordWithToken).not.toHaveBeenCalled()
+    expect(sessionCookie(res)).toBe('')
+
+    const fromAcme = await resetPassword(
+      postFrom('acme.localhost:3000', { token: 't', password: 'secreta-123', subdomain: 'otro' }),
+    )
+    expect(fromAcme.status).toBe(200)
+    expect(resetPasswordWithToken).toHaveBeenCalledWith({ id: 1 }, 't', 'secreta-123')
   })
 })
 

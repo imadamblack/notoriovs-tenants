@@ -26,7 +26,6 @@ export default async function TenantSetPasswordPage({ params, searchParams }: Se
 
   return (
     <SetPasswordScreen
-      subdomain={subdomain}
       companyName={tenant.generalInfo?.companyName || tenant.name}
       token={typeof token === 'string' ? token : ''}
     />
