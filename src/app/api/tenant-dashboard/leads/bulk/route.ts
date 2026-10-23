@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireDashboardAuth, sessionCan, type DashboardSession } from '@/utils/requireDashboardAuth'
+import { requireDashboardAuth, sessionCan, tenantUserIdOf, type DashboardSession } from '@/utils/requireDashboardAuth'
 import type { Where } from 'payload'
 import {
   buildBulkLeadsWhere,
@@ -127,7 +127,9 @@ export async function PATCH(req: NextRequest) {
  */
 function assigneeScope(session: DashboardSession, next: number | null): Where | null {
   if (sessionCan(session, 'leads:assign')) return { id: { exists: true } }
-  if (next !== null && String(next) === String(session.userId)) return { assignee: { exists: false } }
-  if (next === null) return { assignee: { equals: Number(session.userId) } }
+  const viewerId = tenantUserIdOf(session)
+  if (viewerId === null) return null
+  if (next !== null && String(next) === String(viewerId)) return { assignee: { exists: false } }
+  if (next === null) return { assignee: { equals: Number(viewerId) } }
   return null
 }

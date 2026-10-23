@@ -23,14 +23,18 @@ de todas las colecciones.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done — validado en local el 2026-10-22 contra el dev server:
+en `acme.localhost:3000`, `/admin`, `/api/tenants`, `/api/graphql`,
+`/api/users/login` responden 404; en `localhost:3000` siguen vivos; las rutas
+propias (`/api/tenant-dashboard/*`, `/api/quiz-submit`) siguen respondiendo en el
+host del Tenant. Falta desplegar (sin migración).
 
-- [ ] En el host de un Tenant, `/admin` y la API de Payload no existen: responden 404, no 500 ni un login
-- [ ] El panel sigue funcionando igual en el host donde vive hoy
-- [ ] Las rutas propias del Dashboard de Cliente (`/api/tenant-dashboard/*`) siguen respondiendo en el host del Tenant
-- [ ] El resto de rutas propias del producto (`/api/quiz-submit`, `/api/fb-event`, `/api/marketing-reports/ingest`) siguen respondiendo donde ya respondían
-- [ ] El Live Preview y los botones de preview del admin siguen abriendo el sitio del Tenant
-- [ ] Qué rutas viven en qué host se declara en un solo lugar y se puede afirmar en un test del middleware
+- [x] En el host de un Tenant, `/admin` y la API de Payload no existen: responden 404, no 500 ni un login
+- [x] El panel sigue funcionando igual en el host donde vive hoy
+- [x] Las rutas propias del Dashboard de Cliente (`/api/tenant-dashboard/*`) siguen respondiendo en el host del Tenant
+- [x] El resto de rutas propias del producto (`/api/quiz-submit`, `/api/fb-event`, `/api/marketing-reports/ingest`) siguen respondiendo donde ya respondían
+- [x] El Live Preview y los botones de preview del admin siguen abriendo el sitio del Tenant
+- [x] Qué rutas viven en qué host se declara en un solo lugar y se puede afirmar en un test del middleware
 
 ## Notas
 
@@ -52,3 +56,18 @@ de todas las colecciones.
 - Sale de la verificación del issue 08. Ahí se cerró la parte grave (el panel
   llegaba a serializar `dashboardPassword` y `tracking.metaCapiToken` en el
   HTML del 500, arreglado con `auth.depth: 0`); esto es lo que quedó.
+
+## Cómo quedó
+
+- La regla vive en `src/middleware.ts` (`isPanelOnlyPath`): `/admin` y todo
+  `/api` que no sea una ruta propia declarada ahí da 404 en el host de un
+  Tenant. Las rutas propias van por ruta exacta, no por prefijo, porque
+  `leads` y `marketing-reports` también son colecciones de Payload.
+- Excepción: `/api/media/file/*` sigue sirviéndose en el host del Tenant. Es por
+  donde sale el Media sin blob (desarrollo, carpeta `media/`); en producción la
+  `url` ya apunta al CDN. Media es pública.
+- `tests/int/middleware.int.spec.ts` recorre `src/app/api/**/route.ts`: una ruta
+  propia nueva que no se declare en el middleware rompe la prueba en vez de dar
+  404 en producción.
+- De paso: `/administracion` (una página de Tenant que empieza con "admin") ya
+  no se confunde con el panel; antes se comparaba con `startsWith('/admin')`.

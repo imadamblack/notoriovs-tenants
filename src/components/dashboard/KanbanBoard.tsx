@@ -30,7 +30,7 @@ type KanbanBoardProps = {
   onBulkUpdate: (ids: (string | number)[], patch: BulkLeadPatch) => Promise<{leads: Lead[]; error?: string}>
   /** Las personas del Tenant: filtro por Responsable, iniciales y edición en bulto. */
   members: TenantMember[]
-  viewerId: string | number
+  viewerId: string | number | null
   /** Si la sesión reparte leads a cualquiera o solo toma/suelta los propios. */
   canAssignLeads: boolean
   updateEvent: LeadUpdateEvent | null
@@ -219,10 +219,11 @@ export default function KanbanBoard({pipeline, stuckAfterDays, onCardClick, onCr
 
   // "Yo" arriba, luego "Sin asignar" y luego el resto del equipo: el caso de
   // todos los días es buscar los propios. La propia sesión no se repite abajo.
+  // Alguien de Notoriovs (sin `viewerId`) no tiene "Yo": nunca es Responsable.
   const assigneeOptions = useMemo(
     () => [
       {value: ASSIGNEE_FILTER_ALL, label: 'Todos'},
-      {value: 'me', label: 'Yo'},
+      ...(viewerId === null ? [] : [{value: 'me', label: 'Yo'}]),
       {value: 'none', label: 'Sin asignar'},
       ...members
         .filter((member) => String(member.id) !== String(viewerId))

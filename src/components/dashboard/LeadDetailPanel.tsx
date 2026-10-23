@@ -25,7 +25,7 @@ type LeadDetailPanelProps = {
   stuckAfterDays?: number | null
   /** Las personas del Tenant, para el Responsable. */
   members: TenantMember[]
-  viewerId: string | number
+  viewerId: string | number | null
   canAssignLeads: boolean
   onClose: () => void
   onSave: (patch: Partial<Lead>) => Promise<boolean>

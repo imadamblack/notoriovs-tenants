@@ -76,6 +76,7 @@ export interface Config {
     'lead-exports': LeadExport;
     'marketing-reports': MarketingReport;
     'push-subscriptions': PushSubscription;
+    'dashboard-visits': DashboardVisit;
     'payload-kv': PayloadKv;
     'payload-folders': FolderInterface;
     'payload-locked-documents': PayloadLockedDocument;
@@ -96,6 +97,7 @@ export interface Config {
     'lead-exports': LeadExportsSelect<false> | LeadExportsSelect<true>;
     'marketing-reports': MarketingReportsSelect<false> | MarketingReportsSelect<true>;
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
+    'dashboard-visits': DashboardVisitsSelect<false> | DashboardVisitsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -740,6 +742,33 @@ export interface PushSubscription {
   createdAt: string;
 }
 /**
+ * Cada vez que alguien de Notoriovs entró al Dashboard de un cliente desde el panel. Solo lectura.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "dashboard-visits".
+ */
+export interface DashboardVisit {
+  id: number;
+  tenant?: (number | null) | Tenant;
+  user?: (number | null) | User;
+  userEmail: string;
+  ticketHash: string;
+  ticketExpiresAt: string;
+  /**
+   * Vacío si el enlace se emitió pero nunca se abrió.
+   */
+  enteredAt?: string | null;
+  sessionHash?: string | null;
+  sessionExpiresAt?: string | null;
+  /**
+   * Vacío si la sesión venció sola en vez de cerrarse con "Salir".
+   */
+  endedAt?: string | null;
+  returnUrl: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -794,6 +823,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'push-subscriptions';
         value: number | PushSubscription;
+      } | null)
+    | ({
+        relationTo: 'dashboard-visits';
+        value: number | DashboardVisit;
       } | null)
     | ({
         relationTo: 'payload-folders';
@@ -1202,6 +1235,24 @@ export interface PushSubscriptionsSelect<T extends boolean = true> {
       };
   userAgent?: T;
   notificationTypes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "dashboard-visits_select".
+ */
+export interface DashboardVisitsSelect<T extends boolean = true> {
+  tenant?: T;
+  user?: T;
+  userEmail?: T;
+  ticketHash?: T;
+  ticketExpiresAt?: T;
+  enteredAt?: T;
+  sessionHash?: T;
+  sessionExpiresAt?: T;
+  endedAt?: T;
+  returnUrl?: T;
   updatedAt?: T;
   createdAt?: T;
 }

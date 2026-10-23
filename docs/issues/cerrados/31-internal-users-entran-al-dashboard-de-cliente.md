@@ -28,17 +28,24 @@ panel solo en su propio host): el salto entre hosts que este issue construye es
 justo lo que 28 vuelve obligatorio, y las dos reglas de host tienen que quedar
 declaradas en el mismo lugar del middleware.
 
-**Status:** ready-for-agent
+**Status:** done — validado en local el 2026-10-22 con un ticket emitido por
+script para `tenant-prueba` (superadmin): el ticket en el host de `ntrs` da 403
+sin cookie; en su host abre el dashboard, sin "Yo" en el
+filtro y sin Notificaciones; "Salir y volver al panel" cierra la entrada y
+regresa a la ficha del Tenant; reusar el ticket da 403. **No probado en el
+navegador:** el botón "Entrar al Dashboard" del panel (no hubo sesión del panel
+en la prueba). Falta la migración `20261022_224707_dashboard_visits` en
+producción, y después desplegar.
 
-- [ ] Un `superadmin` abre desde el panel el dashboard de cualquier Tenant y ve sus Leads y sus KPIs
-- [ ] Un `account-manager` puede hacerlo con un Tenant asignado, y con uno no asignado no entra (ni desde el panel ni tecleando la URL a mano)
-- [ ] Quitarle a un `account-manager` un Tenant asignado lo saca del dashboard de ese Tenant de inmediato, sin esperar a que expire nada
-- [ ] Estando dentro, hace todo lo que hace un `owner` —incluido borrar Leads y gestionar Usuarios de Cliente— salvo tocar la facturación
-- [ ] Estando dentro, la pantalla dice de forma visible de qué cliente es el dashboard y que se está viendo como equipo de Notoriovs
-- [ ] La sesión interna no se puede reusar para otro Tenant: llevarse el token o la cookie al host de otro cliente no entra
-- [ ] Un Tenant User no gana nada con esto: sus permisos y su alcance quedan igual que hoy
-- [ ] Salir devuelve al panel y no deja viva la sesión del dashboard
-- [ ] Si el issue 38 ya existe: estando dentro, ve el filtro por Responsable y asigna como un `owner`. Un Internal User nunca es Responsable (solo lo son Tenant Users), así que la opción "Yo" del filtro no le aparece
+- [x] Un `superadmin` abre desde el panel el dashboard de cualquier Tenant y ve sus Leads y sus KPIs
+- [x] Un `account-manager` puede hacerlo con un Tenant asignado, y con uno no asignado no entra (ni desde el panel ni tecleando la URL a mano)
+- [x] Quitarle a un `account-manager` un Tenant asignado lo saca del dashboard de ese Tenant de inmediato, sin esperar a que expire nada
+- [x] Estando dentro, hace todo lo que hace un `owner` —incluido borrar Leads y gestionar Usuarios de Cliente— salvo tocar la facturación
+- [ ] ~~Estando dentro, la pantalla dice de forma visible de qué cliente es el dashboard y que se está viendo como equipo de Notoriovs~~ — se descartó: la franja que lo decía se quitó a pedido el 2026-10-22. Lo que queda es el nombre del cliente en la barra y el correo de Notoriovs en el menú de cuenta
+- [x] La sesión interna no se puede reusar para otro Tenant: llevarse el token o la cookie al host de otro cliente no entra
+- [x] Un Tenant User no gana nada con esto: sus permisos y su alcance quedan igual que hoy
+- [x] Salir devuelve al panel y no deja viva la sesión del dashboard
+- [x] Si el issue 38 ya existe: estando dentro, ve el filtro por Responsable y asigna como un `owner`. Un Internal User nunca es Responsable (solo lo son Tenant Users), así que la opción "Yo" del filtro no le aparece
 
 ## Notas
 
@@ -117,3 +124,33 @@ Este issue cae de lleno en dos de las tres áreas que este repo sí prueba
 (CLAUDE.md): autorización del dashboard y aislamiento entre tenants. Como
 mínimo: account manager sin asignación no entra, ticket de un Tenant no sirve
 en el host de otro, y la asignación revocada corta la sesión viva.
+
+## Cómo quedó
+
+- **Traspaso.** Botón "Entrar al Dashboard" en la ficha del Tenant
+  (`TenantPreviewLinks`, en lugar del viejo "Ver Dashboard") → `POST
+  /api/internal-dashboard/enter` (solo en el host del panel, declarado en el
+  middleware junto a la regla del 28) emite el ticket y redirige al host del
+  Tenant → `GET /api/tenant-dashboard/internal-session` lo canjea por la cookie
+  `notoriovs-internal-token` y manda a `/dashboard`.
+- **Ticket, sesión y bitácora** son el mismo documento de la colección nueva
+  `dashboard-visits` (solo lectura en el panel; el account manager ve las de sus
+  Tenants). Ticket de un minuto y un solo uso; sesión de 8 horas. Solo se guarda
+  el hash de cada token.
+- **Autorización en cada petición** (`resolveDashboardAuth`): el ticket tiene
+  que ser del Tenant del host, y el Internal User se relee de la base y tiene que
+  seguir pudiendo entrar (`canInternalUserEnterTenant`).
+- **Orden de resolución:** primero la sesión interna, luego la de Tenant User.
+  Una interna que ya no vale no tapa a la del cliente. "Salir" cierra solo la
+  interna.
+- **Permisos:** `internalSessionCan` = los de `owner` menos `billing:manage`,
+  aparte de `PERMISSIONS`. `users:manage` sigue el mismo interruptor que para un
+  owner (`TENANT_USER_MANAGEMENT_ENABLED`, hoy apagado).
+- **Decidido aquí — Tenant inactivo:** al equipo no se le cierra. Se resuelve
+  con `getTenantBySubdomain(..., { includeInactive: true })`, que solo piden
+  `resolveDashboardAuth` y las rutas ya autorizadas con sesión interna. La lista
+  `ACTIVE_ONLY_TENANT_PROJECTIONS` no cambió.
+- **Decidido aquí — lo que no aplica a un Internal User:** no es Responsable
+  (sin "Yo", sin "Tomarlo"), no tiene Notificaciones push (las rutas de push le
+  responden 403), y al exportar CSV `exportedBy` queda vacío con su correo en
+  `exportedByEmail`.

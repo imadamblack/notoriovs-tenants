@@ -13,6 +13,11 @@ import { isNotificationType, type NotificationType } from '@/notifications/catal
 // Un dispositivo es privado de quien lo dio de alta, no compartido por
 // Tenant: cada ruta compara `tenant` Y `tenantUser` contra la sesión.
 
+// Un dispositivo es de un Tenant User. Una sesión del equipo de Notoriovs
+// (issue 31) no recibe las notificaciones del cliente: no tiene dispositivos.
+const internalSessionHasNoDevices = () =>
+  NextResponse.json({ error: 'Las notificaciones son de cada usuario del cliente' }, { status: 403 })
+
 function toText(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() || undefined : undefined
 }
@@ -23,6 +28,7 @@ function toText(value: unknown): string | undefined {
 export async function GET(req: NextRequest) {
   const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (auth.session.kind !== 'tenant-user') return internalSessionHasNoDevices()
 
   const payload = await getPayload({ config })
   const result = await payload.find({
@@ -64,6 +70,7 @@ export async function POST(req: NextRequest) {
 
   const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (auth.session.kind !== 'tenant-user') return internalSessionHasNoDevices()
 
   const endpoint = toText(body?.endpoint)
   const p256dh = toText(body?.keys?.p256dh)
@@ -116,6 +123,7 @@ export async function DELETE(req: NextRequest) {
 
   const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (auth.session.kind !== 'tenant-user') return internalSessionHasNoDevices()
   if (!endpoint) return NextResponse.json({ error: 'Falta endpoint' }, { status: 400 })
 
   const payload = await getPayload({ config })
@@ -155,6 +163,7 @@ export async function PATCH(req: NextRequest) {
   const { id, notificationTypes } = body || {}
   const auth = await requireDashboardAuth(req)
   if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (auth.session.kind !== 'tenant-user') return internalSessionHasNoDevices()
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
 
   if (!Array.isArray(notificationTypes) || !notificationTypes.every(isNotificationType)) {

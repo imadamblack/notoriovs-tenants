@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getTenantBySubdomain } from '@/utils/getTenant'
-import { requireDashboardAuth } from '@/utils/requireDashboardAuth'
+import { requireDashboardAuth, seesInactiveTenant, tenantUserIdOf } from '@/utils/requireDashboardAuth'
 import { buildLeadsWhere, describeLeadFilters, readLeadFilters } from '@/utils/leadDashboardFilters'
 import {
   buildLeadCsvColumns,
@@ -46,10 +46,12 @@ export async function GET(req: NextRequest) {
   // El pipeline (para la columna "Etapa") y el quiz (para las columnas de
   // respuestas) del tenant que autorizó el host, nunca uno pedido por el
   // cliente.
-  const tenant = await getTenantBySubdomain(subdomain, 'dashboardQuiz')
+  const tenant = await getTenantBySubdomain(subdomain, 'dashboardQuiz', {
+    includeInactive: seesInactiveTenant(session),
+  })
   if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const filters = readLeadFilters(req.nextUrl.searchParams, session.userId)
+  const filters = readLeadFilters(req.nextUrl.searchParams, tenantUserIdOf(session))
   // La etapa se descarta: en el Kanban están abiertas todas las columnas a
   // la vez, así que "lo que estoy viendo" es el tablero completo.
   const where = buildLeadsWhere(tenant, { ...filters, stage: undefined })
@@ -70,7 +72,9 @@ export async function GET(req: NextRequest) {
     collection: 'lead-exports',
     data: {
       tenant: Number(tenant.id),
-      exportedBy: session.userId as number,
+      // Vacío si exportó alguien de Notoriovs desde el panel (issue 31): no es
+      // Tenant User. Su correo queda abajo, y su entrada en `dashboard-visits`.
+      exportedBy: (tenantUserIdOf(session) as number | null) ?? undefined,
       exportedByEmail: session.email,
       leadCount: totalDocs,
       filtersLabel: describeLeadFilters(filters, memberName),

@@ -11,7 +11,7 @@ import { assigneeIdOf, assigneeLabelOf } from '@/components/dashboard/leadAssign
 type LeadAssigneeControlProps = {
   lead: Lead
   members: TenantMember[]
-  viewerId: string | number
+  viewerId: string | number | null
   /** Repartir a cualquiera (`owner`) o solo tomar/soltar el propio (`member`). */
   canAssignLeads: boolean
   onSave: (patch: Partial<Lead>) => Promise<boolean>
@@ -36,7 +36,7 @@ export default function LeadAssigneeControl({
 
   const currentId = assigneeIdOf(lead)
   const currentLabel = assigneeLabelOf(lead, members)
-  const isMine = currentId !== null && currentId === String(viewerId)
+  const isMine = currentId !== null && viewerId !== null && currentId === String(viewerId)
 
   const save = async (next: string | number | null) => {
     setSaving(true)
@@ -83,7 +83,7 @@ export default function LeadAssigneeControl({
             ) : (
               <span className="text-neutral-400 -ft-1">Sin asignar</span>
             )}
-            {currentId === null && (
+            {currentId === null && viewerId !== null && (
               <Button variant="secondary" size="sm" disabled={saving} onClick={() => save(viewerId)}>
                 {saving ? 'Guardando…' : 'Tomarlo'}
               </Button>

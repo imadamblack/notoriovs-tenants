@@ -26,6 +26,12 @@ vi.mock('@/utils/tenantUserAuth', () => ({
   getTenantUserSession: (...args: unknown[]) => getTenantUserSession(...args),
 }))
 
+// Aquí exporta un Tenant User; la sesión del equipo interno (issue 31) se
+// prueba en dashboardAuth.
+vi.mock('@/utils/internalDashboardSession', () => ({
+  getInternalDashboardSession: async () => null,
+}))
+
 // Las personas del Tenant (columna "Responsable") se leen con su propia
 // consulta; aquí se fijan para que `find` quede solo para los leads.
 vi.mock('@/utils/tenantMembers', () => ({

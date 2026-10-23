@@ -9,8 +9,10 @@ import { Tenants } from '@/collections/Tenants'
 import {
   canChangeAssignee,
   normalizeTenantUserRole,
+  permissionsForRole,
   roleCan,
   TENANT_USER_MANAGEMENT_ENABLED,
+  type DashboardPermission,
 } from '@/access/tenantUserPermissions'
 import { assertAssigneeInLeadTenant } from '@/collections/leadAssignee'
 
@@ -22,6 +24,7 @@ import { assertAssigneeInLeadTenant } from '@/collections/leadAssignee'
 // cliente y los de otro.
 const getTenantBySubdomain = vi.fn()
 const getTenantUserSession = vi.fn()
+const getInternalDashboardSession = vi.fn()
 const loginTenantUser = vi.fn()
 const requestPasswordReset = vi.fn()
 const resetPasswordWithToken = vi.fn()
@@ -33,6 +36,14 @@ vi.mock('@/utils/getTenant', () => ({
 vi.mock('@/utils/tenantUserAuth', () => ({
   getTenantUserSession: (...args: unknown[]) => getTenantUserSession(...args),
   loginTenantUser: (...args: unknown[]) => loginTenantUser(...args),
+}))
+
+// La sesión interna (issue 31) se lee de `dashboard-visits` y del Internal
+// User vivo; aquí llega ya leída, y lo que se prueba es la regla que decide si
+// abre ESTE dashboard. La del ticket (`ticketOpensTenant`) es pura y se prueba
+// de verdad.
+vi.mock('@/utils/internalDashboardSession', () => ({
+  getInternalDashboardSession: (...args: unknown[]) => getInternalDashboardSession(...args),
 }))
 
 vi.mock('@/utils/tenantUserAccount', () => ({
@@ -48,7 +59,10 @@ vi.mock('@/utils/tenantSessionCookie', () => ({
     res.cookies.set('notoriovs-tenant-token', token),
 }))
 
-const { resolveDashboardAuth, sessionCan } = await import('@/utils/requireDashboardAuth')
+const { resolveDashboardAuth, sessionCan, sessionCanChangeAssignee, sessionPermissions, tenantUserIdOf } =
+  await import('@/utils/requireDashboardAuth')
+const { ticketOpensTenant } = await import('@/utils/dashboardTicket')
+const { canInternalUserEnterTenant } = await import('@/access/internalRoles')
 const { findLeadOfTenant, buildBulkLeadsWhere, buildLeadsWhere, readBulkLeadIds, readLeadFilters, MAX_BULK_LEADS } =
   await import('@/utils/leadDashboardFilters')
 const { resolveStageAndStatus } = await import('@/utils/leadStageStatus')
@@ -73,6 +87,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   getTenantBySubdomain.mockResolvedValue(ACME)
   getTenantUserSession.mockResolvedValue(null)
+  getInternalDashboardSession.mockResolvedValue(null)
 })
 
 // El subdominio ya no es un argumento: `resolveDashboardAuth` lo saca del
@@ -108,7 +123,7 @@ describe('autorización del dashboard', () => {
     expect(getTenantBySubdomain).toHaveBeenCalledWith('acme', 'dashboardApi')
     expect(auth?.tenant).toBe(ACME)
     expect(auth?.subdomain).toBe('acme')
-    expect(auth?.session).toEqual({ userId: 7, email: 'cliente@acme.com', role: 'owner' })
+    expect(auth?.session).toEqual({ kind: 'tenant-user', userId: 7, email: 'cliente@acme.com', role: 'owner' })
   })
 
   // El caso que justifica toda esta capa: la sesión es legítima, pero es de
@@ -147,6 +162,145 @@ describe('autorización del dashboard', () => {
     getTenantUserSession.mockResolvedValue(tenantUser(1))
 
     expect(await resolveDashboardAuth(onAcme)).toBeNull()
+  })
+})
+
+/** Una sesión interna abierta con un ticket del Tenant `tenantId`, de este Internal User. */
+const internalSession = (tenantId: number, user: Record<string, unknown> | null) => ({
+  visitId: 40,
+  tenantId,
+  user: user && { id: 3, email: 'equipo@notoriovs.com', collection: 'users', ...user },
+})
+
+const superadmin = { role: 'superadmin' }
+const accountManagerOf = (...tenantIds: number[]) => ({
+  role: 'account-manager',
+  tenants: tenantIds.map((tenant) => ({ tenant })),
+})
+
+// Issue 31: alguien de Notoriovs entra al dashboard de un cliente desde el
+// panel. El ticket dice a qué Tenant se emitió, pero quien manda es el host; y
+// el Internal User se vuelve a leer en cada petición.
+describe('el equipo interno entra al dashboard de un cliente', () => {
+  it('un superadmin entra al de cualquier Tenant, como equipo y no como Tenant User', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, superadmin))
+
+    const auth = await resolveDashboardAuth(onAcme)
+
+    expect(auth?.tenant).toBe(ACME)
+    expect(auth?.session).toEqual({ kind: 'internal', internalUserId: 3, email: 'equipo@notoriovs.com', visitId: 40 })
+    expect(auth && tenantUserIdOf(auth.session)).toBeNull()
+  })
+
+  it('un account manager entra a un Tenant asignado', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, accountManagerOf(5, 1)))
+
+    expect((await resolveDashboardAuth(onAcme))?.session.kind).toBe('internal')
+  })
+
+  // El mismo caso cubre "quitarle el Tenant lo saca de inmediato": el usuario
+  // llega leído en esta petición, así que sin la asignación ya no entra.
+  it('un account manager sin ese Tenant asignado no entra, aunque traiga un ticket de ese Tenant', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, accountManagerOf(5)))
+
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
+  })
+
+  it('un Internal User borrado no entra', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, null))
+
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
+  })
+
+  it('la sesión de un Tenant no sirve en el host de otro, ni para un superadmin', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(2, superadmin))
+
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
+  })
+
+  it('un Tenant User con la cookie de otro no se vuelve interno', async () => {
+    // Lo que se lleva a otro host es el token; el usuario detrás sigue siendo
+    // un Tenant User, y la regla interna exige la colección `users`.
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, { collection: 'tenant-users', role: 'owner' }))
+
+    expect(await resolveDashboardAuth(onAcme)).toBeNull()
+  })
+
+  it('una sesión interna que ya no vale deja pasar a la del Tenant User del mismo navegador', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, accountManagerOf()))
+    getTenantUserSession.mockResolvedValue(tenantUser(1, 'member'))
+
+    expect((await resolveDashboardAuth(onAcme))?.session.kind).toBe('tenant-user')
+  })
+
+  it('con las dos sesiones vigentes, gana la interna', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, superadmin))
+    getTenantUserSession.mockResolvedValue(tenantUser(1, 'member'))
+
+    expect((await resolveDashboardAuth(onAcme))?.session.kind).toBe('internal')
+  })
+
+  it('al equipo un Tenant inactivo no le cierra el dashboard; al Tenant User sí', async () => {
+    getInternalDashboardSession.mockResolvedValue(internalSession(1, superadmin))
+    await resolveDashboardAuth(onAcme)
+    expect(getTenantBySubdomain).toHaveBeenCalledWith('acme', 'dashboardApi', { includeInactive: true })
+
+    getTenantBySubdomain.mockClear()
+    getInternalDashboardSession.mockResolvedValue(null)
+    getTenantUserSession.mockResolvedValue(tenantUser(1))
+    await resolveDashboardAuth(onAcme)
+    expect(getTenantBySubdomain).toHaveBeenCalledWith('acme', 'dashboardApi')
+  })
+
+  it('adentro puede todo lo de un owner menos la facturación', async () => {
+    const internal = { kind: 'internal', internalUserId: 3, email: 'equipo@notoriovs.com', visitId: 40 } as const
+    const permissions: DashboardPermission[] = [
+      'leads:read',
+      'leads:update',
+      'leads:delete',
+      'leads:assign',
+      'kpis:read',
+      'users:manage',
+    ]
+
+    for (const permission of permissions) {
+      expect(sessionCan(internal, permission), permission).toBe(roleCan('owner', permission))
+    }
+    expect(sessionCan(internal, 'billing:manage')).toBe(false)
+    expect(sessionPermissions(internal)).toEqual(permissionsForRole('owner'))
+    expect(sessionCanChangeAssignee(internal, 7, 8)).toBe(true)
+  })
+})
+
+describe('el ticket de traspaso al dashboard', () => {
+  const now = Date.parse('2026-10-22T12:00:00Z')
+  const fresh = { tenant: 1, ticketExpiresAt: '2026-10-22T12:00:30Z', enteredAt: null }
+
+  it('abre el dashboard del Tenant para el que se emitió', () => {
+    expect(ticketOpensTenant(fresh, 1, now)).toBe(true)
+    expect(ticketOpensTenant({ ...fresh, tenant: { id: 1 } }, '1', now)).toBe(true)
+  })
+
+  it('el de un Tenant no abre el de otro', () => {
+    expect(ticketOpensTenant(fresh, 2, now)).toBe(false)
+  })
+
+  it('es de un solo uso', () => {
+    expect(ticketOpensTenant({ ...fresh, enteredAt: '2026-10-22T11:59:50Z' }, 1, now)).toBe(false)
+  })
+
+  it('vence', () => {
+    expect(ticketOpensTenant({ ...fresh, ticketExpiresAt: '2026-10-22T11:59:59Z' }, 1, now)).toBe(false)
+  })
+
+  it('lo emite solo quien puede entrar a ese Tenant', () => {
+    const user = { collection: 'users', id: 3 }
+    expect(canInternalUserEnterTenant({ ...user, ...superadmin }, 9)).toBe(true)
+    expect(canInternalUserEnterTenant({ ...user, ...accountManagerOf(1) }, 1)).toBe(true)
+    expect(canInternalUserEnterTenant({ ...user, ...accountManagerOf(1) }, 9)).toBe(false)
+    expect(canInternalUserEnterTenant({ ...user, role: 'account-manager' }, 1)).toBe(false)
+    expect(canInternalUserEnterTenant({ collection: 'tenant-users', role: 'superadmin' }, 1)).toBe(false)
+    expect(canInternalUserEnterTenant(null, 1)).toBe(false)
   })
 })
 
@@ -554,7 +708,7 @@ describe('qué puede hacer cada rol dentro del dashboard', () => {
 
     const auth = await resolveDashboardAuth(onAcme)
 
-    expect(auth?.session.role).toBe('member')
+    expect(auth?.session.kind === 'tenant-user' && auth.session.role).toBe('member')
     expect(auth && sessionCan(auth.session, 'leads:delete')).toBe(false)
   })
 })

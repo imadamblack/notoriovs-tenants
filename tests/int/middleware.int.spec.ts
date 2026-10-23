@@ -1,4 +1,6 @@
 // @vitest-environment node
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -84,8 +86,80 @@ describe('middleware', () => {
     expect(destination(res)).toBeNull()
   })
 
-  it('admin y API de Payload pasan directo desde cualquier host', () => {
-    expect(destination(middleware(request('acme.notoriovs.com', '/admin')))).toBeNull()
-    expect(destination(middleware(request('acme.notoriovs.com', '/api/quiz-submit')))).toBeNull()
+  describe('qué rutas viven en qué host (issue 28)', () => {
+    it('en el host de un tenant, el panel y la API de Payload no existen', () => {
+      for (const path of [
+        '/admin',
+        '/admin/login',
+        '/admin/forgot',
+        '/api/users/login',
+        '/api/users/forgot-password',
+        '/api/tenants',
+        '/api/tenant-users/login',
+        '/api/leads',
+        '/api/marketing-reports',
+        '/api/graphql',
+        '/api/graphql-playground',
+        // El ticket del traspaso al dashboard (issue 31) se emite en el panel.
+        '/api/internal-dashboard/enter',
+      ]) {
+        expect(middleware(request('acme.notoriovs.com', path)).status, path).toBe(404)
+      }
+    })
+
+    it('en el host del panel, el panel y la API de Payload pasan directo', () => {
+      for (const host of ['admin.notoriovs.com', 'notoriovs.com', 'localhost:3000']) {
+        for (const path of [
+          '/admin',
+          '/admin/collections/tenants',
+          '/api/tenants',
+          '/api/graphql',
+          '/api/internal-dashboard/enter',
+        ]) {
+          const res = middleware(request(host, path))
+          expect(res.status, `${host}${path}`).toBe(200)
+          expect(destination(res), `${host}${path}`).toBeNull()
+        }
+      }
+    })
+
+    it('en local, acme.localhost es host de tenant y localhost el del panel', () => {
+      expect(middleware(request('acme.localhost:3000', '/admin')).status).toBe(404)
+      expect(middleware(request('localhost:3000', '/admin')).status).toBe(200)
+    })
+
+    // La lista de rutas propias vive en el middleware; si alguien agrega una en
+    // src/app/api y no la declara, su host de tenant le contestaría 404. Las de
+    // /api/internal-dashboard son del panel a propósito.
+    it('toda ruta propia de src/app/api sigue respondiendo en el host del tenant', () => {
+      const apiDir = path.resolve(__dirname, '../../src/app/api')
+      const routes = fs
+        .readdirSync(apiDir, { recursive: true, encoding: 'utf8' })
+        .filter((file) => file.endsWith('route.ts'))
+        .map((file) => `/api/${path.dirname(file).split(path.sep).join('/')}`)
+        .map((route) => route.replace(/\[[^\]]+\]/g, '123'))
+        .filter((route) => !route.startsWith('/api/internal-dashboard/'))
+
+      expect(routes).toContain('/api/tenant-dashboard/leads/123')
+      expect(routes).toContain('/api/tenant-dashboard/internal-session')
+      for (const route of routes) {
+        const res = middleware(request('acme.notoriovs.com', route))
+        expect(res.status, route).toBe(200)
+        expect(destination(res), route).toBeNull()
+      }
+    })
+
+    it('los archivos de Media sin blob se sirven en el host del tenant', () => {
+      const res = middleware(request('acme.notoriovs.com', '/api/media/file/logo.png'))
+
+      expect(res.status).toBe(200)
+      expect(destination(res)).toBeNull()
+    })
+
+    it('una página del tenant que empieza con "admin" no es el panel', () => {
+      const res = middleware(request('acme.notoriovs.com', '/administracion'))
+
+      expect(destination(res)).toBe('https://acme.notoriovs.com/tenant-site/acme/administracion')
+    })
   })
 })

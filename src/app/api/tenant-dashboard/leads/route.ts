@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireDashboardAuth, requireDashboardTenant, sessionCan } from '@/utils/requireDashboardAuth'
+import {
+  requireDashboardAuth,
+  requireDashboardTenant,
+  seesInactiveTenant,
+  sessionCan,
+  sessionCanChangeAssignee,
+  tenantUserIdOf,
+} from '@/utils/requireDashboardAuth'
 import { buildLeadsWhere, findLeadOfTenant, readAssigneeValue, readLeadFilters } from '@/utils/leadDashboardFilters'
-import { canChangeAssignee } from '@/access/tenantUserPermissions'
 import { relationId } from '@/collections/leadAssignee'
 import { isTenantMember, listTenantMembers } from '@/utils/tenantMembers'
 import { getTenantBySubdomain } from '@/utils/getTenant'
@@ -56,7 +62,7 @@ export async function GET(req: NextRequest) {
   const payload = await getPayload({ config })
   const result = await payload.find({
     collection: 'leads',
-    where: buildLeadsWhere(tenant, readLeadFilters(params, session.userId)),
+    where: buildLeadsWhere(tenant, readLeadFilters(params, tenantUserIdOf(session))),
     sort,
     page,
     limit,
@@ -241,7 +247,7 @@ export async function PATCH(req: NextRequest) {
     if (next !== null && !isTenantMember(await listTenantMembers(payload, tenant.id), next)) {
       return NextResponse.json({ error: 'Esa persona no es de este equipo' }, { status: 400 })
     }
-    if (!canChangeAssignee(auth.session.role, auth.session.userId, relationId(lead.assignee), next)) {
+    if (!sessionCanChangeAssignee(auth.session, relationId(lead.assignee), next)) {
       return NextResponse.json(
         { error: 'Tu rol solo permite tomar leads sin asignar o soltar los tuyos' },
         { status: 403 },
@@ -258,7 +264,9 @@ export async function PATCH(req: NextRequest) {
   // demás. El quiz se carga solo en este caso: las decenas de PATCH que mueven
   // una tarjeta de columna no tienen por qué pagarlo.
   if ('answers' in (body || {})) {
-    const tenantQuiz = await getTenantBySubdomain(auth.subdomain, 'dashboardQuiz')
+    const tenantQuiz = await getTenantBySubdomain(auth.subdomain, 'dashboardQuiz', {
+      includeInactive: seesInactiveTenant(auth.session),
+    })
     const merged = mergeAnswersPatch({
       current: readAnswers(lead.answers),
       patch: body.answers,
