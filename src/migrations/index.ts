@@ -12,6 +12,7 @@ import * as migration_20260918_213811_meta_ad_account_id_en_tenants from './2026
 import * as migration_20260919_215911_media_original_filename from './20260919_215911_media_original_filename';
 import * as migration_20260919_232839_push_subscriptions from './20260919_232839_push_subscriptions';
 import * as migration_20260925_005421_responsable_de_lead from './20260925_005421_responsable_de_lead';
+import * as migration_20261022_224707_dashboard_visits from './20261022_224707_dashboard_visits';
 
 export const migrations = [
   {
@@ -82,6 +83,11 @@ export const migrations = [
   {
     up: migration_20260925_005421_responsable_de_lead.up,
     down: migration_20260925_005421_responsable_de_lead.down,
-    name: '20260925_005421_responsable_de_lead'
+    name: '20260925_005421_responsable_de_lead',
+  },
+  {
+    up: migration_20261022_224707_dashboard_visits.up,
+    down: migration_20261022_224707_dashboard_visits.down,
+    name: '20261022_224707_dashboard_visits'
   },
 ];

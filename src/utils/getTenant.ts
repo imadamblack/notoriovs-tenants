@@ -286,6 +286,15 @@ export type TenantView<K extends TenantProjectionName> = Projected<
 >
 
 /**
+ * Excepción a ACTIVE_ONLY_TENANT_PROJECTIONS, y la única: una sesión del
+ * equipo de Notoriovs en el dashboard de un cliente (issue 31) resuelve el
+ * Tenant aunque esté inactivo. Entrar a ver qué pasó es justo lo que se hace
+ * cuando un cliente se cae. Quien la pide es `resolveDashboardAuth` y las rutas
+ * que ya la pasaron, nunca una página pública.
+ */
+export type TenantLookupOptions = { includeInactive?: boolean }
+
+/**
  * La consulta que resuelve un tenant por subdominio con una proyección dada.
  * Separada de la ejecución para poder afirmarla en un test sin base de datos.
  *
@@ -293,11 +302,15 @@ export type TenantView<K extends TenantProjectionName> = Projected<
  * de un Tenant inactivo se sigue sirviendo (ver
  * ACTIVE_ONLY_TENANT_PROJECTIONS).
  */
-export function buildTenantQuery(subdomain: string, projection: TenantProjectionName) {
+export function buildTenantQuery(
+  subdomain: string,
+  projection: TenantProjectionName,
+  options: TenantLookupOptions = {},
+) {
   const { depth, select } = TENANT_PROJECTIONS[projection]
-  const onlyActive = (ACTIVE_ONLY_TENANT_PROJECTIONS as readonly TenantProjectionName[]).includes(
-    projection,
-  )
+  const onlyActive =
+    !options.includeInactive &&
+    (ACTIVE_ONLY_TENANT_PROJECTIONS as readonly TenantProjectionName[]).includes(projection)
 
   return {
     collection: 'tenants' as const,
@@ -318,9 +331,10 @@ const findTenant = cache(
   async (
     subdomain: string,
     projection: TenantProjectionName,
+    includeInactive: boolean,
   ): Promise<Partial<TenantDoc> | null> => {
     const payload = await getPayload({ config })
-    const { docs } = await payload.find(buildTenantQuery(subdomain, projection))
+    const { docs } = await payload.find(buildTenantQuery(subdomain, projection, { includeInactive }))
     return (docs[0] as Partial<TenantDoc>) ?? null
   },
 )
@@ -333,10 +347,11 @@ const findTenant = cache(
 export async function getTenantBySubdomain<K extends TenantProjectionName>(
   subdomain: string,
   projection: K,
+  options: TenantLookupOptions = {},
 ): Promise<TenantView<K> | null> {
   if (!subdomain) return null
 
-  return (await findTenant(subdomain, projection)) as TenantView<K> | null
+  return (await findTenant(subdomain, projection, Boolean(options.includeInactive))) as TenantView<K> | null
 }
 
 /** ¿Este tenant tiene al menos un Tenant User que pueda entrar con su email? */

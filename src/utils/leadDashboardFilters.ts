@@ -76,7 +76,7 @@ export const ASSIGNEE_NONE = 'none'
  * Lee los filtros de la URL. `viewerId` es el Tenant User de la sesión, para
  * traducir `assignee=me`: sale de la sesión, no de lo que diga el navegador.
  */
-export function readLeadFilters(params: URLSearchParams, viewerId?: string | number): LeadFilters {
+export function readLeadFilters(params: URLSearchParams, viewerId?: string | number | null): LeadFilters {
   return {
     stage: params.get('stage')?.trim() || undefined,
     status: params.get('status')?.trim() || undefined,
@@ -86,10 +86,11 @@ export function readLeadFilters(params: URLSearchParams, viewerId?: string | num
   }
 }
 
-function readAssigneeFilter(raw: string | null, viewerId?: string | number): string | undefined {
+function readAssigneeFilter(raw: string | null, viewerId?: string | number | null): string | undefined {
   const value = raw?.trim()
   if (!value) return undefined
-  if (value === ASSIGNEE_ME) return viewerId === undefined ? undefined : String(viewerId)
+  // Una sesión del equipo interno no tiene "Yo" (issue 31): no es Responsable de nada.
+  if (value === ASSIGNEE_ME) return viewerId === undefined || viewerId === null ? undefined : String(viewerId)
   if (value === ASSIGNEE_NONE) return ASSIGNEE_NONE
   // Solo ids con forma de id: cualquier otra cosa llegaría a Postgres como un
   // valor que no se puede convertir a entero y tronaría la consulta entera.

@@ -24,7 +24,7 @@ type BulkLeadEditPanelProps = {
   leads: Lead[]
   pipeline: PipelineStage[]
   members: TenantMember[]
-  viewerId: string | number
+  viewerId: string | number | null
   /** Sin este permiso, el Responsable solo se toma para uno mismo o se suelta. */
   canAssignLeads: boolean
   onClose: () => void

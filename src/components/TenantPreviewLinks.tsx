@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useFormFields } from '@payloadcms/ui'
+import { useDocumentInfo, useFormFields } from '@payloadcms/ui'
 
 // Botones de preview en el sidebar de Tenants: el admin.livePreview nativo de
 // Payload solo admite una `url` fija por colección, así que no hay forma de
@@ -14,7 +14,6 @@ const VIEWS = [
   { label: 'Ver Quiz', path: '/survey' },
   { label: 'Ver Gracias', path: '/thankyou' },
   { label: 'Ver No Elegible', path: '/not-elegible' },
-  { label: 'Ver Dashboard', path: '/dashboard' },
 ]
 
 const btnStyle: React.CSSProperties = {
@@ -32,8 +31,33 @@ const btnStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
+/**
+ * POST de primer nivel a la ruta que emite el ticket de traspaso, que responde
+ * redirigiendo al host del Tenant (ver /api/internal-dashboard/enter). Se arma
+ * el formulario al vuelo porque este componente ya vive dentro del formulario
+ * del documento, y un `<form>` anidado el navegador lo ignora: el botón
+ * terminaría guardando el Tenant.
+ */
+function enterDashboard(tenantId: string | number) {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = '/api/internal-dashboard/enter'
+  form.target = '_blank'
+
+  const input = document.createElement('input')
+  input.type = 'hidden'
+  input.name = 'tenant'
+  input.value = String(tenantId)
+  form.appendChild(input)
+
+  document.body.appendChild(form)
+  form.submit()
+  form.remove()
+}
+
 export const TenantPreviewLinks: React.FC = () => {
   const subdomain = useFormFields(([fields]) => fields?.subdomain?.value) as string | undefined
+  const { id } = useDocumentInfo()
 
   if (!subdomain || typeof subdomain !== 'string') {
     return (
@@ -56,6 +80,14 @@ export const TenantPreviewLinks: React.FC = () => {
           {v.label} ↗
         </a>
       ))}
+      {/* El Dashboard no se previsualiza desde aquí: vive en el host del
+          cliente y pide sesión. Este botón entra como equipo de Notoriovs
+          (issue 31). Solo con el documento guardado: el ticket va atado a su id. */}
+      {id && (
+        <button type="button" onClick={() => enterDashboard(id)} style={{ ...btnStyle }}>
+          Entrar al Dashboard ↗
+        </button>
+      )}
     </div>
   )
 }

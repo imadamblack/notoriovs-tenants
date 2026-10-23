@@ -88,8 +88,17 @@ type DashboardAppProps = {
   accountEmail: string
   /** Lo que el rol de esta sesión permite. Resuelto en el servidor, ver `sessionPermissions`. */
   permissions: DashboardPermissions
-  /** El Tenant User de la sesión: el "Yo" del filtro por Responsable. */
-  viewerId: string | number
+  /**
+   * El Tenant User de la sesión: el "Yo" del filtro por Responsable. `null`
+   * cuando quien ve es del equipo de Notoriovs, que nunca es Responsable.
+   */
+  viewerId: string | number | null
+  /**
+   * Quien ve es del equipo de Notoriovs y entró desde el panel (issue 31). Sin
+   * Notificaciones, y "Salir" lo devuelve al panel. El menú de cuenta muestra
+   * su correo de Notoriovs; no hay franja aparte (se quitó a pedido).
+   */
+  internalViewer?: boolean
   /** Las personas del Tenant a las que se les puede asignar un Lead. */
   members: TenantMember[]
   pipeline: PipelineStage[]
@@ -109,6 +118,7 @@ export default function DashboardApp({
   accountEmail,
   permissions,
   viewerId,
+  internalViewer = false,
   members,
   pipeline,
   stuckAfterDays,
@@ -408,7 +418,13 @@ export default function DashboardApp({
   )
 
   const handleLogout = async () => {
-    await fetch('/api/tenant-dashboard/logout', { method: 'POST' })
+    const res = await fetch('/api/tenant-dashboard/logout', { method: 'POST' })
+    // Una sesión interna vuelve al panel desde el que entró.
+    const { returnUrl } = await res.json().catch(() => ({}))
+    if (typeof returnUrl === 'string') {
+      window.location.assign(returnUrl)
+      return
+    }
     router.refresh()
   }
 
@@ -421,7 +437,8 @@ export default function DashboardApp({
         onTabChange={setTab}
         onLogout={handleLogout}
         onManageUsers={permissions.canManageUsers ? () => setTeamOpen(true) : undefined}
-        onManageNotifications={() => setNotificationsOpen(true)}
+        onManageNotifications={internalViewer ? undefined : () => setNotificationsOpen(true)}
+        logoutLabel={internalViewer ? 'Salir y volver al panel' : undefined}
       />
 
       {/* Solo scroll vertical: el horizontal es cosa de cada sección que lo

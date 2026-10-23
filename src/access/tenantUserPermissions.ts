@@ -87,6 +87,23 @@ export function roleCan(role: TenantUserRole, permission: DashboardPermission): 
   return PERMISSIONS[role].has(permission)
 }
 
+// Lo que puede una sesión del equipo de Notoriovs dentro del dashboard de un
+// cliente (issue 31): todo lo de un `owner` menos la facturación. La
+// suscripción y la tarjeta son del cliente y nadie de Notoriovs las mueve
+// desde ahí.
+//
+// Vive aparte de `PERMISSIONS` a propósito: el equipo interno no es un rol del
+// cliente (ADR 0001), y meterlo en esa tabla es justo el error que el ADR
+// evita. No distingue superadmin de account manager: el rol interno decide a
+// QUÉ clientes entra (`canInternalUserEnterTenant`), no qué hace adentro.
+const INTERNAL_SESSION_PERMISSIONS: ReadonlySet<DashboardPermission> = new Set(
+  [...PERMISSIONS.owner].filter((permission) => permission !== 'billing:manage'),
+)
+
+export function internalSessionCan(permission: DashboardPermission): boolean {
+  return INTERNAL_SESSION_PERMISSIONS.has(permission)
+}
+
 /**
  * Los permisos ya resueltos, para mandárselos al cliente y que la UI no
  * ofrezca botones que la API va a rechazar. Es una conveniencia de pintado: la
@@ -99,12 +116,17 @@ export type DashboardPermissions = {
   canAssignLeads: boolean
 }
 
-export function permissionsForRole(role: TenantUserRole): DashboardPermissions {
+/** Los permisos de pintado a partir de la pregunta "¿puede X?" de una sesión. */
+export function resolvePermissions(can: (permission: DashboardPermission) => boolean): DashboardPermissions {
   return {
-    canDeleteLeads: roleCan(role, 'leads:delete'),
-    canManageUsers: roleCan(role, 'users:manage'),
-    canAssignLeads: roleCan(role, 'leads:assign'),
+    canDeleteLeads: can('leads:delete'),
+    canManageUsers: can('users:manage'),
+    canAssignLeads: can('leads:assign'),
   }
+}
+
+export function permissionsForRole(role: TenantUserRole): DashboardPermissions {
+  return resolvePermissions((permission) => roleCan(role, permission))
 }
 
 type AssigneeId = string | number | null | undefined

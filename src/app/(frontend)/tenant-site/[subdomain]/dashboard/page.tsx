@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { notFound } from 'next/navigation'
 import { getTenantBySubdomain, tenantHasDashboard } from '@/utils/getTenant'
-import { resolveDashboardAuth, sessionPermissions } from '@/utils/requireDashboardAuth'
+import { resolveDashboardAuth, sessionPermissions, tenantUserIdOf } from '@/utils/requireDashboardAuth'
 import DashboardLogin from '@/components/dashboard/DashboardLogin'
 import DashboardApp from '@/components/dashboard/DashboardApp'
 import DashboardUnavailable from '@/components/dashboard/DashboardUnavailable'
@@ -52,17 +52,22 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
   // Ningún dato del Tenant User se carga aquí: esta página se renderiza sin
   // sesión (es la que muestra el login), así que solo pregunta si el tenant
   // tiene a alguien que pueda entrar. Ver `tenantHasDashboard`.
-  const [hasDashboard, requestHeaders] = await Promise.all([
+  const [hasDashboard, auth] = await Promise.all([
     tenantHasDashboard(tenant.id),
-    headers(),
+    headers().then(resolveDashboardAuth),
   ])
 
-  if (!hasDashboard) {
+  // Alguien de Notoriovs que entró desde el panel (issue 31) ve el dashboard
+  // aunque el cliente esté inactivo o todavía no tenga usuarios: ver qué pasó
+  // es justo para lo que entra. `resolveDashboardAuth` ya lo autorizó contra
+  // este Tenant y contra su asignación.
+  const internalViewer = auth?.session.kind === 'internal'
+
+  if (!hasDashboard && !internalViewer) {
     return <DashboardUnavailable />
   }
 
   const companyName = tenant.generalInfo?.companyName || tenant.name
-  const auth = await resolveDashboardAuth(requestHeaders)
 
   if (!auth) {
     return <DashboardLogin companyName={companyName} />
@@ -80,7 +85,8 @@ export default async function TenantDashboardPage({ params }: DashboardPageProps
       accountEmail={auth.session.email}
       // Quién es "Yo" en el filtro por Responsable y a quién se asigna al
       // tomar un Lead. Las rutas no confían en esto: vuelven a leer la sesión.
-      viewerId={auth.session.userId}
+      viewerId={tenantUserIdOf(auth.session)}
+      internalViewer={internalViewer}
       members={members}
       // Qué puede hacer este rol, ya resuelto en el servidor. La interfaz lo
       // usa para no ofrecer botones que la API va a rechazar; quien decide de

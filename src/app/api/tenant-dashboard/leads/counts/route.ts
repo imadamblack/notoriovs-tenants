@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import type { Where } from 'payload'
 import config from '@payload-config'
-import { requireDashboardAuth } from '@/utils/requireDashboardAuth'
+import { requireDashboardAuth, tenantUserIdOf } from '@/utils/requireDashboardAuth'
 import { buildLeadsWhere, readLeadFilters } from '@/utils/leadDashboardFilters'
 
 // Conteo de leads por etapa del pipeline, para los badges de cantidad del
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   // Descalificados"), tiempo, búsqueda y Responsable que .../leads, para que el número
   // en el badge de cada columna sea el mismo conjunto de leads que esa
   // columna termina mostrando. La etapa no: aquí se cuenta una por una.
-  const filters = readLeadFilters(req.nextUrl.searchParams, session.userId)
+  const filters = readLeadFilters(req.nextUrl.searchParams, tenantUserIdOf(session))
   const baseAnd = (buildLeadsWhere(tenant, { ...filters, stage: undefined }).and ?? []) as Where[]
 
   const pipeline = tenant.leadPipeline || []

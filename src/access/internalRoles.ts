@@ -111,3 +111,19 @@ export function internalScopedToAssignedTenants(fieldName = 'tenant'): Access {
     return { [fieldName]: { in: ids } } as Where
   }
 }
+
+/**
+ * ¿Puede este Internal User entrar al Dashboard de Cliente de este Tenant
+ * (issue 31)? El mismo recorte que rige el panel: un superadmin entra a
+ * cualquiera, un account manager solo a los que tiene asignados.
+ *
+ * Se pregunta al emitir el ticket y otra vez en cada petición de la sesión,
+ * contra el documento vivo del usuario: quitarle el Tenant, degradarlo o
+ * borrarlo lo saca sin esperar a que expire nada.
+ */
+export function canInternalUserEnterTenant(user: MaybeInternalUser, tenantId: string | number): boolean {
+  if (user?.collection !== 'users') return false
+  if (isSuperadminUser(user)) return true
+
+  return assignedTenantIds(user).some((id) => String(id) === String(tenantId))
+}
